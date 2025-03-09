@@ -58,6 +58,7 @@ async function getDashboardData(pool) {
       'SELECT * FROM materials ORDER BY id DESC LIMIT 5'
     );
     
+    
     // Get material types distribution
     const [materialTypes] = await pool.query(
       'SELECT part_name, COUNT(*) as count FROM materials GROUP BY part_name'
