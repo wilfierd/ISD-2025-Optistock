@@ -76,7 +76,7 @@ body {
     }
 }
 
-/* Responsive adjustments */
+
 @media (max-width: 768px) {
     .btn-action {
         margin-bottom: 10px;
