@@ -1,0 +1,269 @@
+<!-- views/dashboard.ejs -->
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Inventory Management System</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .dashboard-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+            height: 100%;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+        }
+        .card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .dashboard-chart {
+            min-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .recent-items {
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .recent-item-row {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .recent-item-row:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <div class="d-flex">
+                <a class="navbar-brand" href="/dashboard">Dashboard</a>
+                <a class="navbar-brand" href="/materials">Nhà kho</a>
+                <a class="navbar-brand" href="/employees">Nhân viên</a>
+            </div>
+            <div class="d-flex align-items-center">
+                <span>Hi, <%= user.username %></span>
+                <div class="avatar"><%= user.username.charAt(0).toUpperCase() %></div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <h2 class="mb-4">Dashboard</h2>
+        
+        <!-- Stats Cards Row -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="dashboard-card bg-primary text-white p-4 text-center">
+                    <i class="fas fa-box card-icon"></i>
+                    <div class="stat-value">6</div>
+                    <div>Total Materials</div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="dashboard-card bg-success text-white p-4 text-center">
+                    <i class="fas fa-truck card-icon"></i>
+                    <div class="stat-value">2</div>
+                    <div>Suppliers</div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="dashboard-card bg-warning text-white p-4 text-center">
+                    <i class="fas fa-shopping-cart card-icon"></i>
+                    <div class="stat-value">12</div>
+                    <div>This Week's Orders</div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="dashboard-card bg-info text-white p-4 text-center">
+                    <i class="fas fa-users card-icon"></i>
+                    <div class="stat-value">5</div>
+                    <div>System Users</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="dashboard-chart bg-white">
+                    <h4>Material Types Distribution</h4>
+                    <canvas id="materialTypesChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="dashboard-chart bg-white">
+                    <h4>Monthly Inventory Changes</h4>
+                    <canvas id="inventoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Items -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="recent-items bg-white">
+                    <h4 class="mb-4">Recently Updated Materials</h4>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Packet No</th>
+                                    <th>Part Name</th>
+                                    <th>Dimensions</th>
+                                    <th>Quantity</th>
+                                    <th>Supplier</th>
+                                    <th>Updated By</th>
+                                    <th>Last Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td>Máy móc</td>
+                                    <td>3000 x 345 x 345</td>
+                                    <td>10</td>
+                                    <td>Khai</td>
+                                    <td>Khai</td>
+                                    <td>05/03/2025</td>
+                                </tr>
+                                <tr>
+                                    <td>1</td>
+                                    <td>Máy móc</td>
+                                    <td>3000 x 345 x 35</td>
+                                    <td>10</td>
+                                    <td>Khai</td>
+                                    <td>Khai</td>
+                                    <td>05/03/2025</td>
+                                </tr>
+                                <tr>
+                                    <td>1</td>
+                                    <td>xxxxxxxxxxxxxxxxxxxxxxxxx</td>
+                                    <td>3000 x 3455 x 2255</td>
+                                    <td>10</td>
+                                    <td>SHENZEN</td>
+                                    <td>Khai</td>
+                                    <td>05/03/2025</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-end mt-3">
+                        <a href="/materials" class="btn btn-primary">View All Materials</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="recent-items bg-white">
+                    <h4 class="mb-4">Quick Actions</h4>
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <a href="/materials" class="btn btn-outline-primary w-100">
+                                <i class="fas fa-boxes me-2"></i> Manage Materials
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="#" class="btn btn-outline-success w-100">
+                                <i class="fas fa-file-export me-2"></i> Export Inventory Report
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="#" class="btn btn-outline-warning w-100">
+                                <i class="fas fa-truck-loading me-2"></i> Register New Shipment
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <a href="#" class="btn btn-outline-info w-100">
+                                <i class="fas fa-user-plus me-2"></i> Add New User
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script>
+        // Initialize charts when the document is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Material Types Chart
+            const materialTypesCtx = document.getElementById('materialTypesChart').getContext('2d');
+            const materialTypesChart = new Chart(materialTypesCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Máy móc', 'Other'],
+                    datasets: [{
+                        data: [5, 1],
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 206, 86, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // Inventory Changes Chart
+            const inventoryCtx = document.getElementById('inventoryChart').getContext('2d');
+            const inventoryChart = new Chart(inventoryCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+                    datasets: [{
+                        label: 'Inventory Level',
+                        data: [42, 49, 55, 60, 66],
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
