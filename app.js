@@ -10,10 +10,10 @@ const PORT = process.env.PORT || 3000;
 
 // Database connection pool
 const pool = mysql.createPool({
-    host: process.env.DB_HOST ,
-    user: process.env.DB_USER ,
-    password: process.env.DB_PASSWORD ,
-    database: process.env.DB_NAME ,
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     port: process.env.DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: process.env.DB_CONNECTION_LIMIT || 10,
@@ -44,6 +44,15 @@ const isAuthenticated = (req, res, next) => {
   }
 };
 
+// API Authentication middleware
+const isAuthenticatedAPI = (req, res, next) => {
+  if (req.session.user) {
+    next();
+  } else {
+    res.status(401).json({ success: false, error: 'Not authenticated' });
+  }
+};
+
 // Function to get dashboard data
 async function getDashboardData(pool) {
   try {
@@ -60,7 +69,6 @@ async function getDashboardData(pool) {
       'SELECT * FROM materials ORDER BY id DESC LIMIT 5'
     );
     
-
     // Get material types distribution
     const [materialTypes] = await pool.query(
       'SELECT part_name, COUNT(*) as count FROM materials GROUP BY part_name'
@@ -76,13 +84,19 @@ async function getDashboardData(pool) {
       data: [42, 49, 55, 60, 66]
     };
     
+    // Get system users count
+    const [usersCountResult] = await pool.query('SELECT COUNT(*) as count FROM users');
+    const systemUsers = usersCountResult[0].count;
+    
     return {
       totalMaterials,
       totalSuppliers,
       recentMaterials,
       materialTypeLabels,
       materialTypeData,
-      inventoryChanges
+      inventoryChanges,
+      systemUsers,
+      ordersThisWeek: 12 // This is still mock data, replace with actual query
     };
   } catch (error) {
     console.error('Error getting dashboard data:', error);
@@ -90,7 +104,9 @@ async function getDashboardData(pool) {
   }
 }
 
-// Routes
+// ===== TRADITIONAL EJS ROUTES =====
+
+// Login/Logout routes
 app.get('/login', (req, res) => {
   res.render('login', { error: null });
 });
@@ -135,7 +151,6 @@ app.get('/dashboard', isAuthenticated, async (req, res) => {
     res.render('dashboard', { 
       user: req.session.user,
       ...dashboardData
-      
     });
   } catch (error) {
     console.error('Error loading dashboard:', error);
@@ -162,8 +177,83 @@ app.get('/materials', isAuthenticated, async (req, res) => {
   }
 });
 
-// API routes for AJAX calls
-app.get('/api/materials', isAuthenticated, async (req, res) => {
+// ===== API ROUTES FOR REACT =====
+
+// Authentication API
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    // In a real application, you should hash passwords and compare hash
+    const [rows] = await pool.query(
+      'SELECT * FROM users WHERE username = ?',
+      [username]
+    );
+    
+    if (rows.length > 0 && password === rows[0].password) { // Simplified for demo
+      req.session.user = {
+        id: rows[0].id,
+        username: rows[0].username,
+        fullName: rows[0].full_name,
+        role: rows[0].role
+      };
+      res.json({ 
+        success: true, 
+        user: req.session.user 
+      });
+    } else {
+      res.status(401).json({ 
+        success: false, 
+        error: 'Invalid username or password' 
+      });
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'An error occurred during login' 
+    });
+  }
+});
+
+app.get('/api/auth/status', (req, res) => {
+  if (req.session.user) {
+    res.json({ 
+      authenticated: true, 
+      user: req.session.user 
+    });
+  } else {
+    res.json({ 
+      authenticated: false, 
+      user: null 
+    });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
+});
+
+// Dashboard API
+app.get('/api/dashboard', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const dashboardData = await getDashboardData(pool);
+    res.json({
+      success: true,
+      ...dashboardData
+    });
+  } catch (error) {
+    console.error('Error getting dashboard data:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to load dashboard data' 
+    });
+  }
+});
+
+// Materials API
+app.get('/api/materials', isAuthenticatedAPI, async (req, res) => {
   try {
     const [materials] = await pool.query('SELECT * FROM materials ORDER BY id DESC');
     res.json({ success: true, data: materials });
@@ -173,7 +263,7 @@ app.get('/api/materials', isAuthenticated, async (req, res) => {
   }
 });
 
-app.post('/api/materials', isAuthenticated, async (req, res) => {
+app.post('/api/materials', isAuthenticatedAPI, async (req, res) => {
   try {
     const { packetNo, partName, length, width, height, quantity, supplier } = req.body;
     const currentDate = new Date().toLocaleDateString('en-GB');
@@ -196,7 +286,7 @@ app.post('/api/materials', isAuthenticated, async (req, res) => {
   }
 });
 
-app.put('/api/materials/:id', isAuthenticated, async (req, res) => {
+app.put('/api/materials/:id', isAuthenticatedAPI, async (req, res) => {
   try {
     const { id } = req.params;
     const { packetNo, partName, length, width, height, quantity, supplier } = req.body;
@@ -218,7 +308,7 @@ app.put('/api/materials/:id', isAuthenticated, async (req, res) => {
   }
 });
 
-app.delete('/api/materials/:id', isAuthenticated, async (req, res) => {
+app.delete('/api/materials/:id', isAuthenticatedAPI, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -231,7 +321,7 @@ app.delete('/api/materials/:id', isAuthenticated, async (req, res) => {
   }
 });
 
-app.delete('/api/materials', isAuthenticated, async (req, res) => {
+app.delete('/api/materials', isAuthenticatedAPI, async (req, res) => {
   try {
     const { ids } = req.body;
     
@@ -248,6 +338,23 @@ app.delete('/api/materials', isAuthenticated, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to delete materials' });
   }
 });
+
+// ===== SERVE REACT APP =====
+
+// For React Single Page Application
+app.get('/react', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/public/index.html'));
+});
+
+// Serve the React app for specific routes
+const reactRoutes = ['/react/dashboard', '/react/materials', '/react/login'];
+reactRoutes.forEach(route => {
+  app.get(route, (req, res) => {
+    res.sendFile(path.join(__dirname, 'client/public/index.html'));
+  });
+});
+
+// ===== ERROR HANDLING =====
 
 // Error page route
 app.get('/error', (req, res) => {
