@@ -7,7 +7,7 @@ Project source code for ISD
    ```bash
    git clone https://github.com/yourusername/yourproject.git
 
-    Navigate into the project folder:
+ Navigate into the project folder:
 
 cd yourproject
 
