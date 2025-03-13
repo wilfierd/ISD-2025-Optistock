@@ -9,13 +9,13 @@ This project uses Node.js and has a `node_modules` folder that is **not tracked*
    ```bash
    git clone https://github.com/wilfierd/ISD-2025-Opistock.git
 
- Navigate into the project folder:
+2. Navigate into the project folder:
 
-   cd ISD-2025-Opistock
+         cd ISD-2025-Opistock
 
-Install the required dependencies:
+4. Install the required dependencies:
 
-    npm install
+       npm install
 
  This will create a node_modules folder and install all necessary packages.
 
