@@ -15,17 +15,17 @@ Install the required dependencies:
 
     npm install
 
-    This will create a node_modules folder and install all necessary packages.
+ This will create a node_modules folder and install all necessary packages.
 
 Additional Information
 
-    Make sure to check for .env files for any environment-specific configurations. 
+ Make sure to check for .env files for any environment-specific configurations. 
 ----> Database Configuration
 
 Edit the .env file:
 
-DB_USER=your_db_username  
-DB_PASSWORD=your_db_password
+      DB_USER=your_db_username  
+      DB_PASSWORD=your_db_password
     If you want to do a clean install, consider using npm ci instead of npm install.
 
 Running the Project
