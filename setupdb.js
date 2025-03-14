@@ -20,9 +20,9 @@ async function setupDatabase() {
   try {
     // First, connect without database selected
     connection = await mysql.createConnection({
-      host: 'localhost',
-      user: 'root',
-      password: ''
+      host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD
     });
     
     console.log('Connected to MySQL server');
