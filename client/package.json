@@ -20,7 +20,6 @@
   "overrides": {
     "nth-check": "^2.0.1"
   },
-  "proxy": "http://localhost:3000",
   "scripts": {
     "start": "set PORT=3001 && react-scripts start",
     "build": "react-scripts build",
@@ -43,12 +42,6 @@
       "last 1 chrome version",
       "last 1 firefox version",
       "last 1 safari version"
-    ]
-  },
-  "options": {
-    "allowedHosts": [
-      "localhost",
-      ".localhost"
     ]
   }
 }
