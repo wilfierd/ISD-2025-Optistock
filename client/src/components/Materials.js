@@ -9,6 +9,61 @@ import {
   useDeleteMaterial,
   useDeleteBatchMaterials
 } from '../hooks/useMaterials';
+// We'll use a different approach for QR codes
+
+// QR Code Modal Component
+const QRCodeModal = ({ id, material, onClose }) => {
+  // Create URL for the material details page
+  const materialUrl = `${window.location.origin}/material/${id}`;
+  
+  return (
+    <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+      <div className="modal-dialog">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">Material QR Code: {material.partName}</h5>
+            <button 
+              type="button" 
+              className="btn-close" 
+              onClick={onClose}
+            ></button>
+          </div>
+          <div className="modal-body text-center">
+            <p>Scan this QR code to view material details:</p>
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(materialUrl)}`}
+              alt="QR Code"
+              width={256}
+              height={256}
+            />
+            <p className="mt-3">
+              <small className="text-muted">{materialUrl}</small>
+            </p>
+          </div>
+          <div className="modal-footer">
+            <button 
+              type="button" 
+              className="btn btn-secondary" 
+              onClick={onClose}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                // Open the URL in a new tab
+                window.open(materialUrl, '_blank');
+              }}
+            >
+              Open Link
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 function Materials({ user }) {
   // State for selection and search
@@ -31,6 +86,10 @@ function Materials({ user }) {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  
+  // QR Code modal state
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [selectedMaterialId, setSelectedMaterialId] = useState(null);
 
   // React Query hooks
   const { data: materials = [], isLoading, error } = useMaterials();
@@ -176,40 +235,13 @@ function Materials({ user }) {
     }
   };
 
-  // Handle print button
+  // Handle QR code generation
   const handlePrint = (id) => {
     const material = materials.find(m => m.id === id);
     if (!material) return;
     
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-      <head>
-          <title>Material #${id}</title>
-          <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              h2 { color: #0a4d8c; }
-              table { border-collapse: collapse; width: 100%; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background-color: #f2f2f2; }
-          </style>
-      </head>
-      <body>
-          <h2>Material Details: ${material.partName}</h2>
-          <table>
-              <tr><th>Packet No</th><td>${material.packetNo}</td></tr>
-              <tr><th>Part Name</th><td>${material.partName}</td></tr>
-              <tr><th>Dimensions</th><td>${material.length} x ${material.width} x ${material.height}</td></tr>
-              <tr><th>Quantity</th><td>${material.quantity}</td></tr>
-              <tr><th>Supplier</th><td>${material.supplier}</td></tr>
-              <tr><th>Updated By</th><td>${material.updatedBy}</td></tr>
-              <tr><th>Last Updated</th><td>${material.lastUpdated}</td></tr>
-          </table>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+    setSelectedMaterialId(id);
+    setShowQrModal(true);
   };
 
   return (
@@ -310,6 +342,7 @@ function Materials({ user }) {
                       <button 
                         className="btn btn-sm" 
                         onClick={() => handlePrint(material.id)}
+                        title="Generate QR Code"
                       >
                         <i className="fas fa-print"></i>
                       </button>
@@ -485,6 +518,15 @@ function Materials({ user }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQrModal && selectedMaterialId && (
+        <QRCodeModal 
+          id={selectedMaterialId} 
+          material={materials.find(m => m.id === selectedMaterialId)}
+          onClose={() => setShowQrModal(false)} 
+        />
       )}
     </div>
   );

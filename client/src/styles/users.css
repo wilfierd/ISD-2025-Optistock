@@ -1,0 +1,59 @@
+/* public/css/users.css */
+.users-container .table thead {
+    background-color: #d9f2ff;
+}
+
+.users-container .table tbody tr:hover {
+    background-color: #f0f8ff;
+    cursor: pointer;
+}
+
+.users-container .search-container {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.users-container .search-container input {
+    padding-left: 40px;
+    border-radius: 20px;
+}
+
+.users-container .search-icon {
+    position: absolute;
+    left: 15px;
+    top: 10px;
+    color: #6c757d;
+}
+
+.edit-icon {
+    color: #007bff;
+    cursor: pointer;
+}
+
+.edit-icon:hover {
+    color: #0056b3;
+}
+
+/* Modal styles */
+.user-modal .modal-header {
+    background-color: #0a4d8c;
+    color: white;
+}
+
+.user-detail-row {
+    border-bottom: 1px solid #dee2e6;
+    padding: 8px 0;
+}
+
+.user-detail-label {
+    font-weight: bold;
+    color: #6c757d;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .btn-action {
+        margin-bottom: 10px;
+        width: 100%;
+    }
+}

@@ -19,21 +19,29 @@ CREATE TABLE IF NOT EXISTS materials (
     last_updated VARCHAR(10) NOT NULL
 );
 
--- Create users table
+-- Create users table with phone number field
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
     role VARCHAR(20) NOT NULL,
+    phone VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Insert default admin user
-INSERT INTO users (username, password, full_name, role) VALUES
-('admin', 'admin123', 'Administrator', 'admin');
+INSERT INTO users (username, password, full_name, role, phone) VALUES
+('admin', 'admin123', 'Administrator', 'admin', '123456789');
 
--- Insert sample data
+-- Insert sample users
+INSERT INTO users (username, password, full_name, role, phone) VALUES
+('nguyenhieu', 'password123', 'Nguyễn Hieu', 'admin', '123456789'),
+('trankhai', 'password123', 'Trần Nguyễn Khải', 'admin', '123456789'),
+('lsd_admin', '123456789', 'Nguyen Quoc Hoang An', 'user', '699696969'),
+('user1', 'password123', 'Máy móc', 'user', NULL);
+
+-- Insert sample data for materials
 INSERT INTO materials (packet_no, part_name, length, width, height, quantity, supplier, updated_by, last_updated) VALUES
 (1, 'xxxxxxxxxxxxxxxxxxxxxxxxx', 3000, 3455, 2255, 10, 'SHENZEN', 'Khai', '05/03/2025'),
 (1, 'Máy móc', 3000, 345, 10, 10, 'Khai', 'Khai', '05/03/2025'),
