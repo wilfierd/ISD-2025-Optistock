@@ -1,10 +1,11 @@
 // setup-db.js
+require('dotenv').config(); 
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
 
 // Read SQL script
-const sqlScript = fs.readFileSync(path.join(__dirname, 'database', 'schema.sql'), 'utf8');
+const sqlScript = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 
 // Split into individual statements
 const statements = sqlScript
