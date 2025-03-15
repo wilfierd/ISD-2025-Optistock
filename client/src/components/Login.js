@@ -1,23 +1,15 @@
 // client/src/components/Login.js
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { useLogin } from '../hooks/useAuth';
 
-function Login({ setUser }) {
+function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const { login, isLoading, error } = useLogin();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    try {
-      const response = await axios.post('/api/auth/login', { username, password });
-      setUser(response.data.user);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.');
-    }
+    login({ username, password });
   };
 
   return (
@@ -58,7 +50,13 @@ function Login({ setUser }) {
             />
           </div>
           <div className="d-grid gap-2">
-            <button type="submit" className="btn btn-primary">Login</button>
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
+              disabled={isLoading}
+            >
+              {isLoading ? 'Logging in...' : 'Login'}
+            </button>
           </div>
         </form>
       </div>

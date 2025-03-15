@@ -1,4 +1,5 @@
 // app.js - Main Express application
+const cors = require('cors');
 const express = require('express');
 const path = require('path');
 const mysql = require('mysql2/promise');
@@ -103,7 +104,10 @@ async function getDashboardData(pool) {
     throw error;
   }
 }
-
+app.use(cors({
+  origin: ['http://localhost:3001', 'http://localhost:3000'],
+  credentials: true  // This is important for cookies/sessions
+}));
 // ===== TRADITIONAL EJS ROUTES =====
 
 // Login/Logout routes

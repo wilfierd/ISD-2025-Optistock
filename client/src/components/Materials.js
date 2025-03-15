@@ -1,11 +1,17 @@
 // client/src/components/Materials.js
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useMemo } from 'react';
+import Navbar from './Navbar';
+import { useLogout } from '../hooks/useAuth';
+import { 
+  useMaterials, 
+  useCreateMaterial, 
+  useUpdateMaterial, 
+  useDeleteMaterial,
+  useDeleteBatchMaterials
+} from '../hooks/useMaterials';
 
 function Materials({ user }) {
-  const [materials, setMaterials] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // State for selection and search
   const [selectedMaterials, setSelectedMaterials] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -26,40 +32,29 @@ function Materials({ user }) {
   const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Fetch materials on component mount
-  useEffect(() => {
-    fetchMaterials();
-  }, []);
+  // React Query hooks
+  const { data: materials = [], isLoading, error } = useMaterials();
+  const createMaterial = useCreateMaterial();
+  const updateMaterial = useUpdateMaterial();
+  const deleteMaterial = useDeleteMaterial();
+  const deleteBatchMaterials = useDeleteBatchMaterials();
+  const logoutMutation = useLogout();
+
+  // Filter materials based on search term
+  const filteredMaterials = useMemo(() => {
+    return materials.filter(material => 
+      material.partName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [materials, searchTerm]);
   
-  // Fetch materials from API
-  const fetchMaterials = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get('/api/materials');
-      if (response.data.success) {
-        // Transform data to match our React component's expected format
-        const transformedData = response.data.data.map(item => ({
-          id: item.id,
-          packetNo: parseInt(item.packet_no),
-          partName: item.part_name,
-          length: parseInt(item.length),
-          width: parseInt(item.width),
-          height: parseInt(item.height),
-          quantity: parseInt(item.quantity),
-          supplier: item.supplier,
-          updatedBy: item.updated_by,
-          lastUpdated: item.last_updated
-        }));
-        setMaterials(transformedData);
-      } else {
-        setError('Failed to fetch materials');
-      }
-    } catch (err) {
-      setError('Error connecting to the server');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  // Clear selections when data changes
+  useEffect(() => {
+    setSelectedMaterials(new Set());
+  }, [materials]);
+
+  // Handle search
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
   };
 
   // Handle checkbox selection
@@ -72,16 +67,6 @@ function Materials({ user }) {
     }
     setSelectedMaterials(newSelectedMaterials);
   };
-
-  // Handle search
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  // Filter materials based on search term
-  const filteredMaterials = materials.filter(material => 
-    material.partName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   // Toggle add modal
   const handleAddClick = () => {
@@ -128,6 +113,11 @@ function Materials({ user }) {
     setShowDeleteModal(true);
   };
 
+  // Handle logout
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
   // Handle form input changes
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -138,54 +128,51 @@ function Materials({ user }) {
   };
 
   // Handle form submission
-  const handleSaveClick = async () => {
-    try {
-      const materialData = {
-        packetNo: parseInt(formData.packetNo),
-        partName: formData.partName,
-        length: parseInt(formData.length),
-        width: parseInt(formData.width),
-        height: parseInt(formData.height),
-        quantity: parseInt(formData.quantity),
-        supplier: formData.supplier
-      };
+  const handleSaveClick = () => {
+    const materialData = {
+      packetNo: parseInt(formData.packetNo),
+      partName: formData.partName,
+      length: parseInt(formData.length),
+      width: parseInt(formData.width),
+      height: parseInt(formData.height),
+      quantity: parseInt(formData.quantity),
+      supplier: formData.supplier
+    };
 
-      let response;
-      if (modalMode === 'add') {
-        response = await axios.post('/api/materials', materialData);
-      } else {
-        response = await axios.put(`/api/materials/${formData.materialId}`, materialData);
-      }
-      
-      if (response.data.success) {
-        fetchMaterials();
-        setShowModal(false);
-        setSelectedMaterials(new Set());
-        // Show success notification (to be implemented)
-      }
-    } catch (err) {
-      console.error('Error saving material:', err);
-      // Show error notification (to be implemented)
+    if (modalMode === 'add') {
+      createMaterial.mutate(materialData, {
+        onSuccess: () => {
+          setShowModal(false);
+        }
+      });
+    } else {
+      updateMaterial.mutate({ 
+        id: formData.materialId, 
+        data: materialData 
+      }, {
+        onSuccess: () => {
+          setShowModal(false);
+        }
+      });
     }
   };
 
   // Handle delete confirmation
-  const handleConfirmDelete = async () => {
-    try {
-      const selectedIds = Array.from(selectedMaterials);
-      if (selectedIds.length === 1) {
-        await axios.delete(`/api/materials/${selectedIds[0]}`);
-      } else {
-        await axios.delete('/api/materials', { data: { ids: selectedIds } });
-      }
-      
-      fetchMaterials();
-      setShowDeleteModal(false);
-      setSelectedMaterials(new Set());
-      // Show success notification (to be implemented)
-    } catch (err) {
-      console.error('Error deleting materials:', err);
-      // Show error notification (to be implemented)
+  const handleConfirmDelete = () => {
+    const selectedIds = Array.from(selectedMaterials);
+    
+    if (selectedIds.length === 1) {
+      deleteMaterial.mutate(selectedIds[0], {
+        onSuccess: () => {
+          setShowDeleteModal(false);
+        }
+      });
+    } else {
+      deleteBatchMaterials.mutate(selectedIds, {
+        onSuccess: () => {
+          setShowDeleteModal(false);
+        }
+      });
     }
   };
 
@@ -227,20 +214,7 @@ function Materials({ user }) {
 
   return (
     <div>
-      {/* Navigation Bar */}
-      <nav className="navbar navbar-expand-lg navbar-dark">
-        <div className="container-fluid">
-          <div className="d-flex">
-            <a className="navbar-brand" href="/react/dashboard">Dashboard</a>
-            <a className="navbar-brand" href="/react/materials">Nhà kho</a>
-            <a className="navbar-brand" href="/react/employees">Nhân viên</a>
-          </div>
-          <div className="d-flex align-items-center">
-            <span>Hi, {user.username}</span>
-            <div className="avatar">{user.username.charAt(0).toUpperCase()}</div>
-          </div>
-        </div>
-      </nav>
+      <Navbar user={user} onLogout={handleLogout} />
 
       {/* Main Content */}
       <div className="container-fluid mt-4">
@@ -259,20 +233,26 @@ function Materials({ user }) {
             </div>
           </div>
           <div className="col-md-6 text-end">
-            <button className="btn btn-primary btn-action" onClick={handleAddClick}>Add</button>
             <button 
               className="btn btn-primary btn-action" 
-              disabled={selectedMaterials.size !== 1}
-              onClick={handleEditClick}
+              onClick={handleAddClick}
+              disabled={createMaterial.isPending}
             >
-              Edit
+              {createMaterial.isPending ? 'Adding...' : 'Add'}
             </button>
             <button 
               className="btn btn-primary btn-action" 
-              disabled={selectedMaterials.size === 0}
+              disabled={selectedMaterials.size !== 1 || updateMaterial.isPending}
+              onClick={handleEditClick}
+            >
+              {updateMaterial.isPending ? 'Editing...' : 'Edit'}
+            </button>
+            <button 
+              className="btn btn-primary btn-action" 
+              disabled={selectedMaterials.size === 0 || deleteMaterial.isPending || deleteBatchMaterials.isPending}
               onClick={handleDeleteClick}
             >
-              Delete
+              {(deleteMaterial.isPending || deleteBatchMaterials.isPending) ? 'Deleting...' : 'Delete'}
             </button>
           </div>
         </div>
@@ -280,14 +260,14 @@ function Materials({ user }) {
         {/* Materials List */}
         <h4>Danh sách nguyên vật liệu ({filteredMaterials.length})</h4>
         
-        {loading ? (
+        {isLoading ? (
           <div className="text-center my-5">
             <div className="spinner-border text-primary" role="status">
               <span className="visually-hidden">Loading...</span>
             </div>
           </div>
         ) : error ? (
-          <div className="alert alert-danger">{error}</div>
+          <div className="alert alert-danger">{error.message}</div>
         ) : (
           <div className="table-responsive">
             <table className="table table-hover">
@@ -336,6 +316,11 @@ function Materials({ user }) {
                     </td>
                   </tr>
                 ))}
+                {filteredMaterials.length === 0 && (
+                  <tr>
+                    <td colSpan="11" className="text-center py-3">No materials found</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -454,8 +439,9 @@ function Materials({ user }) {
                   type="button" 
                   className="btn btn-primary" 
                   onClick={handleSaveClick}
+                  disabled={createMaterial.isPending || updateMaterial.isPending}
                 >
-                  Save
+                  {(createMaterial.isPending || updateMaterial.isPending) ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>
@@ -491,8 +477,9 @@ function Materials({ user }) {
                   type="button" 
                   className="btn btn-danger" 
                   onClick={handleConfirmDelete}
+                  disabled={deleteMaterial.isPending || deleteBatchMaterials.isPending}
                 >
-                  Delete
+                  {(deleteMaterial.isPending || deleteBatchMaterials.isPending) ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             </div>
