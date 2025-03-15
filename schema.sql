@@ -1,3 +1,6 @@
+-- Drop the database if it exists
+DROP DATABASE IF EXISTS inventory_system;
+
 -- Create the database
 CREATE DATABASE IF NOT EXISTS inventory_system;
 USE inventory_system;
