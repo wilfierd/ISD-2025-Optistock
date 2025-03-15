@@ -10,7 +10,6 @@
     "axios": "^1.8.3",
     "chart.js": "^4.4.8",
     "client": "file:",
-    "http-proxy-middleware": "^3.0.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.3.0",
@@ -44,5 +43,6 @@
       "last 1 safari version"
     ]
   },
+  "allowedHosts": "all",
   "proxy": "http://localhost:3000"
 }
