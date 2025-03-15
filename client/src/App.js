@@ -3,6 +3,8 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import Materials from './components/Materials';
+import MaterialDetail from './components/MaterialDetail';
+import Users from './components/Users';
 import Login from './components/Login';
 import { useAuthStatus } from './hooks/useAuth';
 
@@ -19,6 +21,8 @@ function App() {
       <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
       <Route path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
       <Route path="/materials" element={user ? <Materials user={user} /> : <Navigate to="/login" />} />
+      <Route path="/material/:id" element={user ? <MaterialDetail user={user} /> : <Navigate to="/login" />} />
+      <Route path="/employees" element={user ? <Users user={user} /> : <Navigate to="/login" />} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
     </Routes>
   );

@@ -21,7 +21,8 @@
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "myprj": "file:",
-    "mysql2": "^3.13.0"
+    "mysql2": "^3.13.0",
+    "qrcode.react": "^4.2.0"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

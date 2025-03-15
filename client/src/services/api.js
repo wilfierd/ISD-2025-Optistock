@@ -52,6 +52,15 @@ const apiService = {
     deleteBatch: (ids) => api.delete('/materials', { data: { ids } }),
   },
 
+  // User management endpoints
+  users: {
+    getAll: () => api.get('/users'),
+    getById: (id) => api.get(`/users/${id}`),
+    create: (data) => api.post('/users', data),
+    update: (id, data) => api.put(`/users/${id}`, data),
+    delete: (id) => api.delete(`/users/${id}`),
+  },
+
   // Dashboard data
   dashboard: {
     getData: () => api.get('/dashboard'),

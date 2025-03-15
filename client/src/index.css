@@ -11,3 +11,151 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+/* Add these styles to your client/src/index.css file */
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f0f0f0;
+  margin: 0;
+  padding: 0;
+}
+
+/* Navbar styles */
+.navbar {
+  background-color: #0a4d8c !important;
+  color: white;
+  padding: 10px 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.navbar .navbar-brand {
+  color: white;
+  margin-right: 30px;
+  font-size: 16px;
+  text-decoration: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  transition: background-color 0.3s;
+}
+
+.navbar .navbar-brand:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.navbar .navbar-brand.fw-bold {
+  background-color: rgba(255,255,255,0.2);
+}
+
+.avatar {
+  background-color: #4caf50;
+  color: white;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+}
+
+/* Main content container */
+.container-fluid {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Search and header section */
+.search-container {
+  position: relative;
+  margin-bottom: 20px;
+  max-width: 450px;
+}
+
+.search-container input {
+  padding-left: 40px;
+  border-radius: 20px;
+  height: 40px;
+  border: 1px solid #ddd;
+  width: 100%;
+}
+
+.search-icon {
+  position: absolute;
+  left: 15px;
+  top: 12px;
+  color: #6c757d;
+}
+
+/* Table styles */
+.table {
+  background-color: white;
+  border-radius: 5px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.table thead {
+  background-color: #d9f2ff;
+}
+
+.table thead th {
+  border-bottom: none;
+  color: #333;
+  font-weight: 600;
+  padding: 12px 15px;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid #f2f2f2;
+  transition: background-color 0.2s;
+}
+
+.table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.table tbody td {
+  padding: 12px 15px;
+  vertical-align: middle;
+}
+
+/* Action buttons */
+.btn-action {
+  margin-right: 10px;
+}
+
+/* Edit icon */
+.fa-edit {
+  color: #0a4d8c;
+}
+
+/* Modal styles */
+.modal-header {
+  background-color: #0a4d8c;
+  color: white;
+}
+
+.modal-title {
+  font-weight: 500;
+}
+
+/* Page title */
+h4 {
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .btn-action {
+      margin-bottom: 10px;
+      width: 100%;
+  }
+  
+  .container-fluid {
+      padding-left: 10px;
+      padding-right: 10px;
+  }
+}

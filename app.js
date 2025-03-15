@@ -26,24 +26,19 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
-  secret: 'inventory-management-secret-key',
+  secret: process.env.SESSION_SECRET || 'inventory-management-secret-key',
   resave: false,
   saveUninitialized: true,
   cookie: { maxAge: 24 * 60 * 60 * 1000 } 
 }));
 
-// Set EJS as templating engine
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+// CORS configuration
+app.use(cors({
+  origin: ['http://localhost:3001', 'http://localhost:3000'],
+  credentials: true
+}));
 
-// Authentication middleware
-const isAuthenticated = (req, res, next) => {
-  if (req.session.user) {
-    next();
-  } else {
-    res.redirect('/login');
-  }
-};
+// ===== API AUTHENTICATION MIDDLEWARE =====
 
 // API Authentication middleware
 const isAuthenticatedAPI = (req, res, next) => {
@@ -53,6 +48,17 @@ const isAuthenticatedAPI = (req, res, next) => {
     res.status(401).json({ success: false, error: 'Not authenticated' });
   }
 };
+
+// Admin role check middleware
+const isAdminAPI = (req, res, next) => {
+  if (req.session.user && req.session.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403).json({ success: false, error: 'Insufficient permissions' });
+  }
+};
+
+// ===== HELPER FUNCTIONS =====
 
 // Function to get dashboard data
 async function getDashboardData(pool) {
@@ -104,84 +110,8 @@ async function getDashboardData(pool) {
     throw error;
   }
 }
-app.use(cors({
-  origin: ['http://localhost:3001', 'http://localhost:3000'],
-  credentials: true  // This is important for cookies/sessions
-}));
-// ===== TRADITIONAL EJS ROUTES =====
 
-// Login/Logout routes
-app.get('/login', (req, res) => {
-  res.render('login', { error: null });
-});
-
-app.post('/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    
-    // In a real application, you should hash passwords and compare hash
-    const [rows] = await pool.query(
-      'SELECT * FROM users WHERE username = ?',
-      [username]
-    );
-    
-    if (rows.length > 0 && password === rows[0].password) { // Simplified for demo
-      req.session.user = {
-        id: rows[0].id,
-        username: rows[0].username,
-        fullName: rows[0].full_name,
-        role: rows[0].role
-      };
-      res.redirect('/dashboard');
-    } else {
-      res.render('login', { error: 'Invalid username or password' });
-    }
-  } catch (error) {
-    console.error('Login error:', error);
-    res.render('login', { error: 'An error occurred during login' });
-  }
-});
-
-app.get('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/login');
-});
-
-// Dashboard route
-app.get('/dashboard', isAuthenticated, async (req, res) => {
-  try {
-    const dashboardData = await getDashboardData(pool);
-    
-    res.render('dashboard', { 
-      user: req.session.user,
-      ...dashboardData
-    });
-  } catch (error) {
-    console.error('Error loading dashboard:', error);
-    res.status(500).render('error', { error: 'Failed to load dashboard data' });
-  }
-});
-
-// Inventory routes
-app.get('/', isAuthenticated, (req, res) => {
-  res.redirect('/dashboard');
-});
-
-app.get('/materials', isAuthenticated, async (req, res) => {
-  try {
-    const [materials] = await pool.query('SELECT * FROM materials ORDER BY id DESC');
-    res.render('materials', { 
-      user: req.session.user, 
-      materials: materials,
-      count: materials.length
-    });
-  } catch (error) {
-    console.error('Error fetching materials:', error);
-    res.status(500).render('error', { error: 'Failed to fetch materials' });
-  }
-});
-
-// ===== API ROUTES FOR REACT =====
+// ===== API ROUTES =====
 
 // Authentication API
 app.post('/api/auth/login', async (req, res) => {
@@ -256,7 +186,183 @@ app.get('/api/dashboard', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
-// Materials API
+// ===== USER MANAGEMENT API =====
+// Get all users (admin only)
+app.get('/api/users', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
+  try {
+    // Don't return password in the response
+    const [users] = await pool.query('SELECT id, username, full_name, role, phone FROM users ORDER BY id');
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch users' });
+  }
+});
+
+// Get a specific user
+app.get('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Normal users can only get their own information, admins can get any user
+    if (req.session.user.role !== 'admin' && req.session.user.id !== parseInt(id)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    }
+    
+    const [users] = await pool.query(
+      'SELECT id, username, full_name, role, phone, created_at FROM users WHERE id = ?', 
+      [id]
+    );
+    
+    if (users.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    res.json({ success: true, data: users[0] });
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch user' });
+  }
+});
+
+// Create a new user (admin only)
+app.post('/api/users', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
+  try {
+    const { username, password, fullName, role, phone } = req.body;
+    
+    // Validate required fields
+    if (!username || !password || !fullName || !role) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    
+    // Check if username already exists
+    const [existingUsers] = await pool.query('SELECT id FROM users WHERE username = ?', [username]);
+    if (existingUsers.length > 0) {
+      return res.status(400).json({ success: false, error: 'Username already exists' });
+    }
+    
+    // In a real app, you would hash the password here
+    // For simplicity, we're storing plain text passwords (not recommended for production!)
+    const [result] = await pool.query(
+      'INSERT INTO users (username, password, full_name, role, phone) VALUES (?, ?, ?, ?, ?)',
+      [username, password, fullName, role, phone || null]
+    );
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'User created successfully', 
+      userId: result.insertId 
+    });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ success: false, error: 'Failed to create user' });
+  }
+});
+
+// Update a user (admin only or self update)
+app.put('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, password, fullName, role, phone } = req.body;
+    
+    // Normal users can only update their own information, admins can update any user
+    if (req.session.user.role !== 'admin' && req.session.user.id !== parseInt(id)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    }
+    
+    // Normal users cannot change their role
+    if (req.session.user.role !== 'admin' && role && role !== req.session.user.role) {
+      return res.status(403).json({ success: false, error: 'Cannot change role' });
+    }
+    
+    // Check if user exists
+    const [existingUser] = await pool.query('SELECT id FROM users WHERE id = ?', [id]);
+    if (existingUser.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    // Check if username exists (if changing username)
+    if (username) {
+      const [existingUsername] = await pool.query('SELECT id FROM users WHERE username = ? AND id != ?', [username, id]);
+      if (existingUsername.length > 0) {
+        return res.status(400).json({ success: false, error: 'Username already exists' });
+      }
+    }
+    
+    // Build the SQL update statement dynamically based on what's provided
+    let updateFields = [];
+    let queryParams = [];
+    
+    if (username) {
+      updateFields.push('username = ?');
+      queryParams.push(username);
+    }
+    
+    if (password) {
+      // In a real app, you would hash the password here
+      updateFields.push('password = ?');
+      queryParams.push(password);
+    }
+    
+    if (fullName) {
+      updateFields.push('full_name = ?');
+      queryParams.push(fullName);
+    }
+    
+    if (role && req.session.user.role === 'admin') {
+      updateFields.push('role = ?');
+      queryParams.push(role);
+    }
+    
+    if (phone !== undefined) {
+      updateFields.push('phone = ?');
+      queryParams.push(phone);
+    }
+    
+    // Add the ID at the end of params array
+    queryParams.push(id);
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+    
+    const query = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
+    await pool.query(query, queryParams);
+    
+    res.json({ success: true, message: 'User updated successfully' });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ success: false, error: 'Failed to update user' });
+  }
+});
+
+// Delete a user (admin only)
+app.delete('/api/users/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Prevent deleting the current user
+    if (req.session.user.id === parseInt(id)) {
+      return res.status(400).json({ success: false, error: 'Cannot delete yourself' });
+    }
+    
+    // Check if user exists
+    const [existingUser] = await pool.query('SELECT id FROM users WHERE id = ?', [id]);
+    if (existingUser.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete user' });
+  }
+});
+
+// ===== MATERIALS API =====
+
 app.get('/api/materials', isAuthenticatedAPI, async (req, res) => {
   try {
     const [materials] = await pool.query('SELECT * FROM materials ORDER BY id DESC');
@@ -343,31 +449,29 @@ app.delete('/api/materials', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
+// Get a single material by ID
+app.get('/api/materials/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [rows] = await pool.query('SELECT * FROM materials WHERE id = ?', [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Material not found' });
+    }
+    
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Error fetching material:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch material' });
+  }
+});
+
 // ===== SERVE REACT APP =====
 
-// For React Single Page Application
-app.get('/react', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/public/index.html'));
-});
-
-// Serve the React app for specific routes
-const reactRoutes = ['/react/dashboard', '/react/materials', '/react/login'];
-reactRoutes.forEach(route => {
-  app.get(route, (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/public/index.html'));
-  });
-});
-
-// ===== ERROR HANDLING =====
-
-// Error page route
-app.get('/error', (req, res) => {
-  res.render('error', { error: 'An unexpected error occurred' });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).render('error', { error: 'Page not found' });
+// For React Single Page Application routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'client/build/index.html'));
 });
 
 // Start the server
