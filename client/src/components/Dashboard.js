@@ -1,118 +1,113 @@
 // client/src/components/Dashboard.js
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Chart from 'chart.js/auto';
+import Navbar from './Navbar';
+import { useDashboard } from '../hooks/useDashboard';
+import { useLogout } from '../hooks/useAuth';
 
 function Dashboard({ user }) {
-  const [dashboardData, setDashboardData] = useState({
-    totalMaterials: 0,
-    totalSuppliers: 0,
-    recentMaterials: [],
-    materialTypeLabels: [],
-    materialTypeData: [],
-    inventoryChanges: {
-      labels: [],
-      data: []
-    }
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        // This endpoint will need to be created on the backend
-        const response = await axios.get('/api/dashboard');
-        if (response.data.success) {
-          setDashboardData(response.data);
-        } else {
-          setError('Failed to fetch dashboard data');
-        }
-      } catch (err) {
-        setError('Error connecting to the server');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
+  const { data: dashboardData, isLoading, error } = useDashboard();
+  const logoutMutation = useLogout();
+  
+  // Using refs to store chart instances for cleanup
+  const materialTypesChartRef = useRef(null);
+  const inventoryChartRef = useRef(null);
 
   useEffect(() => {
     // Initialize charts when data is available
     const initializeCharts = () => {
-        // Initialize charts using Chart.js
-        if (typeof Chart !== 'undefined') {
-          // Material Types Chart
-          const materialTypesCtx = document.getElementById('materialTypesChart')?.getContext('2d');
-          if (materialTypesCtx) {
-            new Chart(materialTypesCtx, {
-              type: 'pie',
-              data: {
-                labels: dashboardData.materialTypeLabels || ['Máy móc', 'Other'],
-                datasets: [{
-                  data: dashboardData.materialTypeData || [5, 1],
-                  backgroundColor: [
-                    'rgba(54, 162, 235, 0.8)',
-                    'rgba(255, 206, 86, 0.8)'
-                  ],
-                  borderColor: [
-                    'rgba(54, 162, 235, 1)',
-                    'rgba(255, 206, 86, 1)'
-                  ],
-                  borderWidth: 1
-                }]
-              },
-              options: {
-                responsive: true,
-                plugins: {
-                  legend: {
-                    position: 'bottom'
-                  }
-                }
-              }
-            });
-          }
-          
-          // Inventory Changes Chart
-          const inventoryCtx = document.getElementById('inventoryChart')?.getContext('2d');
-          if (inventoryCtx) {
-            new Chart(inventoryCtx, {
-              type: 'line',
-              data: {
-                labels: dashboardData.inventoryChanges?.labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-                datasets: [{
-                  label: 'Inventory Level',
-                  data: dashboardData.inventoryChanges?.data || [42, 49, 55, 60, 66],
-                  backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                  borderColor: 'rgba(75, 192, 192, 1)',
-                  borderWidth: 2,
-                  tension: 0.3
-                }]
-              },
-              options: {
-                responsive: true,
-                scales: {
-                  y: {
-                    beginAtZero: true
-                  }
-                }
-              }
-            });
-          }
+      if (typeof Chart !== 'undefined' && dashboardData) {
+        // Clear any existing charts to avoid duplicates
+        if (materialTypesChartRef.current) {
+          materialTypesChartRef.current.destroy();
         }
-      };
+        
+        if (inventoryChartRef.current) {
+          inventoryChartRef.current.destroy();
+        }
+        
+        // Material Types Chart
+        const materialTypesCtx = document.getElementById('materialTypesChart')?.getContext('2d');
+        if (materialTypesCtx) {
+          materialTypesChartRef.current = new Chart(materialTypesCtx, {
+            type: 'pie',
+            data: {
+              labels: dashboardData.materialTypeLabels || ['Máy móc', 'Other'],
+              datasets: [{
+                data: dashboardData.materialTypeData || [5, 1],
+                backgroundColor: [
+                  'rgba(54, 162, 235, 0.8)',
+                  'rgba(255, 206, 86, 0.8)'
+                ],
+                borderColor: [
+                  'rgba(54, 162, 235, 1)',
+                  'rgba(255, 206, 86, 1)'
+                ],
+                borderWidth: 1
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: {
+                legend: {
+                  position: 'bottom'
+                }
+              }
+            }
+          });
+        }
+        
+        // Inventory Changes Chart
+        const inventoryCtx = document.getElementById('inventoryChart')?.getContext('2d');
+        if (inventoryCtx) {
+          inventoryChartRef.current = new Chart(inventoryCtx, {
+            type: 'line',
+            data: {
+              labels: dashboardData.inventoryChanges?.labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+              datasets: [{
+                label: 'Inventory Level',
+                data: dashboardData.inventoryChanges?.data || [42, 49, 55, 60, 66],
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 2,
+                tension: 0.3
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: {
+                  beginAtZero: true
+                }
+              }
+            }
+          });
+        }
+      }
+    };
     
-    if (!loading && !error && dashboardData) {
+    if (!isLoading && !error && dashboardData) {
       initializeCharts();
     }
-  }, [dashboardData, loading, error]);
+    
+    // Cleanup charts on component unmount
+    return () => {
+      if (materialTypesChartRef.current) {
+        materialTypesChartRef.current.destroy();
+      }
+      
+      if (inventoryChartRef.current) {
+        inventoryChartRef.current.destroy();
+      }
+    };
+  }, [dashboardData, isLoading, error]);
 
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
   
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
         <div className="spinner-border text-primary" role="status">
@@ -125,27 +120,14 @@ function Dashboard({ user }) {
   if (error) {
     return (
       <div className="container mt-5">
-        <div className="alert alert-danger">{error}</div>
+        <div className="alert alert-danger">{error.message}</div>
       </div>
     );
   }
 
   return (
     <>
-      {/* Navigation Bar */}
-      <nav className="navbar navbar-expand-lg navbar-dark">
-        <div className="container-fluid">
-          <div className="d-flex">
-            <Link className="navbar-brand" to="/dashboard">Dashboard</Link>
-            <Link className="navbar-brand" to="/materials">Nhà kho</Link>
-            <Link className="navbar-brand" to="/employees">Nhân viên</Link>
-          </div>
-          <div className="d-flex align-items-center">
-            <span>Hi, {user.username}</span>
-            <div className="avatar">{user.username.charAt(0).toUpperCase()}</div>
-          </div>
-        </div>
-      </nav>
+      <Navbar user={user} onLogout={handleLogout} />
 
       {/* Main Content */}
       <div className="container-fluid mt-4">
@@ -156,28 +138,28 @@ function Dashboard({ user }) {
           <div className="col-md-3 mb-3">
             <div className="dashboard-card bg-primary text-white p-4 text-center">
               <i className="fas fa-box card-icon"></i>
-              <div className="stat-value">{dashboardData.totalMaterials || 6}</div>
+              <div className="stat-value">{dashboardData?.totalMaterials || 0}</div>
               <div>Total Materials</div>
             </div>
           </div>
           <div className="col-md-3 mb-3">
             <div className="dashboard-card bg-success text-white p-4 text-center">
               <i className="fas fa-truck card-icon"></i>
-              <div className="stat-value">{dashboardData.totalSuppliers || 2}</div>
+              <div className="stat-value">{dashboardData?.totalSuppliers || 0}</div>
               <div>Suppliers</div>
             </div>
           </div>
           <div className="col-md-3 mb-3">
             <div className="dashboard-card bg-warning text-white p-4 text-center">
               <i className="fas fa-shopping-cart card-icon"></i>
-              <div className="stat-value">12</div>
+              <div className="stat-value">{dashboardData?.ordersThisWeek || 0}</div>
               <div>This Week's Orders</div>
             </div>
           </div>
           <div className="col-md-3 mb-3">
             <div className="dashboard-card bg-info text-white p-4 text-center">
               <i className="fas fa-users card-icon"></i>
-              <div className="stat-value">5</div>
+              <div className="stat-value">{dashboardData?.systemUsers || 0}</div>
               <div>System Users</div>
             </div>
           </div>
@@ -186,13 +168,13 @@ function Dashboard({ user }) {
         {/* Charts Row */}
         <div className="row mb-4">
           <div className="col-md-6">
-            <div className="dashboard-chart bg-white">
+            <div className="dashboard-chart bg-white p-3 rounded shadow-sm">
               <h4>Material Types Distribution</h4>
               <canvas id="materialTypesChart"></canvas>
             </div>
           </div>
           <div className="col-md-6">
-            <div className="dashboard-chart bg-white">
+            <div className="dashboard-chart bg-white p-3 rounded shadow-sm">
               <h4>Monthly Inventory Changes</h4>
               <canvas id="inventoryChart"></canvas>
             </div>
@@ -202,7 +184,7 @@ function Dashboard({ user }) {
         {/* Recent Items */}
         <div className="row mb-4">
           <div className="col-md-12">
-            <div className="recent-items bg-white">
+            <div className="recent-items bg-white p-3 rounded shadow-sm">
               <h4 className="mb-4">Recently Updated Materials</h4>
               <div className="table-responsive">
                 <table className="table table-hover">
@@ -218,7 +200,7 @@ function Dashboard({ user }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {(dashboardData.recentMaterials || []).length > 0 ? (
+                    {(dashboardData?.recentMaterials || []).length > 0 ? (
                       dashboardData.recentMaterials.map(material => (
                         <tr key={material.id}>
                           <td>{material.packet_no}</td>
@@ -274,7 +256,7 @@ function Dashboard({ user }) {
         {/* Quick Actions */}
         <div className="row mb-4">
           <div className="col-md-12">
-            <div className="recent-items bg-white">
+            <div className="recent-items bg-white p-3 rounded shadow-sm">
               <h4 className="mb-4">Quick Actions</h4>
               <div className="row">
                 <div className="col-md-3 mb-2">
