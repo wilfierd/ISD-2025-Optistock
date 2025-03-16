@@ -41,13 +41,36 @@
 }
 
 .user-detail-row {
-    border-bottom: 1px solid #dee2e6;
-    padding: 8px 0;
+    display: flex;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    flex-wrap: wrap; /* Allow wrapping for long content */
 }
 
 .user-detail-label {
-    font-weight: bold;
-    color: #6c757d;
+    flex: 0 0 120px;
+    font-weight: 600;
+    color: #495057;
+    padding-right: 15px;
+}
+
+.user-detail-value {
+    flex: 1;
+    word-break: break-word; /* Break words to prevent overflow */
+    overflow-wrap: break-word; /* Modern browsers */
+    hyphens: auto; /* Add hyphens when breaking words if needed */
+    min-width: 0;
+    max-width: 100%; /* Ensure the value doesn't exceed container width */
+}
+
+/* User details container specific styles */
+.user-details-container {
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    width: 100%;
+    overflow: hidden; /* Prevent overflow */
 }
 
 /* Mobile responsiveness */
@@ -55,5 +78,73 @@
     .btn-action {
         margin-bottom: 10px;
         width: 100%;
+    }
+    
+    .user-detail-row {
+        flex-direction: column;
+    }
+    
+    .user-detail-label {
+        margin-bottom: 5px;
+        flex-basis: 100%;
+    }
+    
+    .user-detail-value {
+        padding-left: 10px;
+    }
+}
+
+@media (max-width: 576px) {
+    .user-detail-row {
+        flex-direction: column;
+    }
+    
+    .user-detail-label {
+        margin-bottom: 5px;
+    }
+}
+
+/* Make sure the modals look good */
+.modal-dialog {
+    max-width: 90% !important; /* Use percentage instead of fixed width */
+    width: 90%;
+    margin: 1.75rem auto;
+}
+
+.modal-dialog.modal-lg {
+    max-width: 90% !important; /* For even wider modals when needed */
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-x: hidden; /* Hide horizontal overflow */
+}
+
+.modal-title {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* For very long content */
+@media (min-width: 992px) {
+    .modal-dialog {
+        max-width: 80% !important;
+    }
+    
+    .modal-dialog.modal-lg {
+        max-width: 85% !important;
+    }
+}
+
+/* For very wide screens, limit maximum width */
+@media (min-width: 1200px) {
+    .modal-dialog {
+        max-width: 1000px !important;
+    }
+    
+    .modal-dialog.modal-lg {
+        max-width: 1100px !important;
     }
 }
