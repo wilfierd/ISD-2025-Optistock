@@ -159,3 +159,118 @@ h4 {
       padding-right: 10px;
   }
 }
+
+/* Status dot styles */
+.status-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: #e9ecef;
+  border: 1px solid #ced4da;
+  margin: auto;
+  transition: all 0.2s ease-in-out;
+}
+
+.status-dot.active {
+  background-color: #4caf50;
+  border-color: #4caf50;
+  transform: scale(1.1);
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+/* Highlight the row on hover */
+.table tbody tr:hover {
+  background-color: #f5f9fc !important;
+}
+
+/* Modal overlay styles */
+.modal-backdrop {
+  opacity: 0.5;
+}
+
+.modal-content {
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  border: none;
+}
+
+/* Center modals properly on the screen */
+.modal {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 !important;
+}
+
+.modal-dialog {
+  margin: 0 auto;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  border-bottom: 2px solid #f0f0f0;
+  padding: 15px 20px;
+}
+
+.modal-footer {
+  border-top: 2px solid #f0f0f0;
+  padding: 15px 20px;
+}
+
+/* Form styling */
+.form-label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.form-control:focus {
+  border-color: #0a4d8c;
+  box-shadow: 0 0 0 0.2rem rgba(10, 77, 140, 0.25);
+}
+
+/* Read-only details view */
+.modal-body strong {
+  color: #495057;
+}
+
+.modal-body p {
+  margin-bottom: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Print button styling */
+.fa-print {
+  color: #6c757d;
+}
+
+.fa-print:hover {
+  color: #0a4d8c;
+}
+
+/* Add button styling */
+.btn-primary {
+  background-color: #0a4d8c;
+  border-color: #0a4d8c;
+}
+
+.btn-primary:hover {
+  background-color: #083d70;
+  border-color: #083d70;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .modal-dialog {
+    margin: 0.5rem;
+  }
+  
+  .container-fluid {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  
+  .table th, .table td {
+    padding: 0.5rem;
+  }
+}

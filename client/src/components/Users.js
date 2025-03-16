@@ -135,6 +135,7 @@ function Users({ user }) {
       createUser.mutate(userData, {
         onSuccess: () => {
           setShowUserModal(false);
+          setSelectedUserId(null);
         }
       });
     } else {
@@ -144,6 +145,7 @@ function Users({ user }) {
       }, {
         onSuccess: () => {
           setShowUserModal(false);
+          setSelectedUserId(null);
         }
       });
     }
@@ -154,8 +156,16 @@ function Users({ user }) {
     deleteUser.mutate(selectedUserId, {
       onSuccess: () => {
         setShowDeleteModal(false);
+        setSelectedUserId(null);
       }
     });
+  };
+
+  // Close all modals and clear selection
+  const closeAllModals = () => {
+    setShowUserModal(false);
+    setShowDeleteModal(false);
+    setSelectedUserId(null);
   };
 
   return (
@@ -252,7 +262,7 @@ function Users({ user }) {
       {/* User Modal (View/Edit/Add) */}
       {showUserModal && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
-          <div className="modal-dialog modal-lg">
+          <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
@@ -265,31 +275,34 @@ function Users({ user }) {
                 <button 
                   type="button" 
                   className="btn-close" 
-                  onClick={() => setShowUserModal(false)}
+                  onClick={() => {
+                    setShowUserModal(false);
+                    setSelectedUserId(null);
+                  }}
                 ></button>
               </div>
               <div className="modal-body">
                 {modalMode === 'view' && selectedUser ? (
-                  <div>
-                    <div className="row mb-3">
-                      <div className="col-md-3 fw-bold">Username:</div>
-                      <div className="col-md-9">{selectedUser.username}</div>
+                  <div className="user-details-container">
+                    <div className="user-detail-row">
+                      <div className="user-detail-label">Username</div>
+                      <div className="user-detail-value">{selectedUser.username}</div>
                     </div>
-                    <div className="row mb-3">
-                      <div className="col-md-3 fw-bold">Full Name:</div>
-                      <div className="col-md-9">{selectedUser.full_name}</div>
+                    <div className="user-detail-row">
+                      <div className="user-detail-label">Full Name</div>
+                      <div className="user-detail-value">{selectedUser.full_name}</div>
                     </div>
-                    <div className="row mb-3">
-                      <div className="col-md-3 fw-bold">Role:</div>
-                      <div className="col-md-9">{selectedUser.role}</div>
+                    <div className="user-detail-row">
+                      <div className="user-detail-label">Role</div>
+                      <div className="user-detail-value">{selectedUser.role}</div>
                     </div>
-                    <div className="row mb-3">
-                      <div className="col-md-3 fw-bold">Phone:</div>
-                      <div className="col-md-9">{selectedUser.phone || '-'}</div>
+                    <div className="user-detail-row">
+                      <div className="user-detail-label">Phone</div>
+                      <div className="user-detail-value">{selectedUser.phone || '-'}</div>
                     </div>
-                    <div className="row mb-3">
-                      <div className="col-md-3 fw-bold">Created At:</div>
-                      <div className="col-md-9">
+                    <div className="user-detail-row">
+                      <div className="user-detail-label">Created At</div>
+                      <div className="user-detail-value">
                         {new Date(selectedUser.created_at).toLocaleString()}
                       </div>
                     </div>
@@ -365,7 +378,10 @@ function Users({ user }) {
                 <button 
                   type="button" 
                   className="btn btn-secondary" 
-                  onClick={() => setShowUserModal(false)}
+                  onClick={() => {
+                    setShowUserModal(false);
+                    setSelectedUserId(null);
+                  }}
                 >
                   {modalMode === 'view' ? 'Close' : 'Cancel'}
                 </button>
@@ -413,7 +429,7 @@ function Users({ user }) {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
-          <div className="modal-dialog">
+          <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Confirm Delete</h5>
@@ -446,6 +462,14 @@ function Users({ user }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Backdrop for modals */}
+      {(showUserModal || showDeleteModal) && (
+        <div 
+          className="modal-backdrop fade show" 
+          onClick={closeAllModals}
+        ></div>
       )}
     </div>
   );
