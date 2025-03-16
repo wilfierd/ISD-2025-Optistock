@@ -111,6 +111,78 @@ async function getDashboardData(pool) {
   }
 }
 
+// Add this function near the top of your app.js file
+function safelyParseJSON(json) {
+  try {
+    // If it's already an object, return it
+    if (typeof json === 'object' && json !== null) {
+      return json;
+    }
+    
+    // If it's a string, parse it
+    if (typeof json === 'string') {
+      return JSON.parse(json);
+    }
+    
+    // Otherwise, return an empty object
+    return {};
+  } catch (error) {
+    console.error("JSON parse error:", error);
+    return {};
+  }
+}
+
+// Then update your API route
+app.get('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
+  try {
+    // Get request filter from query params
+    const status = req.query.status || 'pending';
+    
+    // Admins see all requests, regular users only see their own
+    const whereClause = req.session.user.role === 'admin' 
+      ? 'WHERE mr.status = ?' 
+      : 'WHERE mr.status = ? AND mr.user_id = ?';
+    
+    const queryParams = req.session.user.role === 'admin'
+      ? [status]
+      : [status, req.session.user.id];
+    
+    // Query with joins to get user info
+    const [requests] = await pool.query(
+      `SELECT mr.*, u.username as user_username, u.full_name as user_full_name
+       FROM material_requests mr
+       JOIN users u ON mr.user_id = u.id
+       ${whereClause}
+       ORDER BY mr.request_date DESC`,
+      queryParams
+    );
+    
+    // Pre-process the request data to ensure it's properly formatted
+    const processedRequests = requests.map(request => {
+      // Make a copy to avoid modifying the original
+      const processedRequest = {...request};
+      
+      // Process the request_data field
+      if (processedRequest.request_data) {
+        try {
+          // Parse JSON string if needed
+          processedRequest.request_data = safelyParseJSON(processedRequest.request_data);
+        } catch (error) {
+          console.error(`Error processing request data for ID ${request.id}:`, error);
+          processedRequest.request_data = {};
+        }
+      }
+      
+      return processedRequest;
+    });
+    
+    res.json({ success: true, data: processedRequests });
+  } catch (error) {
+    console.error('Error fetching material requests:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch material requests' });
+  }
+});
+
 // ===== API ROUTES =====
 
 // Authentication API
@@ -466,6 +538,246 @@ app.get('/api/materials/:id', isAuthenticatedAPI, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch material' });
   }
 });
+
+// ===== MATERIAL REQUESTS API =====
+
+// Get all material requests (admin only, with proper error handling)
+app.get('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
+  try {
+    // Get request filter from query params
+    const status = req.query.status || 'pending';
+    
+    // Admins see all requests, regular users only see their own
+    const whereClause = req.session.user.role === 'admin' 
+      ? 'WHERE mr.status = ?' 
+      : 'WHERE mr.status = ? AND mr.user_id = ?';
+    
+    const queryParams = req.session.user.role === 'admin'
+      ? [status]
+      : [status, req.session.user.id];
+    
+    // Query with joins to get user info
+    const [requests] = await pool.query(
+      `SELECT mr.*, u.username as user_username, u.full_name as user_full_name
+       FROM material_requests mr
+       JOIN users u ON mr.user_id = u.id
+       ${whereClause}
+       ORDER BY mr.request_date DESC`,
+      queryParams
+    );
+    
+    // Log the retrieved data for debugging
+    console.log(`Retrieved ${requests.length} ${status} material requests`);
+    
+    res.json({ success: true, data: requests });
+  } catch (error) {
+    console.error('Error fetching material requests:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch material requests' });
+  }
+});
+
+// Get material requests for current user
+app.get('/api/my-material-requests', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const [requests] = await pool.query(
+      `SELECT * FROM material_requests
+       WHERE user_id = ?
+       ORDER BY request_date DESC`,
+      [req.session.user.id]
+    );
+    
+    console.log(`Retrieved ${requests.length} material requests for user ${req.session.user.id}`);
+    
+    res.json({ success: true, data: requests });
+  } catch (error) {
+    console.error('Error fetching user material requests:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch material requests' });
+  }
+});
+
+// Create a new material request (simplified)
+app.post('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
+  try {
+    console.log('Received material request payload:', JSON.stringify(req.body));
+    
+    const { requestType, materialId, requestData } = req.body;
+    
+    // Validate request type
+    if (!['add', 'edit', 'delete'].includes(requestType)) {
+      return res.status(400).json({ success: false, error: 'Invalid request type' });
+    }
+    
+    // For edit and delete, materialId is required
+    if ((requestType === 'edit' || requestType === 'delete') && !materialId) {
+      return res.status(400).json({ success: false, error: 'Material ID is required for edit/delete requests' });
+    }
+    
+    // Insert request into database
+    const [result] = await pool.query(
+      `INSERT INTO material_requests 
+       (request_type, material_id, request_data, user_id) 
+       VALUES (?, ?, ?, ?)`,
+      [
+        requestType, 
+        materialId || null, 
+        JSON.stringify(requestData || {}), 
+        req.session.user.id
+      ]
+    );
+    
+    console.log(`Created material request with ID ${result.insertId}`);
+    
+    // Create notification for all admins
+    const [admins] = await pool.query('SELECT id FROM users WHERE role = "admin"');
+    
+    for (const admin of admins) {
+      await pool.query(
+        `INSERT INTO admin_notifications (user_id, message)
+         VALUES (?, ?)`,
+        [admin.id, `New ${requestType} material request from ${req.session.user.username}`]
+      );
+    }
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Material request submitted successfully', 
+      requestId: result.insertId 
+    });
+  } catch (error) {
+    console.error('Error creating material request:', error);
+    res.status(500).json({ success: false, error: `Failed to create material request: ${error.message}` });
+  }
+});
+
+// Process a material request (admin only)
+app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, adminNotes } = req.body;
+    
+    console.log(`Processing material request ${id} with status ${status}`);
+    
+
+    
+    // Validate status
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status' });
+    }
+    
+    // Get the request details
+    const [requests] = await pool.query('SELECT * FROM material_requests WHERE id = ?', [id]);
+    
+    if (requests.length === 0) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
+    
+    const request = requests[0];
+    
+    // Check if request is already processed
+    if (request.status !== 'pending') {
+      return res.status(400).json({ success: false, error: 'Request already processed' });
+    }
+
+    let requestData = {};
+    try {
+      requestData = safelyParseJSON(request.request_data);
+    } catch (error) {
+      console.error('Error parsing request data:', error);
+      return res.status(400).json({ success: false, error: 'Invalid request data format' });
+    }
+    
+    // Start a transaction
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+    
+    try {
+      // Update request status
+      await connection.query(
+        `UPDATE material_requests 
+         SET status = ?, response_date = NOW(), admin_id = ?, admin_notes = ? 
+         WHERE id = ?`,
+        [status, req.session.user.id, adminNotes || null, id]
+      );
+      
+      console.log(`Updated material request ${id} status to ${status}`);
+      
+      // If approved, process the request
+      if (status === 'approved') {
+        let requestData = {};
+    try {
+      requestData = safelyParseJSON(request.request_data);
+    } catch (error) {
+      console.error('Error parsing request data:', error);
+      return res.status(400).json({ success: false, error: 'Invalid request data format' });
+    }
+        
+        if (request.request_type === 'add') {
+          // Add new material
+          const { packetNo, partName, length, width, height, quantity, supplier } = requestData;
+          const currentDate = new Date().toLocaleDateString('en-GB');
+          
+          const [addResult] = await connection.query(
+            `INSERT INTO materials 
+             (packet_no, part_name, length, width, height, quantity, supplier, updated_by, last_updated) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [packetNo, partName, length, width, height, quantity, supplier, req.session.user.username, currentDate]
+          );
+          
+          console.log(`Added new material with ID ${addResult.insertId}`);
+        } else if (request.request_type === 'edit') {
+          // Edit existing material
+          const { packetNo, partName, length, width, height, quantity, supplier } = requestData;
+          const currentDate = new Date().toLocaleDateString('en-GB');
+          
+          await connection.query(
+            `UPDATE materials 
+             SET packet_no = ?, part_name = ?, length = ?, width = ?, height = ?, 
+                 quantity = ?, supplier = ?, updated_by = ?, last_updated = ? 
+             WHERE id = ?`,
+            [packetNo, partName, length, width, height, quantity, supplier, 
+             req.session.user.username, currentDate, request.material_id]
+          );
+          
+          console.log(`Updated material ${request.material_id}`);
+        } else if (request.request_type === 'delete') {
+          // Delete material
+          await connection.query('DELETE FROM materials WHERE id = ?', [request.material_id]);
+          console.log(`Deleted material ${request.material_id}`);
+        }
+      }
+      
+      // Commit the transaction
+      await connection.commit();
+      
+      // Create notification for the requester
+      await pool.query(
+        `INSERT INTO admin_notifications (user_id, message)
+         VALUES (?, ?)`,
+        [request.user_id, `Your ${request.request_type} material request has been ${status}`]
+      );
+      
+      res.json({ 
+        success: true, 
+        message: `Request ${status} successfully`,
+        requestId: id
+      });
+    } catch (error) {
+      // If error, rollback changes
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Error processing material request:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: `Failed to process material request: ${error.message}` 
+    });
+  }
+});
+
+
 
 // ===== SERVE REACT APP =====
 

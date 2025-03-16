@@ -1,4 +1,4 @@
-// client/src/components/Materials.js
+// Updated Materials.js component with green indicator restored
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
@@ -8,6 +8,7 @@ import {
   useUpdateMaterial, 
   useDeleteMaterial
 } from '../hooks/useMaterials';
+import { useCreateMaterialRequest } from '../hooks/useMaterialRequests';
 
 function Materials({ user }) {
   // State for search and selected material
@@ -18,11 +19,11 @@ function Materials({ user }) {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestType, setRequestType] = useState('add');
   
   // QR code state
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
-  const [qrCodeMaterialUrl, setQrCodeMaterialUrl] = useState('');
+  const [showQrModal, setShowQrModal] = useState(false);
   
   // Form state for add/edit modal
   const [formData, setFormData] = useState({
@@ -41,7 +42,11 @@ function Materials({ user }) {
   const createMaterial = useCreateMaterial();
   const updateMaterial = useUpdateMaterial();
   const deleteMaterial = useDeleteMaterial();
+  const createRequest = useCreateMaterialRequest();
   const logoutMutation = useLogout();
+
+  // Check if user is admin
+  const isAdmin = user.role === 'admin';
 
   // Filter materials based on search term
   const filteredMaterials = useMemo(() => {
@@ -83,30 +88,34 @@ function Materials({ user }) {
       quantity: '',
       supplier: ''
     });
-    setShowAddModal(true);
+    
+    if (isAdmin) {
+      setShowAddModal(true);
+    } else {
+      setRequestType('add');
+      setShowRequestModal(true);
+    }
   };
 
-  // Handle delete button click in details modal
+  // Toggle edit modal (in detail view)
+  const handleEditClick = () => {
+    if (!isAdmin) {
+      setShowDetailsModal(false);
+      setRequestType('edit');
+      setShowRequestModal(true);
+    }
+  };
+
+  // Toggle delete modal (in detail view)
   const handleDeleteClick = () => {
-    setShowDetailsModal(false);
-    setShowDeleteModal(true);
-  };
-
-  // Handle QR code generation
-  const handlePrint = (id, e) => {
-    e.stopPropagation(); // Prevent row click event
-    
-    const material = materials.find(m => m.id === id);
-    if (!material) return;
-    
-    // Set up QR code modal data
-    setSelectedMaterial(material);
-    const materialUrl = `${window.location.origin}/material/${id}`;
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(materialUrl)}`;
-    
-    setQrCodeUrl(qrCodeUrl);
-    setQrCodeMaterialUrl(materialUrl);
-    setShowQrModal(true);
+    if (isAdmin) {
+      setShowDeleteModal(true);
+      setShowDetailsModal(false);
+    } else {
+      setShowDetailsModal(false);
+      setRequestType('delete');
+      setShowRequestModal(true);
+    }
   };
 
   // Handle logout
@@ -123,7 +132,7 @@ function Materials({ user }) {
     }));
   };
 
-  // Handle save (create or update)
+  // Handle form submission (admin only)
   const handleSaveClick = (isNewMaterial = false) => {
     const materialData = {
       packetNo: parseInt(formData.packetNo),
@@ -139,7 +148,6 @@ function Materials({ user }) {
       createMaterial.mutate(materialData, {
         onSuccess: () => {
           setShowAddModal(false);
-          setSelectedMaterial(null);
         }
       });
     } else {
@@ -149,31 +157,74 @@ function Materials({ user }) {
       }, {
         onSuccess: () => {
           setShowDetailsModal(false);
-          setSelectedMaterial(null);
         }
       });
     }
   };
 
-  // Handle delete confirmation
+  // Handle delete confirmation (admin only)
   const handleConfirmDelete = () => {
     if (selectedMaterial) {
       deleteMaterial.mutate(selectedMaterial.id, {
         onSuccess: () => {
           setShowDeleteModal(false);
-          setSelectedMaterial(null);
         }
       });
     }
   };
 
-  // Close all modals and clear selection
-  const closeAllModals = () => {
-    setShowDetailsModal(false);
-    setShowAddModal(false);
-    setShowDeleteModal(false);
-    setShowQrModal(false);
-    setSelectedMaterial(null);
+  // Handle request submission (non-admin users)
+  const handleSubmitRequest = () => {
+    const materialData = {
+      packetNo: parseInt(formData.packetNo),
+      partName: formData.partName,
+      length: parseInt(formData.length),
+      width: parseInt(formData.width),
+      height: parseInt(formData.height),
+      quantity: parseInt(formData.quantity),
+      supplier: formData.supplier
+    };
+    
+    let requestData = {};
+    
+    if (requestType === 'add') {
+      requestData = {
+        requestType: 'add',
+        requestData: materialData
+      };
+    } else if (requestType === 'edit') {
+      requestData = {
+        requestType: 'edit',
+        materialId: formData.materialId,
+        requestData: materialData
+      };
+    } else if (requestType === 'delete') {
+      requestData = {
+        requestType: 'delete',
+        materialId: selectedMaterial.id
+      };
+    }
+    
+    createRequest.mutate(requestData, {
+      onSuccess: () => {
+        setShowRequestModal(false);
+      }
+    });
+  };
+
+  // Handle QR code generation
+  const handlePrint = (id, e) => {
+    e.stopPropagation(); // Prevent row click event
+    
+    const material = materials.find(m => m.id === id);
+    if (!material) return;
+    
+    // Set up QR code modal data
+    setSelectedMaterial(material);
+    const materialUrl = `${window.location.origin}/material/${id}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(materialUrl)}`;
+    
+    setShowQrModal(true);
   };
 
   return (
@@ -200,9 +251,9 @@ function Materials({ user }) {
             <button 
               className="btn btn-primary" 
               onClick={handleAddClick}
-              disabled={createMaterial.isPending}
+              disabled={isAdmin ? createMaterial.isPending : createRequest.isPending}
             >
-              {createMaterial.isPending ? 'Adding...' : 'Add'}
+              {isAdmin ? 'Add' : 'Request Add'}
             </button>
           </div>
         </div>
@@ -296,7 +347,7 @@ function Materials({ user }) {
                 ></button>
               </div>
               <div className="modal-body">
-                {user.role === 'admin' ? (
+                {isAdmin ? (
                   // Admin view - Edit form
                   <form id="materialForm">
                     <div className="row mb-3">
@@ -438,7 +489,7 @@ function Materials({ user }) {
                   Close
                 </button>
                 
-                {user.role === 'admin' && (
+                {isAdmin ? (
                   <>
                     <button 
                       type="button" 
@@ -456,6 +507,23 @@ function Materials({ user }) {
                       {updateMaterial.isPending ? 'Saving...' : 'Save Changes'}
                     </button>
                   </>
+                ) : (
+                  <>
+                    <button 
+                      type="button" 
+                      className="btn btn-warning" 
+                      onClick={handleEditClick}
+                    >
+                      Request Edit
+                    </button>
+                    <button 
+                      type="button" 
+                      className="btn btn-danger" 
+                      onClick={handleDeleteClick}
+                    >
+                      Request Delete
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -463,7 +531,7 @@ function Materials({ user }) {
         </div>
       )}
 
-      {/* Add Material Modal */}
+      {/* Add Material Modal (Admin Only) */}
       {showAddModal && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
           <div className="modal-dialog modal-lg modal-dialog-centered">
@@ -585,7 +653,7 @@ function Materials({ user }) {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal (Admin Only) */}
       {showDeleteModal && selectedMaterial && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered">
@@ -623,6 +691,146 @@ function Materials({ user }) {
         </div>
       )}
 
+      {/* Request Modal (Non-Admin Only) */}
+      {showRequestModal && (
+        <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+          <div className="modal-dialog modal-lg">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">
+                  Request to {requestType.charAt(0).toUpperCase() + requestType.slice(1)} Material
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => setShowRequestModal(false)}
+                ></button>
+              </div>
+              <div className="modal-body">
+                {requestType === 'delete' ? (
+                  <div>
+                    <p>You are about to request deletion of the following material:</p>
+                    <p><strong>Material:</strong> {selectedMaterial.partName} (ID: {selectedMaterial.id})</p>
+                    <div className="alert alert-info">
+                      <i className="fas fa-info-circle me-2"></i>
+                      This request will be sent to an administrator for approval.
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p>Fill in the details for your {requestType} request:</p>
+                    <form id="materialRequestForm">
+                      <div className="row mb-3">
+                        <div className="col-md-6">
+                          <label htmlFor="packetNo" className="form-label">Packet No</label>
+                          <input 
+                            type="number" 
+                            className="form-control" 
+                            id="packetNo" 
+                            value={formData.packetNo}
+                            onChange={handleInputChange}
+                            required 
+                          />
+                        </div>
+                        <div className="col-md-6">
+                          <label htmlFor="partName" className="form-label">Part Name</label>
+                          <input 
+                            type="text" 
+                            className="form-control" 
+                            id="partName" 
+                            value={formData.partName}
+                            onChange={handleInputChange}
+                            required 
+                          />
+                        </div>
+                      </div>
+                      <div className="row mb-3">
+                        <div className="col-md-3">
+                          <label htmlFor="length" className="form-label">Dài</label>
+                          <input 
+                            type="number" 
+                            className="form-control" 
+                            id="length" 
+                            value={formData.length}
+                            onChange={handleInputChange}
+                            required 
+                          />
+                        </div>
+                        <div className="col-md-3">
+                          <label htmlFor="width" className="form-label">Rộng</label>
+                          <input 
+                            type="number" 
+                            className="form-control" 
+                            id="width" 
+                            value={formData.width}
+                            onChange={handleInputChange}
+                            required 
+                          />
+                        </div>
+                        <div className="col-md-3">
+                          <label htmlFor="height" className="form-label">Cao</label>
+                          <input 
+                            type="number" 
+                            className="form-control" 
+                            id="height" 
+                            value={formData.height}
+                            onChange={handleInputChange}
+                            required 
+                          />
+                        </div>
+                        <div className="col-md-3">
+                          <label htmlFor="quantity" className="form-label">Quantity</label>
+                          <input 
+                            type="number" 
+                            className="form-control" 
+                            id="quantity" 
+                            value={formData.quantity}
+                            onChange={handleInputChange}
+                            required 
+                          />
+                        </div>
+                      </div>
+                      <div className="mb-3">
+                        <label htmlFor="supplier" className="form-label">Supplier</label>
+                        <input 
+                          type="text" 
+                          className="form-control" 
+                          id="supplier" 
+                          value={formData.supplier}
+                          onChange={handleInputChange}
+                          required 
+                        />
+                      </div>
+                      <div className="alert alert-info">
+                        <i className="fas fa-info-circle me-2"></i>
+                        This request will be sent to an administrator for approval.
+                      </div>
+                    </form>
+                  </>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowRequestModal(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  onClick={handleSubmitRequest}
+                  disabled={createRequest.isPending}
+                >
+                  {createRequest.isPending ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* QR Code Modal */}
       {showQrModal && selectedMaterial && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
@@ -642,13 +850,13 @@ function Materials({ user }) {
               <div className="modal-body text-center">
                 <p>Scan this QR code to view material details:</p>
                 <img 
-                  src={qrCodeUrl}
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/material/${selectedMaterial.id}`)}`}
                   alt="QR Code"
                   className="img-fluid mb-3"
                   style={{ maxWidth: '200px' }}
                 />
                 <p className="small text-muted">
-                  {qrCodeMaterialUrl}
+                  {`${window.location.origin}/material/${selectedMaterial.id}`}
                 </p>
               </div>
               <div className="modal-footer">
@@ -685,8 +893,8 @@ function Materials({ user }) {
                           <h3>${selectedMaterial.partName}</h3>
                           <p>Packet: ${selectedMaterial.packetNo} | Dimensions: ${selectedMaterial.length} x ${selectedMaterial.width} x ${selectedMaterial.height}</p>
                         </div>
-                        <img src="${qrCodeUrl}" class="qr-code" />
-                        <p>${qrCodeMaterialUrl}</p>
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/material/${selectedMaterial.id}`)}" class="qr-code" />
+                        <p>${window.location.origin}/material/${selectedMaterial.id}</p>
                       </body>
                       </html>
                     `);
@@ -705,10 +913,17 @@ function Materials({ user }) {
       )}
 
       {/* Backdrop for modals */}
-      {(showDetailsModal || showAddModal || showDeleteModal || showQrModal) && (
+      {(showDetailsModal || showAddModal || showDeleteModal || showQrModal || showRequestModal) && (
         <div 
-          className="modal-backdrop fade show" 
-          onClick={closeAllModals}
+          className="modal-backdrop fade show"
+          onClick={() => {
+            setShowDetailsModal(false);
+            setShowAddModal(false);
+            setShowDeleteModal(false);
+            setShowQrModal(false);
+            setShowRequestModal(false);
+            setSelectedMaterial(null);
+          }}
         ></div>
       )}
     </div>

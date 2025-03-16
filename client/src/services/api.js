@@ -64,7 +64,21 @@ const apiService = {
   // Dashboard data
   dashboard: {
     getData: () => api.get('/dashboard'),
-  }
+  },
+
+  materialRequests: {
+    getAll: (status = 'pending') => api.get(`/material-requests?status=${status}`),
+    getMyRequests: () => api.get('/my-material-requests'),
+    create: (data) => api.post('/material-requests', data),
+    process: (id, data) => api.put(`/material-requests/${id}`, data),
+    getById: (id) => api.get(`/material-requests/${id}`),
+  },
+  
+  // Notifications endpoints
+  notifications: {
+    getAll: () => api.get('/notifications'),
+    markAsRead: (notificationIds) => api.put('/notifications/read', { notificationIds }),
+  },
 };
 
 export default apiService;
