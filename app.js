@@ -663,8 +663,7 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, error: 'Invalid status' });
     }
-    
-    
+
     // Get the request details
     const [requests] = await pool.query('SELECT * FROM material_requests WHERE id = ?', [id]);
     
