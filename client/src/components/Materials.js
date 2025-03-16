@@ -1,4 +1,4 @@
-// Updated Materials.js component with green indicator restored
+// client/src/components/Materials.js with fixed dropdown functionality
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
@@ -13,6 +13,8 @@ import { useCreateMaterialRequest } from '../hooks/useMaterialRequests';
 function Materials({ user }) {
   // State for search and selected material
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchField, setSearchField] = useState('partName'); // Default search field
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false); // State for dropdown visibility
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   
   // Modal states
@@ -48,17 +50,52 @@ function Materials({ user }) {
   // Check if user is admin
   const isAdmin = user.role === 'admin';
 
-  // Filter materials based on search term
+  // Filter materials based on search term and search field
   const filteredMaterials = useMemo(() => {
-    return materials.filter(material => 
-      material.partName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [materials, searchTerm]);
+    if (!searchTerm) return materials;
+    
+    return materials.filter(material => {
+      switch(searchField) {
+        case 'packetNo':
+          return material.packetNo.toString().includes(searchTerm);
+        case 'partName':
+          return material.partName.toLowerCase().includes(searchTerm.toLowerCase());
+        case 'supplier':
+          return material.supplier.toLowerCase().includes(searchTerm.toLowerCase());
+        case 'updatedBy':
+          return material.updatedBy.toLowerCase().includes(searchTerm.toLowerCase());
+        default:
+          return material.partName.toLowerCase().includes(searchTerm.toLowerCase());
+      }
+    });
+  }, [materials, searchTerm, searchField]);
 
-  // Handle search
+  // Handle search input change
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
   };
+
+  // Handle search field change
+  const handleSearchFieldChange = (e) => {
+    setSearchField(e.target.value);
+    setSearchTerm(''); // Clear search term when changing fields
+    setShowFilterDropdown(false); // Close dropdown after selection
+  };
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (showFilterDropdown && 
+          !event.target.closest('.dropdown')) {
+        setShowFilterDropdown(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFilterDropdown]);
 
   // Handle material row click
   const handleMaterialClick = (material) => {
@@ -227,6 +264,22 @@ function Materials({ user }) {
     setShowQrModal(true);
   };
 
+  // Get placeholder text based on selected search field
+  const getPlaceholderText = () => {
+    switch(searchField) {
+      case 'packetNo':
+        return 'Tìm theo Packet No';
+      case 'partName':
+        return 'Tìm theo Part Name';
+      case 'supplier':
+        return 'Tìm theo Supplier';
+      case 'updatedBy':
+        return 'Tìm theo Updated By';
+      default:
+        return 'Tìm kiếm...';
+    }
+  };
+
   return (
     <div>
       <Navbar user={user} onLogout={handleLogout} />
@@ -235,19 +288,102 @@ function Materials({ user }) {
       <div className="container-fluid mt-4">
         {/* Search and Add Button */}
         <div className="row mb-3">
-          <div className="col-md-6">
-            <div className="search-container">
-              <span className="search-icon"><i className="fas fa-search"></i></span>
-              <input 
-                type="text" 
-                className="form-control" 
-                placeholder="Tìm sản phẩm theo tên"
-                value={searchTerm}
-                onChange={handleSearch}
-              />
+          <div className="col-md-8">
+            <div className="d-flex">
+              <div className="search-container flex-grow-1">
+                <span className="search-icon"><i className="fas fa-search"></i></span>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder={getPlaceholderText()}
+                  value={searchTerm}
+                  onChange={handleSearch}
+                />
+              </div>
+              
+              {/* Filter Dropdown Button */}
+              <div className="dropdown ms-2 position-relative">
+                <button 
+                  className="btn btn-light" 
+                  type="button"
+                  onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                >
+                  <i className="fas fa-filter me-2"></i> Tìm theo
+                </button>
+                
+                {showFilterDropdown && (
+                  <div 
+                    className="dropdown-menu shadow p-3 position-absolute" 
+                    style={{ 
+                      display: 'block', 
+                      minWidth: '200px',
+                      top: '100%',
+                      left: 0,
+                      zIndex: 1000
+                    }}
+                  >
+                    <div className="form-check mb-2">
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="searchFieldOptions"
+                        id="packetNoOption"
+                        value="packetNo"
+                        checked={searchField === 'packetNo'}
+                        onChange={handleSearchFieldChange}
+                      />
+                      <label className="form-check-label" htmlFor="packetNoOption">
+                        Packet No
+                      </label>
+                    </div>
+                    <div className="form-check mb-2">
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="searchFieldOptions"
+                        id="partNameOption"
+                        value="partName"
+                        checked={searchField === 'partName'}
+                        onChange={handleSearchFieldChange}
+                      />
+                      <label className="form-check-label" htmlFor="partNameOption">
+                        Part Name
+                      </label>
+                    </div>
+                    <div className="form-check mb-2">
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="searchFieldOptions"
+                        id="supplierOption"
+                        value="supplier"
+                        checked={searchField === 'supplier'}
+                        onChange={handleSearchFieldChange}
+                      />
+                      <label className="form-check-label" htmlFor="supplierOption">
+                        Supplier
+                      </label>
+                    </div>
+                    <div className="form-check">
+                      <input
+                        className="form-check-input"
+                        type="radio"
+                        name="searchFieldOptions"
+                        id="updatedByOption"
+                        value="updatedBy"
+                        checked={searchField === 'updatedBy'}
+                        onChange={handleSearchFieldChange}
+                      />
+                      <label className="form-check-label" htmlFor="updatedByOption">
+                        Updated by
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div className="col-md-6 text-end">
+          <div className="col-md-4 text-end">
             <button 
               className="btn btn-primary" 
               onClick={handleAddClick}
@@ -923,6 +1059,9 @@ function Materials({ user }) {
             setShowQrModal(false);
             setShowRequestModal(false);
             setSelectedMaterial(null);
+            
+            // Also close filter dropdown if open
+            setShowFilterDropdown(false);
           }}
         ></div>
       )}
