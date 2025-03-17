@@ -24,7 +24,12 @@ function App() {
       <Route path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
       <Route path="/materials" element={user ? <Materials user={user} /> : <Navigate to="/login" />} />
       <Route path="/material/:id" element={user ? <MaterialDetail user={user} /> : <Navigate to="/login" />} />
-      <Route path="/employees" element={user ? <Users user={user} /> : <Navigate to="/login" />} />
+      
+      {/* Restrict employees route to admin users only */}
+      <Route 
+        path="/employees" 
+        element={user && isAdmin ? <Users user={user} /> : <Navigate to="/dashboard" />} 
+      />
       
       {/* Admin only routes */}
       <Route 

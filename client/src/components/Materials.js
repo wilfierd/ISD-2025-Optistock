@@ -1,4 +1,4 @@
-// client/src/components/Materials.js with fixed dropdown functionality
+// client/src/components/Materials.js with packet number uniqueness validation
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
@@ -41,6 +41,9 @@ function Materials({ user }) {
     supplier: ''
   });
 
+  // Validation errors state
+  const [validationErrors, setValidationErrors] = useState({});
+
   // React Query hooks
   const { data: materials = [], isLoading, error } = useMaterials();
   const createMaterial = useCreateMaterial();
@@ -72,7 +75,63 @@ function Materials({ user }) {
     });
   }, [materials, searchTerm, searchField]);
 
-  
+  // Validation function to check for duplicate packet numbers
+  const checkDuplicatePacketNo = () => {
+    const packetNoToCheck = parseInt(formData.packetNo);
+    
+    // When editing, exclude the current material from the check
+    if (formData.materialId) {
+      return materials.some(material => 
+        material.packetNo === packetNoToCheck && material.id !== formData.materialId
+      );
+    }
+    
+    // When adding a new material, check against all existing materials
+    return materials.some(material => material.packetNo === packetNoToCheck);
+  };
+
+  // Form validation function
+  const validateForm = () => {
+    const errors = {};
+    
+    // Basic required field validation
+    if (!formData.packetNo) {
+      errors.packetNo = 'Packet No is required';
+    }
+    
+    if (!formData.partName) {
+      errors.partName = 'Part Name is required';
+    }
+    
+    if (!formData.length) {
+      errors.length = 'Length is required';
+    }
+    
+    if (!formData.width) {
+      errors.width = 'Width is required';
+    }
+    
+    if (!formData.height) {
+      errors.height = 'Height is required';
+    }
+    
+    if (!formData.quantity) {
+      errors.quantity = 'Quantity is required';
+    }
+    
+    if (!formData.supplier) {
+      errors.supplier = 'Supplier is required';
+    }
+    
+    // Check for duplicate packet number
+    const isDuplicate = checkDuplicatePacketNo();
+    if (isDuplicate) {
+      errors.packetNo = 'This packet number already exists. Packet numbers must be unique.';
+    }
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0; // Return true if no errors
+  };
 
   // Handle search input change
   const handleSearch = (e) => {
@@ -114,6 +173,7 @@ function Materials({ user }) {
       quantity: material.quantity,
       supplier: material.supplier
     });
+    setValidationErrors({}); // Clear any previous validation errors
     setShowDetailsModal(true);
   };
 
@@ -129,6 +189,7 @@ function Materials({ user }) {
       quantity: '',
       supplier: ''
     });
+    setValidationErrors({}); // Clear any previous validation errors
     
     if (isAdmin) {
       setShowAddModal(true);
@@ -171,10 +232,25 @@ function Materials({ user }) {
       ...prev,
       [id]: value
     }));
+    
+    // Clear the specific validation error when the user starts typing
+    if (validationErrors[id]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [id]: null
+      }));
+    }
   };
 
   // Handle form submission (admin only)
   const handleSaveClick = (isNewMaterial = false) => {
+    // Run validation before proceeding
+    if (!validateForm()) {
+      // If validation fails, display error message and don't submit
+      toast.error('Please correct the errors before saving');
+      return;
+    }
+    
     const materialData = {
       packetNo: parseInt(formData.packetNo),
       partName: formData.partName,
@@ -189,6 +265,21 @@ function Materials({ user }) {
       createMaterial.mutate(materialData, {
         onSuccess: () => {
           setShowAddModal(false);
+          setValidationErrors({}); // Clear validation errors on success
+        },
+        onError: (error) => {
+          // Handle server-side validation errors
+          if (error.response?.data?.error) {
+            toast.error(error.response.data.error);
+            
+            // If the error is about duplicate packet_no, update validation errors
+            if (error.response.data.error.includes('packet number already exists')) {
+              setValidationErrors(prev => ({
+                ...prev,
+                packetNo: 'This packet number already exists. Packet numbers must be unique.'
+              }));
+            }
+          }
         }
       });
     } else {
@@ -198,6 +289,21 @@ function Materials({ user }) {
       }, {
         onSuccess: () => {
           setShowDetailsModal(false);
+          setValidationErrors({}); // Clear validation errors on success
+        },
+        onError: (error) => {
+          // Handle server-side validation errors
+          if (error.response?.data?.error) {
+            toast.error(error.response.data.error);
+            
+            // If the error is about duplicate packet_no, update validation errors
+            if (error.response.data.error.includes('packet number already exists')) {
+              setValidationErrors(prev => ({
+                ...prev,
+                packetNo: 'This packet number already exists. Packet numbers must be unique.'
+              }));
+            }
+          }
         }
       });
     }
@@ -214,13 +320,12 @@ function Materials({ user }) {
     }
   };
 
-    // Handle request submission (non-admin users)
+  // Handle request submission (non-admin users)
   const handleSubmitRequest = () => {
-    // Validate form data
-    if (!formData.packetNo || !formData.partName || !formData.length || 
-        !formData.width || !formData.height || !formData.quantity || !formData.supplier) {
-      // Show error message to user
-      toast.error("All fields are required. Please fill in all fields.");
+    // Run validation before proceeding
+    if (!validateForm()) {
+      // If validation fails, display error message and don't submit
+      toast.error('Please correct the errors before submitting the request');
       return;
     }
     
@@ -257,6 +362,21 @@ function Materials({ user }) {
     createRequest.mutate(requestData, {
       onSuccess: () => {
         setShowRequestModal(false);
+        setValidationErrors({}); // Clear validation errors on success
+      },
+      onError: (error) => {
+        // Handle server-side validation errors
+        if (error.response?.data?.error) {
+          toast.error(error.response.data.error);
+          
+          // If the error is about duplicate packet_no, update validation errors
+          if (error.response.data.error.includes('packet number already exists')) {
+            setValidationErrors(prev => ({
+              ...prev,
+              packetNo: 'This packet number already exists. Packet numbers must be unique.'
+            }));
+          }
+        }
       }
     });
   };
@@ -491,6 +611,7 @@ function Materials({ user }) {
                   onClick={() => {
                     setShowDetailsModal(false);
                     setSelectedMaterial(null);
+                    setValidationErrors({});
                   }}
                 ></button>
               </div>
@@ -503,23 +624,33 @@ function Materials({ user }) {
                         <label htmlFor="packetNo" className="form-label">Packet No</label>
                         <input 
                           type="number" 
-                          className="form-control" 
+                          className={`form-control ${validationErrors.packetNo ? 'is-invalid' : ''}`}
                           id="packetNo" 
                           value={formData.packetNo}
                           onChange={handleInputChange}
                           required 
                         />
+                        {validationErrors.packetNo && (
+                          <div className="invalid-feedback">
+                            {validationErrors.packetNo}
+                          </div>
+                        )}
                       </div>
                       <div className="col-md-6">
                         <label htmlFor="partName" className="form-label">Part Name</label>
                         <input 
                           type="text" 
-                          className="form-control" 
+                          className={`form-control ${validationErrors.partName ? 'is-invalid' : ''}`}
                           id="partName" 
                           value={formData.partName}
                           onChange={handleInputChange}
                           required 
                         />
+                        {validationErrors.partName && (
+                          <div className="invalid-feedback">
+                            {validationErrors.partName}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="row mb-3">
@@ -527,34 +658,49 @@ function Materials({ user }) {
                         <label htmlFor="length" className="form-label">Dài</label>
                         <input 
                           type="number" 
-                          className="form-control" 
+                          className={`form-control ${validationErrors.length ? 'is-invalid' : ''}`}
                           id="length" 
                           value={formData.length}
                           onChange={handleInputChange}
                           required 
                         />
+                        {validationErrors.length && (
+                          <div className="invalid-feedback">
+                            {validationErrors.length}
+                          </div>
+                        )}
                       </div>
                       <div className="col-md-4">
                         <label htmlFor="width" className="form-label">Rộng</label>
                         <input 
                           type="number" 
-                          className="form-control" 
+                          className={`form-control ${validationErrors.width ? 'is-invalid' : ''}`}
                           id="width" 
                           value={formData.width}
                           onChange={handleInputChange}
                           required 
                         />
+                        {validationErrors.width && (
+                          <div className="invalid-feedback">
+                            {validationErrors.width}
+                          </div>
+                        )}
                       </div>
                       <div className="col-md-4">
                         <label htmlFor="height" className="form-label">Cao</label>
                         <input 
                           type="number" 
-                          className="form-control" 
+                          className={`form-control ${validationErrors.height ? 'is-invalid' : ''}`}
                           id="height" 
                           value={formData.height}
                           onChange={handleInputChange}
                           required 
                         />
+                        {validationErrors.height && (
+                          <div className="invalid-feedback">
+                            {validationErrors.height}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="row mb-3">
@@ -562,23 +708,33 @@ function Materials({ user }) {
                         <label htmlFor="quantity" className="form-label">Quantity</label>
                         <input 
                           type="number" 
-                          className="form-control" 
+                          className={`form-control ${validationErrors.quantity ? 'is-invalid' : ''}`}
                           id="quantity" 
                           value={formData.quantity}
                           onChange={handleInputChange}
                           required 
                         />
+                        {validationErrors.quantity && (
+                          <div className="invalid-feedback">
+                            {validationErrors.quantity}
+                          </div>
+                        )}
                       </div>
                       <div className="col-md-6">
                         <label htmlFor="supplier" className="form-label">Supplier</label>
                         <input 
                           type="text" 
-                          className="form-control" 
+                          className={`form-control ${validationErrors.supplier ? 'is-invalid' : ''}`}
                           id="supplier" 
                           value={formData.supplier}
                           onChange={handleInputChange}
                           required 
                         />
+                        {validationErrors.supplier && (
+                          <div className="invalid-feedback">
+                            {validationErrors.supplier}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="row mb-3">
@@ -632,6 +788,7 @@ function Materials({ user }) {
                   onClick={() => {
                     setShowDetailsModal(false);
                     setSelectedMaterial(null);
+                    setValidationErrors({});
                   }}
                 >
                   Close
@@ -689,7 +846,10 @@ function Materials({ user }) {
                 <button 
                   type="button" 
                   className="btn-close" 
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setValidationErrors({});
+                  }}
                 ></button>
               </div>
               <div className="modal-body">
@@ -699,23 +859,33 @@ function Materials({ user }) {
                       <label htmlFor="packetNo" className="form-label">Packet No</label>
                       <input 
                         type="number" 
-                        className="form-control" 
+                        className={`form-control ${validationErrors.packetNo ? 'is-invalid' : ''}`}
                         id="packetNo" 
                         value={formData.packetNo}
                         onChange={handleInputChange}
                         required 
                       />
+                      {validationErrors.packetNo && (
+                        <div className="invalid-feedback">
+                          {validationErrors.packetNo}
+                        </div>
+                      )}
                     </div>
                     <div className="col-md-6">
                       <label htmlFor="partName" className="form-label">Part Name</label>
                       <input 
                         type="text" 
-                        className="form-control" 
+                        className={`form-control ${validationErrors.partName ? 'is-invalid' : ''}`}
                         id="partName" 
                         value={formData.partName}
                         onChange={handleInputChange}
                         required 
                       />
+                      {validationErrors.partName && (
+                        <div className="invalid-feedback">
+                          {validationErrors.partName}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="row mb-3">
@@ -723,34 +893,49 @@ function Materials({ user }) {
                       <label htmlFor="length" className="form-label">Dài</label>
                       <input 
                         type="number" 
-                        className="form-control" 
+                        className={`form-control ${validationErrors.length ? 'is-invalid' : ''}`}
                         id="length" 
                         value={formData.length}
                         onChange={handleInputChange}
                         required 
                       />
+                      {validationErrors.length && (
+                        <div className="invalid-feedback">
+                          {validationErrors.length}
+                        </div>
+                      )}
                     </div>
                     <div className="col-md-4">
                       <label htmlFor="width" className="form-label">Rộng</label>
                       <input 
                         type="number" 
-                        className="form-control" 
+                        className={`form-control ${validationErrors.width ? 'is-invalid' : ''}`}
                         id="width" 
                         value={formData.width}
                         onChange={handleInputChange}
                         required 
                       />
+                      {validationErrors.width && (
+                        <div className="invalid-feedback">
+                          {validationErrors.width}
+                        </div>
+                      )}
                     </div>
                     <div className="col-md-4">
                       <label htmlFor="height" className="form-label">Cao</label>
                       <input 
                         type="number" 
-                        className="form-control" 
+                        className={`form-control ${validationErrors.height ? 'is-invalid' : ''}`}
                         id="height" 
                         value={formData.height}
                         onChange={handleInputChange}
                         required 
                       />
+                      {validationErrors.height && (
+                        <div className="invalid-feedback">
+                          {validationErrors.height}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="row mb-3">
@@ -758,23 +943,33 @@ function Materials({ user }) {
                       <label htmlFor="quantity" className="form-label">Quantity</label>
                       <input 
                         type="number" 
-                        className="form-control" 
+                        className={`form-control ${validationErrors.quantity ? 'is-invalid' : ''}`}
                         id="quantity" 
                         value={formData.quantity}
                         onChange={handleInputChange}
                         required 
                       />
+                      {validationErrors.quantity && (
+                        <div className="invalid-feedback">
+                          {validationErrors.quantity}
+                        </div>
+                      )}
                     </div>
                     <div className="col-md-6">
                       <label htmlFor="supplier" className="form-label">Supplier</label>
                       <input 
                         type="text" 
-                        className="form-control" 
+                        className={`form-control ${validationErrors.supplier ? 'is-invalid' : ''}`}
                         id="supplier" 
                         value={formData.supplier}
                         onChange={handleInputChange}
                         required 
                       />
+                      {validationErrors.supplier && (
+                        <div className="invalid-feedback">
+                          {validationErrors.supplier}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </form>
@@ -783,7 +978,10 @@ function Materials({ user }) {
                 <button 
                   type="button" 
                   className="btn btn-secondary" 
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setValidationErrors({});
+                  }}
                 >
                   Cancel
                 </button>
@@ -851,7 +1049,10 @@ function Materials({ user }) {
                 <button 
                   type="button" 
                   className="btn-close" 
-                  onClick={() => setShowRequestModal(false)}
+                  onClick={() => {
+                    setShowRequestModal(false);
+                    setValidationErrors({});
+                  }}
                 ></button>
               </div>
               <div className="modal-body">
@@ -873,23 +1074,33 @@ function Materials({ user }) {
                           <label htmlFor="packetNo" className="form-label">Packet No</label>
                           <input 
                             type="number" 
-                            className="form-control" 
+                            className={`form-control ${validationErrors.packetNo ? 'is-invalid' : ''}`}
                             id="packetNo" 
                             value={formData.packetNo}
                             onChange={handleInputChange}
                             required 
                           />
+                          {validationErrors.packetNo && (
+                            <div className="invalid-feedback">
+                              {validationErrors.packetNo}
+                            </div>
+                          )}
                         </div>
                         <div className="col-md-6">
                           <label htmlFor="partName" className="form-label">Part Name</label>
                           <input 
                             type="text" 
-                            className="form-control" 
+                            className={`form-control ${validationErrors.partName ? 'is-invalid' : ''}`}
                             id="partName" 
                             value={formData.partName}
                             onChange={handleInputChange}
                             required 
                           />
+                          {validationErrors.partName && (
+                            <div className="invalid-feedback">
+                              {validationErrors.partName}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="row mb-3">
@@ -897,57 +1108,82 @@ function Materials({ user }) {
                           <label htmlFor="length" className="form-label">Dài</label>
                           <input 
                             type="number" 
-                            className="form-control" 
+                            className={`form-control ${validationErrors.length ? 'is-invalid' : ''}`}
                             id="length" 
                             value={formData.length}
                             onChange={handleInputChange}
                             required 
                           />
+                          {validationErrors.length && (
+                            <div className="invalid-feedback">
+                              {validationErrors.length}
+                            </div>
+                          )}
                         </div>
                         <div className="col-md-3">
                           <label htmlFor="width" className="form-label">Rộng</label>
                           <input 
                             type="number" 
-                            className="form-control" 
+                            className={`form-control ${validationErrors.width ? 'is-invalid' : ''}`}
                             id="width" 
                             value={formData.width}
                             onChange={handleInputChange}
                             required 
                           />
+                          {validationErrors.width && (
+                            <div className="invalid-feedback">
+                              {validationErrors.width}
+                            </div>
+                          )}
                         </div>
                         <div className="col-md-3">
                           <label htmlFor="height" className="form-label">Cao</label>
                           <input 
                             type="number" 
-                            className="form-control" 
+                            className={`form-control ${validationErrors.height ? 'is-invalid' : ''}`}
                             id="height" 
                             value={formData.height}
                             onChange={handleInputChange}
                             required 
                           />
+                          {validationErrors.height && (
+                            <div className="invalid-feedback">
+                              {validationErrors.height}
+                            </div>
+                          )}
                         </div>
                         <div className="col-md-3">
                           <label htmlFor="quantity" className="form-label">Quantity</label>
                           <input 
                             type="number" 
-                            className="form-control" 
+                            className={`form-control ${validationErrors.quantity ? 'is-invalid' : ''}`}
                             id="quantity" 
                             value={formData.quantity}
                             onChange={handleInputChange}
                             required 
                           />
+                          {validationErrors.quantity && (
+                            <div className="invalid-feedback">
+                              {validationErrors.quantity}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="mb-3">
                         <label htmlFor="supplier" className="form-label">Supplier</label>
                         <input 
                           type="text" 
-                          className="form-control" 
+                          className={`form-control ${validationErrors.supplier ? 'is-invalid' : ''}`}
                           id="supplier" 
                           value={formData.supplier}
                           onChange={handleInputChange}
                           required 
                         />
+                        {validationErrors.supplier && (
+                          <div className="invalid-feedback">
+                            {validationErrors.supplier}
+                          </div>
+                        )}
                       </div>
                       <div className="alert alert-info">
                         <i className="fas fa-info-circle me-2"></i>
@@ -961,7 +1197,10 @@ function Materials({ user }) {
                 <button 
                   type="button" 
                   className="btn btn-secondary" 
-                  onClick={() => setShowRequestModal(false)}
+                  onClick={() => {
+                    setShowRequestModal(false);
+                    setValidationErrors({});
+                  }}
                 >
                   Cancel
                 </button>
@@ -1071,6 +1310,7 @@ function Materials({ user }) {
             setShowQrModal(false);
             setShowRequestModal(false);
             setSelectedMaterial(null);
+            setValidationErrors({});
             
             // Also close filter dropdown if open
             setShowFilterDropdown(false);

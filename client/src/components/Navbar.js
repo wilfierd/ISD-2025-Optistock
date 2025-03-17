@@ -14,6 +14,9 @@ function Navbar({ user, onLogout }) {
   // Count unread notifications
   const unreadCount = notifications.filter(n => !n.is_read).length;
   
+  // Check if user is admin
+  const isAdmin = user.role === 'admin';
+  
   // Handle viewing all notifications
   const handleViewAllNotifications = () => {
     if (unreadCount > 0) {
@@ -43,12 +46,15 @@ function Navbar({ user, onLogout }) {
           >
             Nhà kho
           </Link>
-          <Link 
-            className={`navbar-brand ${isActive('/employees') ? 'fw-bold' : ''}`} 
-            to="/employees"
-          >
-            Nhân viên
-          </Link>
+          {/* Only show Employees link for admin users */}
+          {isAdmin && (
+            <Link 
+              className={`navbar-brand ${isActive('/employees') ? 'fw-bold' : ''}`} 
+              to="/employees"
+            >
+              Nhân viên
+            </Link>
+          )}
           {user.role === 'admin' && (
             <Link 
               className={`navbar-brand ${isActive('/requests') ? 'fw-bold' : ''}`} 
