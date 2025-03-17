@@ -9,6 +9,8 @@ import {
   useDeleteMaterial
 } from '../hooks/useMaterials';
 import { useCreateMaterialRequest } from '../hooks/useMaterialRequests';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function Materials({ user }) {
   // State for search and selected material
@@ -69,6 +71,8 @@ function Materials({ user }) {
       }
     });
   }, [materials, searchTerm, searchField]);
+
+  
 
   // Handle search input change
   const handleSearch = (e) => {
@@ -210,8 +214,16 @@ function Materials({ user }) {
     }
   };
 
-  // Handle request submission (non-admin users)
+    // Handle request submission (non-admin users)
   const handleSubmitRequest = () => {
+    // Validate form data
+    if (!formData.packetNo || !formData.partName || !formData.length || 
+        !formData.width || !formData.height || !formData.quantity || !formData.supplier) {
+      // Show error message to user
+      toast.error("All fields are required. Please fill in all fields.");
+      return;
+    }
+    
     const materialData = {
       packetNo: parseInt(formData.packetNo),
       partName: formData.partName,
