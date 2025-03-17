@@ -445,10 +445,26 @@ app.get('/api/materials', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
+// Update these API endpoints in app.js
+
+// Create new material with packet_no uniqueness validation
 app.post('/api/materials', isAuthenticatedAPI, async (req, res) => {
   try {
     const { packetNo, partName, length, width, height, quantity, supplier } = req.body;
     const currentDate = new Date().toLocaleDateString('en-GB');
+    
+    // Check if a material with the same packet_no already exists
+    const [existingMaterials] = await pool.query(
+      'SELECT id FROM materials WHERE packet_no = ?',
+      [packetNo]
+    );
+    
+    if (existingMaterials.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'A material with this packet number already exists. Packet numbers must be unique.' 
+      });
+    }
     
     const [result] = await pool.query(
       `INSERT INTO materials 
@@ -468,11 +484,25 @@ app.post('/api/materials', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
+// Update material with packet_no uniqueness validation
 app.put('/api/materials/:id', isAuthenticatedAPI, async (req, res) => {
   try {
     const { id } = req.params;
     const { packetNo, partName, length, width, height, quantity, supplier } = req.body;
     const currentDate = new Date().toLocaleDateString('en-GB');
+    
+    // Check if any other material has the same packet_no (excluding the current material)
+    const [existingMaterials] = await pool.query(
+      'SELECT id FROM materials WHERE packet_no = ? AND id != ?',
+      [packetNo, id]
+    );
+    
+    if (existingMaterials.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Another material with this packet number already exists. Packet numbers must be unique.' 
+      });
+    }
     
     await pool.query(
       `UPDATE materials 
@@ -715,6 +745,20 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
           // Add new material
           const { packetNo, partName, length, width, height, quantity, supplier } = requestData;
           const currentDate = new Date().toLocaleDateString('en-GB');
+
+          // Check if a material with the same packet_no already exists
+          const [existingMaterials] = await connection.query(
+            'SELECT id FROM materials WHERE packet_no = ?',
+            [packetNo]
+          );
+          
+          if (existingMaterials.length > 0) {
+            await connection.rollback();
+            return res.status(400).json({ 
+              success: false, 
+              error: 'A material with this packet number already exists. The request cannot be approved.' 
+            });
+          }
           
           const [addResult] = await connection.query(
             `INSERT INTO materials 
@@ -728,6 +772,20 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
           // Edit existing material
           const { packetNo, partName, length, width, height, quantity, supplier } = requestData;
           const currentDate = new Date().toLocaleDateString('en-GB');
+
+          // Check if any other material has the same packet_no (excluding the current material)
+          const [existingMaterials] = await connection.query(
+            'SELECT id FROM materials WHERE packet_no = ? AND id != ?',
+            [packetNo, request.material_id]
+          );
+          
+          if (existingMaterials.length > 0) {
+            await connection.rollback();
+            return res.status(400).json({ 
+              success: false, 
+              error: 'Another material with this packet number already exists. The request cannot be approved.' 
+            });
+          }
           
           await connection.query(
             `UPDATE materials 
