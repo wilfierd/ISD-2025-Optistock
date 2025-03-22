@@ -161,8 +161,7 @@ const formatRequestData = (requestData) => {
             </button>
           </div>
         ) : (
-          <div className="card shadow-sm">
-            <div className="card-body">
+          <div className="custom-table-container">
               {requests.length === 0 ? (
                 <div className="text-center py-5">
                   <div className="text-muted">No {selectedStatus} requests found</div>
@@ -244,7 +243,7 @@ const formatRequestData = (requestData) => {
                   </table>
                 </div>
               )}
-            </div>
+            
           </div>
         )}
       </div>

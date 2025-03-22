@@ -538,62 +538,64 @@ function Materials({ user }) {
         ) : error ? (
           <div className="alert alert-danger">{error.message}</div>
         ) : (
-          <div className="table-responsive">
-            <table className="table table-hover">
-              <thead>
-                <tr>
-                  <th width="5%"></th>
-                  <th width="5%">Packet No</th>
-                  <th width="20%">Part Name</th>
-                  <th width="10%">Dài</th>
-                  <th width="10%">Rộng</th>
-                  <th width="10%">Cao</th>
-                  <th width="5%">Quantity</th>
-                  <th width="15%">Supplier</th>
-                  <th width="10%">Updated by</th>
-                  <th width="10%">Last Updated</th>
-                  <th width="5%"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMaterials.map(material => (
-                  <tr 
-                    key={material.id} 
-                    onClick={() => handleMaterialClick(material)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <td>
-                      <div 
-                        className={`status-dot ${selectedMaterial?.id === material.id ? 'active' : ''}`}
-                      ></div>
-                    </td>
-                    <td>{material.packetNo}</td>
-                    <td>{material.partName}</td>
-                    <td>{material.length}</td>
-                    <td>{material.width}</td>
-                    <td>{material.height}</td>
-                    <td>{material.quantity}</td>
-                    <td>{material.supplier}</td>
-                    <td>{material.updatedBy}</td>
-                    <td>{material.lastUpdated}</td>
-                    <td>
-                      <button 
-                        className="btn btn-sm" 
-                        onClick={(e) => handlePrint(material.id, e)}
-                        title="Generate QR Code"
-                      >
-                        <i className="fas fa-print"></i>
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {filteredMaterials.length === 0 && (
+          <div className="custom-table-container"> 
+            <div className="table-responsive">
+              <table className="table table-hover">
+                <thead>
                   <tr>
-                    <td colSpan="11" className="text-center py-3">No materials found</td>
+                    <th width="5%"></th>
+                    <th width="5%">Packet No</th>
+                    <th width="20%">Part Name</th>
+                    <th width="10%">Dài</th>
+                    <th width="10%">Rộng</th>
+                    <th width="10%">Cao</th>
+                    <th width="5%">Quantity</th>
+                    <th width="15%">Supplier</th>
+                    <th width="10%">Updated by</th>
+                    <th width="10%">Last Updated</th>
+                    <th width="5%"></th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredMaterials.map(material => (
+                    <tr 
+                      key={material.id} 
+                      onClick={() => handleMaterialClick(material)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <td>
+                        <div 
+                          className={`status-dot ${selectedMaterial?.id === material.id ? 'active' : ''}`}
+                        ></div>
+                      </td>
+                      <td>{material.packetNo}</td>
+                      <td>{material.partName}</td>
+                      <td>{material.length}</td>
+                      <td>{material.width}</td>
+                      <td>{material.height}</td>
+                      <td>{material.quantity}</td>
+                      <td>{material.supplier}</td>
+                      <td>{material.updatedBy}</td>
+                      <td>{material.lastUpdated}</td>
+                      <td>
+                        <button 
+                          className="btn btn-sm" 
+                          onClick={(e) => handlePrint(material.id, e)}
+                          title="Generate QR Code"
+                        >
+                          <i className="fas fa-print"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredMaterials.length === 0 && (
+                    <tr>
+                      <td colSpan="11" className="text-center py-3">No materials found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

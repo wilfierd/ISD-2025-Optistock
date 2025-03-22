@@ -213,48 +213,50 @@ function Users({ user }) {
         ) : error ? (
           <div className="alert alert-danger">{error.message}</div>
         ) : (
-          <div className="table-responsive">
-            <table className="table table-hover">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Tên đăng nhập</th>
-                  <th>Họ và tên</th>
-                  <th>Chức vụ</th>
-                  <th>SĐT</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map(tableUser => (
-                  <tr key={tableUser.id} onClick={() => handleViewUser(tableUser.id)} style={{ cursor: 'pointer' }}>
-                    <td>{tableUser.id}</td>
-                    <td>{tableUser.username}</td>
-                    <td>{tableUser.full_name}</td>
-                    <td>{tableUser.role}</td>
-                    <td>{tableUser.phone || '-'}</td>
-                    <td className="text-end">
-                    {(user.role === 'admin' || user.id === tableUser.id) && (
-                        <button 
-                          className="btn btn-sm" 
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent row click
-                            handleEditClick(tableUser.id);
-                          }}
-                        >
-                          <i className="fas fa-edit"></i>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {filteredUsers.length === 0 && (
+          <div className="custom-table-container">
+            <div className="table-responsive">
+              <table className="table table-hover">
+                <thead>
                   <tr>
-                    <td colSpan="6" className="text-center py-3">No users found</td>
+                    <th>ID</th>
+                    <th>Tên đăng nhập</th>
+                    <th>Họ và tên</th>
+                    <th>Chức vụ</th>
+                    <th>SĐT</th>
+                    <th></th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredUsers.map(tableUser => (
+                    <tr key={tableUser.id} onClick={() => handleViewUser(tableUser.id)} style={{ cursor: 'pointer' }}>
+                      <td>{tableUser.id}</td>
+                      <td>{tableUser.username}</td>
+                      <td>{tableUser.full_name}</td>
+                      <td>{tableUser.role}</td>
+                      <td>{tableUser.phone || '-'}</td>
+                      <td className="text-end">
+                      {(user.role === 'admin' || user.id === tableUser.id) && (
+                          <button 
+                            className="btn btn-sm" 
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click
+                              handleEditClick(tableUser.id);
+                            }}
+                          >
+                            <i className="fas fa-edit"></i>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredUsers.length === 0 && (
+                    <tr>
+                      <td colSpan="6" className="text-center py-3">No users found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

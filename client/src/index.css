@@ -259,6 +259,46 @@ h4 {
   border-color: #083d70;
 }
 
+/* Custom table styling with light blue background */
+.custom-table-container {
+  background-color: #e6f7ff; /* Light blue background color */
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.custom-table-container .table {
+  margin-bottom: 0;
+}
+
+/* Table header styling - make this more specific and important */
+.custom-table-container .table thead {
+  background-color: #d9f2ff !important; /* Slightly darker blue for header */
+}
+
+.custom-table-container .table thead th {
+  background-color: #d9f2ff !important; /* Ensure the th elements also have the background */
+  color: #0a4d8c;
+  font-weight: 600;
+  border-bottom: 1px solid #b8e2ff;
+}
+
+/* Additional styling for cells */
+.custom-table-container .table td {
+  vertical-align: middle;
+  border-color: #d1ebff;
+}
+
+/* Row styling */
+.custom-table-container .table tbody tr {
+  background-color: #e6f7ff; /* Light blue background for rows */
+}
+
+.custom-table-container .table tbody tr:hover {
+  background-color: #f0f8ff !important; /* Light blue highlight on hover */
+}
+
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
   .modal-dialog {
