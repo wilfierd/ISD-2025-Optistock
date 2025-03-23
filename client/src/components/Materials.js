@@ -1,4 +1,4 @@
-// client/src/components/Materials.js with packet number uniqueness validation
+// client/src/components/Materials.js (with complete language support)
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './Navbar';
 import { canManageMaterials } from '../utils/rolePermissions';
@@ -12,8 +12,12 @@ import {
 import { useCreateMaterialRequest } from '../hooks/useMaterialRequests';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function Materials({ user }) {
+  // Get translation function
+  const { t } = useLanguage();
+  
   // State for search and selected material
   const [searchTerm, setSearchTerm] = useState('');
   const [searchField, setSearchField] = useState('partName'); // Default search field
@@ -97,37 +101,37 @@ function Materials({ user }) {
     
     // Basic required field validation
     if (!formData.packetNo) {
-      errors.packetNo = 'Packet No is required';
+      errors.packetNo = t('packetNo') + ' ' + t('is required');
     }
     
     if (!formData.partName) {
-      errors.partName = 'Part Name is required';
+      errors.partName = t('partName') + ' ' + t('is required');
     }
     
     if (!formData.length) {
-      errors.length = 'Length is required';
+      errors.length = t('length') + ' ' + t('is required');
     }
     
     if (!formData.width) {
-      errors.width = 'Width is required';
+      errors.width = t('width') + ' ' + t('is required');
     }
     
     if (!formData.height) {
-      errors.height = 'Height is required';
+      errors.height = t('height') + ' ' + t('is required');
     }
     
     if (!formData.quantity) {
-      errors.quantity = 'Quantity is required';
+      errors.quantity = t('quantity') + ' ' + t('is required');
     }
     
     if (!formData.supplier) {
-      errors.supplier = 'Supplier is required';
+      errors.supplier = t('supplier') + ' ' + t('is required');
     }
     
     // Check for duplicate packet number
     const isDuplicate = checkDuplicatePacketNo();
     if (isDuplicate) {
-      errors.packetNo = 'This packet number already exists. Packet numbers must be unique.';
+      errors.packetNo = t('This packet number already exists. Packet numbers must be unique.');
     }
     
     setValidationErrors(errors);
@@ -248,7 +252,11 @@ function Materials({ user }) {
     // Run validation before proceeding
     if (!validateForm()) {
       // If validation fails, display error message and don't submit
-      toast.error('Please correct the errors before saving');
+      try {
+        toast.error(t('validationError'));
+      } catch (e) {
+        toast.error('Please correct the errors before saving');
+      }
       return;
     }
     
@@ -262,62 +270,79 @@ function Materials({ user }) {
       supplier: formData.supplier
     };
 
-    if (isNewMaterial) {
-      createMaterial.mutate(materialData, {
-        onSuccess: () => {
-          setShowAddModal(false);
-          setValidationErrors({}); // Clear validation errors on success
-        },
-        onError: (error) => {
-          // Handle server-side validation errors
-          if (error.response?.data?.error) {
-            toast.error(error.response.data.error);
-            
-            // If the error is about duplicate packet_no, update validation errors
-            if (error.response.data.error.includes('packet number already exists')) {
-              setValidationErrors(prev => ({
-                ...prev,
-                packetNo: 'This packet number already exists. Packet numbers must be unique.'
-              }));
+    try {
+      if (isNewMaterial) {
+        createMaterial.mutate(materialData, {
+          onSuccess: () => {
+            setShowAddModal(false);
+            setValidationErrors({}); // Clear validation errors on success
+          },
+          onError: (error) => {
+            // Handle server-side validation errors
+            if (error.response?.data?.error) {
+              toast.error(error.response.data.error);
+              
+              // If the error is about duplicate packet_no, update validation errors
+              if (error.response.data.error.includes('packet number already exists')) {
+                setValidationErrors(prev => ({
+                  ...prev,
+                  packetNo: t('This packet number already exists. Packet numbers must be unique.')
+                }));
+              }
+            } else {
+              toast.error(t('materialAddFailed') || 'Failed to add material');
             }
           }
-        }
-      });
-    } else {
-      updateMaterial.mutate({ 
-        id: formData.materialId, 
-        data: materialData 
-      }, {
-        onSuccess: () => {
-          setShowDetailsModal(false);
-          setValidationErrors({}); // Clear validation errors on success
-        },
-        onError: (error) => {
-          // Handle server-side validation errors
-          if (error.response?.data?.error) {
-            toast.error(error.response.data.error);
-            
-            // If the error is about duplicate packet_no, update validation errors
-            if (error.response.data.error.includes('packet number already exists')) {
-              setValidationErrors(prev => ({
-                ...prev,
-                packetNo: 'This packet number already exists. Packet numbers must be unique.'
-              }));
+        });
+      } else {
+        updateMaterial.mutate({ 
+          id: formData.materialId, 
+          data: materialData 
+        }, {
+          onSuccess: () => {
+            setShowDetailsModal(false);
+            setValidationErrors({}); // Clear validation errors on success
+          },
+          onError: (error) => {
+            // Handle server-side validation errors
+            if (error.response?.data?.error) {
+              toast.error(error.response.data.error);
+              
+              // If the error is about duplicate packet_no, update validation errors
+              if (error.response.data.error.includes('packet number already exists')) {
+                setValidationErrors(prev => ({
+                  ...prev,
+                  packetNo: t('This packet number already exists. Packet numbers must be unique.')
+                }));
+              }
+            } else {
+              toast.error(t('materialUpdateFailed') || 'Failed to update material');
             }
           }
-        }
-      });
+        });
+      }
+    } catch (e) {
+      console.error("Error in save operation", e);
+      toast.error(t('operationFailed') || 'An unexpected error occurred. Please try again.');
     }
   };
 
   // Handle delete confirmation (admin only)
   const handleConfirmDelete = () => {
-    if (selectedMaterial) {
+    if (!selectedMaterial) return;
+    
+    try {
       deleteMaterial.mutate(selectedMaterial.id, {
         onSuccess: () => {
           setShowDeleteModal(false);
+        },
+        onError: (error) => {
+          toast.error(error.message || t('materialDeleteFailed') || 'Failed to delete material');
         }
       });
+    } catch (e) {
+      console.error("Error in delete operation", e);
+      toast.error(t('operationFailed') || 'An unexpected error occurred. Please try again.');
     }
   };
 
@@ -326,7 +351,7 @@ function Materials({ user }) {
     // Run validation before proceeding
     if (!validateForm()) {
       // If validation fails, display error message and don't submit
-      toast.error('Please correct the errors before submitting the request');
+      toast.error(t('validationError') || 'Please correct the errors before submitting the request');
       return;
     }
     
@@ -360,26 +385,33 @@ function Materials({ user }) {
       };
     }
     
-    createRequest.mutate(requestData, {
-      onSuccess: () => {
-        setShowRequestModal(false);
-        setValidationErrors({}); // Clear validation errors on success
-      },
-      onError: (error) => {
-        // Handle server-side validation errors
-        if (error.response?.data?.error) {
-          toast.error(error.response.data.error);
-          
-          // If the error is about duplicate packet_no, update validation errors
-          if (error.response.data.error.includes('packet number already exists')) {
-            setValidationErrors(prev => ({
-              ...prev,
-              packetNo: 'This packet number already exists. Packet numbers must be unique.'
-            }));
+    try {
+      createRequest.mutate(requestData, {
+        onSuccess: () => {
+          setShowRequestModal(false);
+          setValidationErrors({}); // Clear validation errors on success
+        },
+        onError: (error) => {
+          // Handle server-side validation errors
+          if (error.response?.data?.error) {
+            toast.error(error.response.data.error);
+            
+            // If the error is about duplicate packet_no, update validation errors
+            if (error.response.data.error.includes('packet number already exists')) {
+              setValidationErrors(prev => ({
+                ...prev,
+                packetNo: t('This packet number already exists. Packet numbers must be unique.')
+              }));
+            }
+          } else {
+            toast.error(t('requestSubmitFailed') || 'Failed to submit request');
           }
         }
-      }
-    });
+      });
+    } catch (e) {
+      console.error("Error in request submission", e);
+      toast.error(t('operationFailed') || 'An unexpected error occurred. Please try again.');
+    }
   };
 
   // Handle QR code generation
@@ -401,15 +433,15 @@ function Materials({ user }) {
   const getPlaceholderText = () => {
     switch(searchField) {
       case 'packetNo':
-        return 'Tìm theo Packet No';
+        return t('searchByPacketNo');
       case 'partName':
-        return 'Tìm theo Part Name';
+        return t('searchByPartName');
       case 'supplier':
-        return 'Tìm theo Supplier';
+        return t('searchBySupplier');
       case 'updatedBy':
-        return 'Tìm theo Updated By';
+        return t('searchByUpdatedBy');
       default:
-        return 'Tìm kiếm...';
+        return t('search');
     }
   };
 
@@ -441,7 +473,7 @@ function Materials({ user }) {
                   type="button"
                   onClick={() => setShowFilterDropdown(!showFilterDropdown)}
                 >
-                  <i className="fas fa-filter me-2"></i> Tìm theo
+                  <i className="fas fa-filter me-2"></i> {t('searchBy')}
                 </button>
                 
                 {showFilterDropdown && (
@@ -466,7 +498,7 @@ function Materials({ user }) {
                         onChange={handleSearchFieldChange}
                       />
                       <label className="form-check-label" htmlFor="packetNoOption">
-                        Packet No
+                        {t('packetNo')}
                       </label>
                     </div>
                     <div className="form-check mb-2">
@@ -480,7 +512,7 @@ function Materials({ user }) {
                         onChange={handleSearchFieldChange}
                       />
                       <label className="form-check-label" htmlFor="partNameOption">
-                        Part Name
+                        {t('partName')}
                       </label>
                     </div>
                     <div className="form-check mb-2">
@@ -494,7 +526,7 @@ function Materials({ user }) {
                         onChange={handleSearchFieldChange}
                       />
                       <label className="form-check-label" htmlFor="supplierOption">
-                        Supplier
+                        {t('supplier')}
                       </label>
                     </div>
                     <div className="form-check">
@@ -508,7 +540,7 @@ function Materials({ user }) {
                         onChange={handleSearchFieldChange}
                       />
                       <label className="form-check-label" htmlFor="updatedByOption">
-                        Updated by
+                        {t('updatedBy')}
                       </label>
                     </div>
                   </div>
@@ -522,18 +554,18 @@ function Materials({ user }) {
               onClick={handleAddClick}
               disabled={canEditMaterials ? createMaterial.isPending : createRequest.isPending}
             >
-              {canEditMaterials ? 'Add' : 'Request Add'}
+              {canEditMaterials ? t('addMaterial') : t('requestAdd')}
             </button>
           </div>
         </div>
 
         {/* Materials List */}
-        <h4>Danh sách nguyên vật liệu ({filteredMaterials.length})</h4>
+        <h4>{t('materialsList')} ({filteredMaterials.length})</h4>
         
         {isLoading ? (
           <div className="text-center my-5">
             <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
+              <span className="visually-hidden">{t('loading')}</span>
             </div>
           </div>
         ) : error ? (
@@ -545,15 +577,15 @@ function Materials({ user }) {
                 <thead>
                   <tr>
                     <th width="5%"></th>
-                    <th width="5%">Packet No</th>
-                    <th width="20%">Part Name</th>
-                    <th width="10%">Dài</th>
-                    <th width="10%">Rộng</th>
-                    <th width="10%">Cao</th>
-                    <th width="5%">Quantity</th>
-                    <th width="15%">Supplier</th>
-                    <th width="10%">Updated by</th>
-                    <th width="10%">Last Updated</th>
+                    <th width="5%">{t('packetNo')}</th>
+                    <th width="20%">{t('partName')}</th>
+                    <th width="10%">{t('length')}</th>
+                    <th width="10%">{t('width')}</th>
+                    <th width="10%">{t('height')}</th>
+                    <th width="5%">{t('quantity')}</th>
+                    <th width="15%">{t('supplier')}</th>
+                    <th width="10%">{t('updatedBy')}</th>
+                    <th width="10%">{t('lastUpdated')}</th>
                     <th width="5%"></th>
                   </tr>
                 </thead>
@@ -582,7 +614,7 @@ function Materials({ user }) {
                         <button 
                           className="btn btn-sm" 
                           onClick={(e) => handlePrint(material.id, e)}
-                          title="Generate QR Code"
+                          title={t('generateQRCode')}
                         >
                           <i className="fas fa-print"></i>
                         </button>
@@ -591,7 +623,7 @@ function Materials({ user }) {
                   ))}
                   {filteredMaterials.length === 0 && (
                     <tr>
-                      <td colSpan="11" className="text-center py-3">No materials found</td>
+                      <td colSpan="11" className="text-center py-3">{t('noRecordsFound')}</td>
                     </tr>
                   )}
                 </tbody>
@@ -607,7 +639,7 @@ function Materials({ user }) {
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Thông tin nguyên vật liệu</h5>
+                <h5 className="modal-title">{t('materialDetails')}</h5>
                 <button 
                   type="button" 
                   className="btn-close" 
@@ -624,7 +656,7 @@ function Materials({ user }) {
                   <form id="materialForm">
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <label htmlFor="packetNo" className="form-label">Packet No</label>
+                        <label htmlFor="packetNo" className="form-label">{t('packetNo')}</label>
                         <input 
                           type="number" 
                           className={`form-control ${validationErrors.packetNo ? 'is-invalid' : ''}`}
@@ -640,7 +672,7 @@ function Materials({ user }) {
                         )}
                       </div>
                       <div className="col-md-6">
-                        <label htmlFor="partName" className="form-label">Part Name</label>
+                        <label htmlFor="partName" className="form-label">{t('partName')}</label>
                         <input 
                           type="text" 
                           className={`form-control ${validationErrors.partName ? 'is-invalid' : ''}`}
@@ -658,7 +690,7 @@ function Materials({ user }) {
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-4">
-                        <label htmlFor="length" className="form-label">Dài</label>
+                        <label htmlFor="length" className="form-label">{t('length')}</label>
                         <input 
                           type="number" 
                           className={`form-control ${validationErrors.length ? 'is-invalid' : ''}`}
@@ -674,7 +706,7 @@ function Materials({ user }) {
                         )}
                       </div>
                       <div className="col-md-4">
-                        <label htmlFor="width" className="form-label">Rộng</label>
+                        <label htmlFor="width" className="form-label">{t('width')}</label>
                         <input 
                           type="number" 
                           className={`form-control ${validationErrors.width ? 'is-invalid' : ''}`}
@@ -690,7 +722,7 @@ function Materials({ user }) {
                         )}
                       </div>
                       <div className="col-md-4">
-                        <label htmlFor="height" className="form-label">Cao</label>
+                        <label htmlFor="height" className="form-label">{t('height')}</label>
                         <input 
                           type="number" 
                           className={`form-control ${validationErrors.height ? 'is-invalid' : ''}`}
@@ -708,7 +740,7 @@ function Materials({ user }) {
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <label htmlFor="quantity" className="form-label">Quantity</label>
+                        <label htmlFor="quantity" className="form-label">{t('quantity')}</label>
                         <input 
                           type="number" 
                           className={`form-control ${validationErrors.quantity ? 'is-invalid' : ''}`}
@@ -724,7 +756,7 @@ function Materials({ user }) {
                         )}
                       </div>
                       <div className="col-md-6">
-                        <label htmlFor="supplier" className="form-label">Supplier</label>
+                        <label htmlFor="supplier" className="form-label">{t('supplier')}</label>
                         <input 
                           type="text" 
                           className={`form-control ${validationErrors.supplier ? 'is-invalid' : ''}`}
@@ -742,10 +774,10 @@ function Materials({ user }) {
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <p><strong>Updated By:</strong> {selectedMaterial.updatedBy}</p>
+                        <p><strong>{t('updatedBy')}:</strong> {selectedMaterial.updatedBy}</p>
                       </div>
                       <div className="col-md-6">
-                        <p><strong>Last Updated:</strong> {selectedMaterial.lastUpdated}</p>
+                        <p><strong>{t('lastUpdated')}:</strong> {selectedMaterial.lastUpdated}</p>
                       </div>
                     </div>
                   </form>
@@ -754,31 +786,31 @@ function Materials({ user }) {
                   <div>
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <p><strong>Packet No:</strong> {selectedMaterial.packetNo}</p>
+                        <p><strong>{t('packetNo')}:</strong> {selectedMaterial.packetNo}</p>
                       </div>
                       <div className="col-md-6">
-                        <p><strong>Part Name:</strong> {selectedMaterial.partName}</p>
+                        <p><strong>{t('partName')}:</strong> {selectedMaterial.partName}</p>
                       </div>
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-12">
-                        <p><strong>Dimensions:</strong> {selectedMaterial.length} x {selectedMaterial.width} x {selectedMaterial.height}</p>
+                        <p><strong>{t('dimensions')}:</strong> {selectedMaterial.length} x {selectedMaterial.width} x {selectedMaterial.height}</p>
                       </div>
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <p><strong>Quantity:</strong> {selectedMaterial.quantity}</p>
+                        <p><strong>{t('quantity')}:</strong> {selectedMaterial.quantity}</p>
                       </div>
                       <div className="col-md-6">
-                        <p><strong>Supplier:</strong> {selectedMaterial.supplier}</p>
+                        <p><strong>{t('supplier')}:</strong> {selectedMaterial.supplier}</p>
                       </div>
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <p><strong>Updated By:</strong> {selectedMaterial.updatedBy}</p>
+                        <p><strong>{t('updatedBy')}:</strong> {selectedMaterial.updatedBy}</p>
                       </div>
                       <div className="col-md-6">
-                        <p><strong>Last Updated:</strong> {selectedMaterial.lastUpdated}</p>
+                        <p><strong>{t('lastUpdated')}:</strong> {selectedMaterial.lastUpdated}</p>
                       </div>
                     </div>
                   </div>
@@ -794,7 +826,7 @@ function Materials({ user }) {
                     setValidationErrors({});
                   }}
                 >
-                  Close
+                  {t('close')}
                 </button>
                 
                 {canEditMaterials ? (
@@ -804,7 +836,7 @@ function Materials({ user }) {
                       className="btn btn-danger" 
                       onClick={handleDeleteClick}
                     >
-                      Delete
+                      {t('delete')}
                     </button>
                     <button 
                       type="button" 
@@ -812,7 +844,7 @@ function Materials({ user }) {
                       onClick={() => handleSaveClick(false)}
                       disabled={updateMaterial.isPending}
                     >
-                      {updateMaterial.isPending ? 'Saving...' : 'Save Changes'}
+                      {updateMaterial.isPending ? t('saving') : t('saveChanges')}
                     </button>
                   </>
                 ) : (
@@ -822,14 +854,14 @@ function Materials({ user }) {
                       className="btn btn-warning" 
                       onClick={handleEditClick}
                     >
-                      Request Edit
+                      {t('requestEdit')}
                     </button>
                     <button 
                       type="button" 
                       className="btn btn-danger" 
                       onClick={handleDeleteClick}
                     >
-                      Request Delete
+                      {t('requestDelete')}
                     </button>
                   </>
                 )}
@@ -839,13 +871,13 @@ function Materials({ user }) {
         </div>
       )}
 
-      {/* Add Material Modal (Admin Only) */}
+      {/* Add Material Modal */}
       {showAddModal && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
           <div className="modal-dialog modal-lg modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Add New Material</h5>
+                <h5 className="modal-title">{t('addMaterial')}</h5>
                 <button 
                   type="button" 
                   className="btn-close" 
@@ -859,7 +891,7 @@ function Materials({ user }) {
                 <form id="addMaterialForm">
                   <div className="row mb-3">
                     <div className="col-md-6">
-                      <label htmlFor="packetNo" className="form-label">Packet No</label>
+                      <label htmlFor="packetNo" className="form-label">{t('packetNo')}</label>
                       <input 
                         type="number" 
                         className={`form-control ${validationErrors.packetNo ? 'is-invalid' : ''}`}
@@ -875,7 +907,7 @@ function Materials({ user }) {
                       )}
                     </div>
                     <div className="col-md-6">
-                      <label htmlFor="partName" className="form-label">Part Name</label>
+                      <label htmlFor="partName" className="form-label">{t('partName')}</label>
                       <input 
                         type="text" 
                         className={`form-control ${validationErrors.partName ? 'is-invalid' : ''}`}
@@ -893,7 +925,7 @@ function Materials({ user }) {
                   </div>
                   <div className="row mb-3">
                     <div className="col-md-4">
-                      <label htmlFor="length" className="form-label">Dài</label>
+                      <label htmlFor="length" className="form-label">{t('length')}</label>
                       <input 
                         type="number" 
                         className={`form-control ${validationErrors.length ? 'is-invalid' : ''}`}
@@ -909,7 +941,7 @@ function Materials({ user }) {
                       )}
                     </div>
                     <div className="col-md-4">
-                      <label htmlFor="width" className="form-label">Rộng</label>
+                      <label htmlFor="width" className="form-label">{t('width')}</label>
                       <input 
                         type="number" 
                         className={`form-control ${validationErrors.width ? 'is-invalid' : ''}`}
@@ -925,7 +957,7 @@ function Materials({ user }) {
                       )}
                     </div>
                     <div className="col-md-4">
-                      <label htmlFor="height" className="form-label">Cao</label>
+                      <label htmlFor="height" className="form-label">{t('height')}</label>
                       <input 
                         type="number" 
                         className={`form-control ${validationErrors.height ? 'is-invalid' : ''}`}
@@ -943,7 +975,7 @@ function Materials({ user }) {
                   </div>
                   <div className="row mb-3">
                     <div className="col-md-6">
-                      <label htmlFor="quantity" className="form-label">Quantity</label>
+                      <label htmlFor="quantity" className="form-label">{t('quantity')}</label>
                       <input 
                         type="number" 
                         className={`form-control ${validationErrors.quantity ? 'is-invalid' : ''}`}
@@ -959,7 +991,7 @@ function Materials({ user }) {
                       )}
                     </div>
                     <div className="col-md-6">
-                      <label htmlFor="supplier" className="form-label">Supplier</label>
+                      <label htmlFor="supplier" className="form-label">{t('supplier')}</label>
                       <input 
                         type="text" 
                         className={`form-control ${validationErrors.supplier ? 'is-invalid' : ''}`}
@@ -986,7 +1018,7 @@ function Materials({ user }) {
                     setValidationErrors({});
                   }}
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button 
                   type="button" 
@@ -994,7 +1026,7 @@ function Materials({ user }) {
                   onClick={() => handleSaveClick(true)}
                   disabled={createMaterial.isPending}
                 >
-                  {createMaterial.isPending ? 'Adding...' : 'Add Material'}
+                  {createMaterial.isPending ? t('adding') : t('addMaterial')}
                 </button>
               </div>
             </div>
@@ -1002,13 +1034,13 @@ function Materials({ user }) {
         </div>
       )}
 
-      {/* Delete Confirmation Modal (Admin Only) */}
+      {/* Delete Confirmation Modal */}
       {showDeleteModal && selectedMaterial && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Confirm Delete</h5>
+                <h5 className="modal-title">{t('confirmDelete')}</h5>
                 <button 
                   type="button" 
                   className="btn-close" 
@@ -1016,7 +1048,8 @@ function Materials({ user }) {
                 ></button>
               </div>
               <div className="modal-body">
-                <p>Are you sure you want to delete "{selectedMaterial.partName}"?</p>
+                <p>{t('materialDeleteConfirm')}</p>
+                <p><strong>{t('partName')}:</strong> {selectedMaterial.partName}</p>
               </div>
               <div className="modal-footer">
                 <button 
@@ -1024,7 +1057,7 @@ function Materials({ user }) {
                   className="btn btn-secondary" 
                   onClick={() => setShowDeleteModal(false)}
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button 
                   type="button" 
@@ -1032,7 +1065,7 @@ function Materials({ user }) {
                   onClick={handleConfirmDelete}
                   disabled={deleteMaterial.isPending}
                 >
-                  {deleteMaterial.isPending ? 'Deleting...' : 'Delete'}
+                  {deleteMaterial.isPending ? t('deleting') : t('delete')}
                 </button>
               </div>
             </div>
@@ -1040,14 +1073,18 @@ function Materials({ user }) {
         </div>
       )}
 
-      {/* Request Modal (Non-Admin Only) */}
+      {/* Request Modal */}
       {showRequestModal && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  Request to {requestType.charAt(0).toUpperCase() + requestType.slice(1)} Material
+                  {t('requestDetails', { 
+                    requestType: requestType === 'add' ? t('add') : 
+                                 requestType === 'edit' ? t('edit') : 
+                                 t('delete') 
+                  })}
                 </h5>
                 <button 
                   type="button" 
@@ -1061,20 +1098,20 @@ function Materials({ user }) {
               <div className="modal-body">
                 {requestType === 'delete' ? (
                   <div>
-                    <p>You are about to request deletion of the following material:</p>
-                    <p><strong>Material:</strong> {selectedMaterial.partName} (ID: {selectedMaterial.id})</p>
+                    <p>{t('materialDeleteConfirm')}</p>
+                    <p><strong>{t('partName')}:</strong> {selectedMaterial.partName}</p>
                     <div className="alert alert-info">
                       <i className="fas fa-info-circle me-2"></i>
-                      This request will be sent to an administrator for approval.
+                      {t('This request will be sent to an administrator for approval.')}
                     </div>
                   </div>
                 ) : (
                   <>
-                    <p>Fill in the details for your {requestType} request:</p>
+                    <p>{t('Fill in the details for your')} {requestType === 'add' ? t('add') : t('edit')} {t('request')}:</p>
                     <form id="materialRequestForm">
                       <div className="row mb-3">
                         <div className="col-md-6">
-                          <label htmlFor="packetNo" className="form-label">Packet No</label>
+                          <label htmlFor="packetNo" className="form-label">{t('packetNo')}</label>
                           <input 
                             type="number" 
                             className={`form-control ${validationErrors.packetNo ? 'is-invalid' : ''}`}
@@ -1090,7 +1127,7 @@ function Materials({ user }) {
                           )}
                         </div>
                         <div className="col-md-6">
-                          <label htmlFor="partName" className="form-label">Part Name</label>
+                          <label htmlFor="partName" className="form-label">{t('partName')}</label>
                           <input 
                             type="text" 
                             className={`form-control ${validationErrors.partName ? 'is-invalid' : ''}`}
@@ -1108,7 +1145,7 @@ function Materials({ user }) {
                       </div>
                       <div className="row mb-3">
                         <div className="col-md-3">
-                          <label htmlFor="length" className="form-label">Dài</label>
+                          <label htmlFor="length" className="form-label">{t('length')}</label>
                           <input 
                             type="number" 
                             className={`form-control ${validationErrors.length ? 'is-invalid' : ''}`}
@@ -1124,7 +1161,7 @@ function Materials({ user }) {
                           )}
                         </div>
                         <div className="col-md-3">
-                          <label htmlFor="width" className="form-label">Rộng</label>
+                          <label htmlFor="width" className="form-label">{t('width')}</label>
                           <input 
                             type="number" 
                             className={`form-control ${validationErrors.width ? 'is-invalid' : ''}`}
@@ -1140,7 +1177,7 @@ function Materials({ user }) {
                           )}
                         </div>
                         <div className="col-md-3">
-                          <label htmlFor="height" className="form-label">Cao</label>
+                          <label htmlFor="height" className="form-label">{t('height')}</label>
                           <input 
                             type="number" 
                             className={`form-control ${validationErrors.height ? 'is-invalid' : ''}`}
@@ -1156,7 +1193,7 @@ function Materials({ user }) {
                           )}
                         </div>
                         <div className="col-md-3">
-                          <label htmlFor="quantity" className="form-label">Quantity</label>
+                          <label htmlFor="quantity" className="form-label">{t('quantity')}</label>
                           <input 
                             type="number" 
                             className={`form-control ${validationErrors.quantity ? 'is-invalid' : ''}`}
@@ -1173,7 +1210,7 @@ function Materials({ user }) {
                         </div>
                       </div>
                       <div className="mb-3">
-                        <label htmlFor="supplier" className="form-label">Supplier</label>
+                        <label htmlFor="supplier" className="form-label">{t('supplier')}</label>
                         <input 
                           type="text" 
                           className={`form-control ${validationErrors.supplier ? 'is-invalid' : ''}`}
@@ -1190,7 +1227,7 @@ function Materials({ user }) {
                       </div>
                       <div className="alert alert-info">
                         <i className="fas fa-info-circle me-2"></i>
-                        This request will be sent to an administrator for approval.
+                        {t('This request will be sent to an administrator for approval.')}
                       </div>
                     </form>
                   </>
@@ -1205,7 +1242,7 @@ function Materials({ user }) {
                     setValidationErrors({});
                   }}
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button 
                   type="button" 
@@ -1213,7 +1250,7 @@ function Materials({ user }) {
                   onClick={handleSubmitRequest}
                   disabled={createRequest.isPending}
                 >
-                  {createRequest.isPending ? 'Submitting...' : 'Submit Request'}
+                  {createRequest.isPending ? t('submitting') : t('submit')}
                 </button>
               </div>
             </div>
@@ -1227,7 +1264,9 @@ function Materials({ user }) {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Material QR Code: {selectedMaterial.partName}</h5>
+                <h5 className="modal-title">
+                  {t('materialQRCode', { materialName: selectedMaterial.partName })}
+                </h5>
                 <button 
                   type="button" 
                   className="btn-close" 
@@ -1238,7 +1277,7 @@ function Materials({ user }) {
                 ></button>
               </div>
               <div className="modal-body text-center">
-                <p>Scan this QR code to view material details:</p>
+                <p>{t('scanQRCode')}</p>
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/material/${selectedMaterial.id}`)}`}
                   alt="QR Code"
@@ -1258,7 +1297,7 @@ function Materials({ user }) {
                     setSelectedMaterial(null);
                   }}
                 >
-                  Close
+                  {t('close')}
                 </button>
                 <button
                   type="button"
@@ -1269,7 +1308,7 @@ function Materials({ user }) {
                     printWindow.document.write(`
                       <html>
                       <head>
-                        <title>Material QR Code: ${selectedMaterial.partName}</title>
+                        <title>${t('materialQRCode', { materialName: selectedMaterial.partName })}</title>
                         <style>
                           body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
                           h2 { color: #0a4d8c; }
@@ -1278,10 +1317,10 @@ function Materials({ user }) {
                         </style>
                       </head>
                       <body>
-                        <h2>Material QR Code</h2>
+                        <h2>${t('materialQRCode', { materialName: '' })}</h2>
                         <div class="material-info">
                           <h3>${selectedMaterial.partName}</h3>
-                          <p>Packet: ${selectedMaterial.packetNo} | Dimensions: ${selectedMaterial.length} x ${selectedMaterial.width} x ${selectedMaterial.height}</p>
+                          <p>${t('packetNo')}: ${selectedMaterial.packetNo} | ${t('dimensions')}: ${selectedMaterial.length} x ${selectedMaterial.width} x ${selectedMaterial.height}</p>
                         </div>
                         <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/material/${selectedMaterial.id}`)}" class="qr-code" />
                         <p>${window.location.origin}/material/${selectedMaterial.id}</p>
@@ -1294,7 +1333,7 @@ function Materials({ user }) {
                     }, 300);
                   }}
                 >
-                  Print
+                  {t('print')}
                 </button>
               </div>
             </div>

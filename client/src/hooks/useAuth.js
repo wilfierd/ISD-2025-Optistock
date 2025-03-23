@@ -4,6 +4,7 @@ import apiService from '../services/api';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const useAuthStatus = () => {
   return useQuery({
@@ -20,6 +21,7 @@ export const useLogin = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [error, setError] = useState(null);
+  const { t } = useLanguage();
 
   const mutation = useMutation({
     mutationFn: (credentials) => apiService.auth.login(credentials),
@@ -34,7 +36,12 @@ export const useLogin = () => {
       setError(null);
       
       // Show success message
-      toast.success('Login successful');
+      // Try to use translation, but fall back to a simple message
+      try {
+        toast.success(t('loginSuccess'));
+      } catch (e) {
+        toast.success('Login successful');
+      }
       
       // Navigate to dashboard
       navigate('/dashboard');
@@ -56,6 +63,7 @@ export const useLogin = () => {
 export const useLogout = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   return useMutation({
     mutationFn: () => apiService.auth.logout(),
@@ -70,7 +78,12 @@ export const useLogout = () => {
       queryClient.invalidateQueries();
       
       // Show success message
-      toast.success('Logged out successfully');
+      // Try to use translation, but fall back to a simple message
+      try {
+        toast.success(t('logoutSuccess'));
+      } catch (e) {
+        toast.success('Logged out successfully');
+      }
       
       // Navigate to login
       navigate('/login');

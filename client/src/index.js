@@ -28,7 +28,18 @@ root.render(
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <App />
-      <ToastContainer position="top-right" autoClose={3000} />
+      {/* Configure ToastContainer to be top-center */}
+      <ToastContainer 
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
     </BrowserRouter>
     {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
   </QueryClientProvider>

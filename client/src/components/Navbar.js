@@ -3,14 +3,17 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useNotifications, useMarkNotificationsAsRead } from '../hooks/useNotifications';
 import { hasAdminOnlyAccess, hasAdminOrManagerAccess } from '../utils/rolePermissions';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   
   const { data: notifications = [] } = useNotifications();
   const markAsRead = useMarkNotificationsAsRead();
+  const { language, toggleLanguage, t } = useLanguage();
   
   // Count unread notifications
   const unreadCount = notifications.filter(n => !n.is_read).length;
@@ -36,13 +39,13 @@ function Navbar({ user, onLogout }) {
             className={`navbar-brand ${isActive('/dashboard') ? 'fw-bold' : ''}`} 
             to="/dashboard"
           >
-            Dashboard
+            {t('dashboard')}
           </Link>
           <Link 
             className={`navbar-brand ${isActive('/materials') ? 'fw-bold' : ''}`} 
             to="/materials"
           >
-            Nhà kho
+            {t('warehouse')}
           </Link>
           {/* Show Employees link for admin and manager users */}
           {hasAdminOrManagerAccess(user) && (
@@ -50,7 +53,7 @@ function Navbar({ user, onLogout }) {
               className={`navbar-brand ${isActive('/employees') ? 'fw-bold' : ''}`} 
               to="/employees"
             >
-              Nhân viên
+              {t('employees')}
             </Link>
           )}
           {/* Show Requests link to both admins and managers */}
@@ -59,11 +62,46 @@ function Navbar({ user, onLogout }) {
               className={`navbar-brand ${isActive('/requests') ? 'fw-bold' : ''}`} 
               to="/requests"
             >
-              Requests
+              {t('requests')}
             </Link>
           )}
         </div>
         <div className="d-flex align-items-center">
+          {/* Language Switcher */}
+          <div className="position-relative me-3">
+            <button 
+              className="btn btn-link text-white" 
+              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+            >
+              <i className="fas fa-globe me-1"></i>
+              {language === 'en' ? 'EN' : 'VI'}
+            </button>
+            
+            {/* Language dropdown */}
+            {showLanguageDropdown && (
+              <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show" style={{ minWidth: '150px' }}>
+                <button 
+                  className={`dropdown-item ${language === 'en' ? 'active' : ''}`} 
+                  onClick={() => {
+                    if (language !== 'en') toggleLanguage();
+                    setShowLanguageDropdown(false);
+                  }}
+                >
+                  {t('english')}
+                </button>
+                <button 
+                  className={`dropdown-item ${language === 'vi' ? 'active' : ''}`} 
+                  onClick={() => {
+                    if (language !== 'vi') toggleLanguage();
+                    setShowLanguageDropdown(false);
+                  }}
+                >
+                  {t('vietnamese')}
+                </button>
+              </div>
+            )}
+          </div>
+          
           {/* Notification bell icon */}
           <div className="position-relative me-3">
             <button 
@@ -82,19 +120,19 @@ function Navbar({ user, onLogout }) {
             {showNotifications && (
               <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show" style={{ width: '300px' }}>
                 <div className="d-flex justify-content-between align-items-center px-3 py-2">
-                  <h6 className="mb-0">Notifications</h6>
+                  <h6 className="mb-0">{t('notifications')}</h6>
                   <button 
                     className="btn btn-sm btn-link" 
                     onClick={handleViewAllNotifications}
                   >
-                    Mark all as read
+                    {t('markAllAsRead')}
                   </button>
                 </div>
                 <div className="dropdown-divider"></div>
                 <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
                   {notifications.length === 0 ? (
                     <div className="dropdown-item text-center text-muted">
-                      No notifications
+                      {t('noNotifications')}
                     </div>
                   ) : (
                     notifications.slice(0, 10).map(notification => (
@@ -112,7 +150,7 @@ function Navbar({ user, onLogout }) {
                 </div>
                 <div className="dropdown-divider"></div>
                 <Link to="/notifications" className="dropdown-item text-center">
-                  View all notifications
+                  {t('viewAllNotifications')}
                 </Link>
               </div>
             )}
@@ -124,7 +162,7 @@ function Navbar({ user, onLogout }) {
             className="btn btn-outline-light btn-sm" 
             onClick={onLogout}
           >
-            Logout
+            {t('logout')}
           </button>
         </div>
       </div>
