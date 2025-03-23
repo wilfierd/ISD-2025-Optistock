@@ -318,16 +318,26 @@ app.put('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
     }
     
     const existingUser = existingUsers[0];
+
+    console.log('Update user request:');
+    console.log('Current user:', req.session.user.username, req.session.user.role);
+    console.log('Target user ID:', id, 'role:', existingUser.role);
+    console.log('New role to assign:', role);
     
-    // Normal users cannot change their role
-    if (req.session.user.role !== 'admin' && role && role !== req.session.user.role) {
-      return res.status(403).json({ success: false, error: 'Cannot change role' });
-    }
-    
-    // Check if current user is a manager (any variation)
+    // Check if the user is a manager
     const isManager = ['quản lý', 'quan ly', 'manager'].includes(req.session.user.role.toLowerCase());
+    // Regular users cannot change role, but admins and managers can (with restrictions)
+    if (!isManager && req.session.user.role !== 'admin' && role && role !== req.session.user.role) {
+      return res.status(403).json({ success: false, error: 'Cannot change role' });
+    } 
     
     if (isManager) {
+
+      console.log('User is a manager');
+      console.log('Existing user role:', existingUser.role);
+      console.log('Is admin?', existingUser.role === 'admin');
+      console.log('Is manager?', ['quản lý', 'quan ly', 'manager'].includes(existingUser.role.toLowerCase()));
+      
       // Managers can't modify admins or other managers
       const targetIsAdminOrManager = existingUser.role === 'admin' || 
                                     ['quản lý', 'quan ly', 'manager'].includes(existingUser.role.toLowerCase());
@@ -379,7 +389,8 @@ app.put('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
       queryParams.push(fullName);
     }
     
-    if (role && req.session.user.role === 'admin') {
+    if (role && (req.session.user.role === 'admin'|| 
+      ['quản lý', 'quan ly', 'manager'].includes(req.session.user.role.toLowerCase()))) {
       updateFields.push('role = ?');
       queryParams.push(role);
     }
@@ -493,39 +504,107 @@ app.post('/api/materials', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
-// Update material with packet_no uniqueness validation
-app.put('/api/materials/:id', isAuthenticatedAPI, async (req, res) => {
+// Update a user (admin, manager, or self update)
+app.put('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
   try {
     const { id } = req.params;
-    const { packetNo, partName, length, width, height, quantity, supplier } = req.body;
-    const currentDate = new Date().toLocaleDateString('en-GB');
+    const { username, password, fullName, role, phone } = req.body;
     
-    // Check if any other material has the same packet_no (excluding the current material)
-    const [existingMaterials] = await pool.query(
-      'SELECT id FROM materials WHERE packet_no = ? AND id != ?',
-      [packetNo, id]
-    );
+    // First, check if user exists and get their role
+    const [existingUsers] = await pool.query('SELECT id, role FROM users WHERE id = ?', [id]);
     
-    if (existingMaterials.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Another material with this packet number already exists. Packet numbers must be unique.' 
-      });
+    if (existingUsers.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
     }
     
-    await pool.query(
-      `UPDATE materials 
-       SET packet_no = ?, part_name = ?, length = ?, width = ?, height = ?, 
-           quantity = ?, supplier = ?, updated_by = ?, last_updated = ? 
-       WHERE id = ?`,
-      [packetNo, partName, length, width, height, quantity, supplier, 
-       req.session.user.username, currentDate, id]
-    );
+    const existingUser = existingUsers[0];
     
-    res.json({ success: true, message: 'Material updated successfully' });
+    // Determine current user's permission level
+    const isAdmin = req.session.user.role === 'admin';
+    const isManager = ['quản lý', 'quan ly', 'manager'].includes(req.session.user.role.toLowerCase());
+    const isSelfUpdate = req.session.user.id === parseInt(id);
+    
+    // Determine target user's type
+    const targetIsAdmin = existingUser.role === 'admin';
+    const targetIsManager = ['quản lý', 'quan ly', 'manager'].includes(existingUser.role.toLowerCase());
+    
+    // Permission checks
+    // 1. Regular users can only update themselves
+    if (!isAdmin && !isManager && !isSelfUpdate) {
+      return res.status(403).json({ success: false, error: 'You can only update your own information' });
+    }
+    
+    // 2. Managers can't modify admins or other managers
+    if (isManager && !isAdmin && (targetIsAdmin || targetIsManager)) {
+      return res.status(403).json({ success: false, error: 'Managers cannot modify admins or other managers' });
+    }
+    
+    // 3. Only admins can assign admin role
+    if (role === 'admin' && !isAdmin) {
+      return res.status(403).json({ success: false, error: 'Only admins can assign admin role' });
+    }
+    
+    // 4. Regular users can't change their role
+    if (!isAdmin && !isManager && isSelfUpdate && role && role !== req.session.user.role) {
+      return res.status(403).json({ success: false, error: 'Regular users cannot change their role' });
+    }
+    
+    // Check if username exists (if changing username)
+    if (username) {
+      const [existingUsername] = await pool.query('SELECT id FROM users WHERE username = ? AND id != ?', [username, id]);
+      if (existingUsername.length > 0) {
+        return res.status(400).json({ success: false, error: 'Username already exists' });
+      }
+    }
+    
+    // Build the SQL update statement dynamically based on what's provided
+    let updateFields = [];
+    let queryParams = [];
+    
+    if (username) {
+      updateFields.push('username = ?');
+      queryParams.push(username);
+    }
+    
+    if (password) {
+      // In a real app, you would hash the password here
+      updateFields.push('password = ?');
+      queryParams.push(password);
+    }
+    
+    if (fullName) {
+      updateFields.push('full_name = ?');
+      queryParams.push(fullName);
+    }
+    
+    // Only admins and managers can update roles (with appropriate restrictions)
+    if (role && (isAdmin || isManager)) {
+      updateFields.push('role = ?');
+      queryParams.push(role);
+    }
+    
+    if (phone !== undefined) {
+      updateFields.push('phone = ?');
+      queryParams.push(phone);
+    }
+    
+    // Add the ID at the end of params array
+    queryParams.push(id);
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ success: false, error: 'No fields to update' });
+    }
+    
+    const query = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
+    console.log("Executing query:", query);
+    console.log("With params:", queryParams);
+    
+    await pool.query(query, queryParams);
+    
+    res.json({ success: true, message: 'User updated successfully' });
   } catch (error) {
-    console.error('Error updating material:', error);
-    res.status(500).json({ success: false, error: 'Failed to update material' });
+    console.error('Error updating user:', error);
+    res.status(500).json({ success: false, error: 'Failed to update user', details: error.message });
   }
 });
 
