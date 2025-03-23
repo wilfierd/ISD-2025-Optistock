@@ -15,7 +15,8 @@ import {
   hasAdminOnlyAccess, 
   hasAdminOrManagerAccess, 
   canDeleteUser, 
-  getAvailableRoles 
+  getAvailableRoles,
+  canEditUser as utilsCanEditUser // Import the utility function with a different name
 } from '../utils/rolePermissions';
 
 function Users({ user }) {
@@ -39,7 +40,11 @@ function Users({ user }) {
 
   // React Query hooks
   const { data: users = [], isLoading, error } = useUsers();
-  const { data: selectedUser } = useUser(selectedUserId);
+  const { 
+    data: selectedUser, 
+    isLoading: isLoadingUser,
+    error: userError 
+  } = useUser(selectedUserId);
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
@@ -188,18 +193,8 @@ function Users({ user }) {
   // Determine if user can edit another user
   const canEditUser = (targetUserId) => {
     const targetUser = users.find(u => u.id === targetUserId);
-    
-    // Admins can edit anyone
-    if (user.role === 'admin') return true;
-    
-    // Managers can edit only regular employees and themselves
-    if (user.role === 'quản lý') {
-      if (targetUser && targetUser.role === 'nhân viên') return true;
-      return false;
-    }
-    
-    // Regular users can only edit themselves
-    return user.id === targetUserId;
+    if (!targetUser) return false;
+    return utilsCanEditUser(user, targetUser);
   };
 
   return (
@@ -318,31 +313,45 @@ function Users({ user }) {
                 ></button>
               </div>
               <div className="modal-body">
-                {modalMode === 'view' && selectedUser ? (
-                  <div className="user-details-container">
-                    <div className="user-detail-row">
-                      <div className="user-detail-label">Username</div>
-                      <div className="user-detail-value">{selectedUser.username}</div>
-                    </div>
-                    <div className="user-detail-row">
-                      <div className="user-detail-label">Full Name</div>
-                      <div className="user-detail-value">{selectedUser.full_name}</div>
-                    </div>
-                    <div className="user-detail-row">
-                      <div className="user-detail-label">Role</div>
-                      <div className="user-detail-value">{selectedUser.role}</div>
-                    </div>
-                    <div className="user-detail-row">
-                      <div className="user-detail-label">Phone</div>
-                      <div className="user-detail-value">{selectedUser.phone || '-'}</div>
-                    </div>
-                    <div className="user-detail-row">
-                      <div className="user-detail-label">Created At</div>
-                      <div className="user-detail-value">
-                        {new Date(selectedUser.created_at).toLocaleString()}
+                {modalMode === 'view' ? (
+                  isLoadingUser ? (
+                    <div className="text-center my-3">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Loading user details...</span>
                       </div>
                     </div>
-                  </div>
+                  ) : userError ? (
+                    <div className="alert alert-danger">
+                      Error loading user details: {userError.message}
+                    </div>
+                  ) : selectedUser ? (
+                    <div className="user-details-container">
+                      <div className="user-detail-row">
+                        <div className="user-detail-label">Username</div>
+                        <div className="user-detail-value">{selectedUser.username}</div>
+                      </div>
+                      <div className="user-detail-row">
+                        <div className="user-detail-label">Full Name</div>
+                        <div className="user-detail-value">{selectedUser.full_name}</div>
+                      </div>
+                      <div className="user-detail-row">
+                        <div className="user-detail-label">Role</div>
+                        <div className="user-detail-value">{selectedUser.role}</div>
+                      </div>
+                      <div className="user-detail-row">
+                        <div className="user-detail-label">Phone</div>
+                        <div className="user-detail-value">{selectedUser.phone || '-'}</div>
+                      </div>
+                      <div className="user-detail-row">
+                        <div className="user-detail-label">Created At</div>
+                        <div className="user-detail-value">
+                          {new Date(selectedUser.created_at).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="alert alert-warning">User not found</div>
+                  )
                 ) : (
                   <form id="userForm">
                     <div className="row mb-3">

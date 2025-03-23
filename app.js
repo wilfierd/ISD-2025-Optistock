@@ -230,13 +230,25 @@ app.get('/api/users', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
 });
 
 // Get a specific user
+// Get a specific user
 app.get('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Normal users can only get their own information, admins can get any user
-    if (req.session.user.role !== 'admin' && req.session.user.id !== parseInt(id)) {
-      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
+    // Safer checks for user role
+    const currentUserRole = req.session.user && req.session.user.role ? 
+                           String(req.session.user.role).toLowerCase() : '';
+    
+    // Check if user is admin or manager
+    const isAdmin = currentUserRole === 'admin';
+    const isManager = ['quản lý', 'quan ly', 'manager'].includes(currentUserRole);
+    
+    // Permission check with better error handling
+    if (!isAdmin && !isManager && req.session.user.id !== parseInt(id)) {
+      return res.status(403).json({ 
+        success: false, 
+        error: 'Insufficient permissions' 
+      });
     }
     
     const [users] = await pool.query(
@@ -251,7 +263,11 @@ app.get('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
     res.json({ success: true, data: users[0] });
   } catch (error) {
     console.error('Error fetching user:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch user' });
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch user', 
+      details: error.message 
+    });
   }
 });
 
@@ -295,15 +311,28 @@ app.put('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
     const { id } = req.params;
     const { username, password, fullName, role, phone } = req.body;
     
+    // First, check if user exists and get their role
+    const [existingUsers] = await pool.query('SELECT id, role FROM users WHERE id = ?', [id]);
+    if (existingUsers.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    const existingUser = existingUsers[0];
+    
     // Normal users cannot change their role
     if (req.session.user.role !== 'admin' && role && role !== req.session.user.role) {
       return res.status(403).json({ success: false, error: 'Cannot change role' });
     }
     
-    // Additional permission checks for managers
-    if (req.session.user.role === 'quản lý') {
+    // Check if current user is a manager (any variation)
+    const isManager = ['quản lý', 'quan ly', 'manager'].includes(req.session.user.role.toLowerCase());
+    
+    if (isManager) {
       // Managers can't modify admins or other managers
-      if (existingUser[0].role === 'admin' || existingUser[0].role === 'quản lý') {
+      const targetIsAdminOrManager = existingUser.role === 'admin' || 
+                                    ['quản lý', 'quan ly', 'manager'].includes(existingUser.role.toLowerCase());
+      
+      if (targetIsAdminOrManager) {
         return res.status(403).json({ 
           success: false, 
           error: 'Insufficient permissions to modify managers or admins' 
@@ -320,12 +349,6 @@ app.put('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
     } else if (req.session.user.role !== 'admin' && req.session.user.id !== parseInt(id)) {
       // Regular users can only update their own information
       return res.status(403).json({ success: false, error: 'Insufficient permissions' });
-    }
-    
-    // Check if user exists
-    const [existingUser] = await pool.query('SELECT id FROM users WHERE id = ?', [id]);
-    if (existingUser.length === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
     }
     
     // Check if username exists (if changing username)
