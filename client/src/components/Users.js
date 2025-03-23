@@ -11,6 +11,12 @@ import {
   useUpdateUser, 
   useDeleteUser
 } from '../hooks/useUsers';
+import { 
+  hasAdminOnlyAccess, 
+  hasAdminOrManagerAccess, 
+  canDeleteUser, 
+  getAvailableRoles 
+} from '../utils/rolePermissions';
 
 function Users({ user }) {
   // State for user ID being viewed or edited
@@ -39,11 +45,14 @@ function Users({ user }) {
   const deleteUser = useDeleteUser();
   const logoutMutation = useLogout();
 
+  // Get available roles based on current user's role
+  const availableRoles = getAvailableRoles(user);
+
   // Filter users based on search term
   const filteredUsers = useMemo(() => {
-    return users.filter(user => 
-      user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase())
+    return users.filter(u => 
+      u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.username.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [users, searchTerm]);
 
@@ -98,6 +107,14 @@ function Users({ user }) {
 
   // Handle delete user click
   const handleDeleteClick = (id) => {
+    const targetUser = users.find(u => u.id === id);
+    
+    // Check if user can delete the target user
+    if (targetUser && !canDeleteUser(user, targetUser)) {
+      toast.error("You don't have permission to delete this user");
+      return;
+    }
+    
     setSelectedUserId(id);
     setShowDeleteModal(true);
   };
@@ -167,6 +184,23 @@ function Users({ user }) {
     setShowDeleteModal(false);
     setSelectedUserId(null);
   };
+  
+  // Determine if user can edit another user
+  const canEditUser = (targetUserId) => {
+    const targetUser = users.find(u => u.id === targetUserId);
+    
+    // Admins can edit anyone
+    if (user.role === 'admin') return true;
+    
+    // Managers can edit only regular employees and themselves
+    if (user.role === 'quản lý') {
+      if (targetUser && targetUser.role === 'nhân viên') return true;
+      return false;
+    }
+    
+    // Regular users can only edit themselves
+    return user.id === targetUserId;
+  };
 
   return (
     <div>
@@ -189,7 +223,7 @@ function Users({ user }) {
             </div>
           </div>
           <div className="col-md-6 text-end">
-            {user.role === 'admin' && (
+            {hasAdminOrManagerAccess(user) && (
               <button 
                 className="btn btn-primary btn-action" 
                 onClick={handleAddClick}
@@ -235,7 +269,7 @@ function Users({ user }) {
                       <td>{tableUser.role}</td>
                       <td>{tableUser.phone || '-'}</td>
                       <td className="text-end">
-                      {(user.role === 'admin' || user.id === tableUser.id) && (
+                        {canEditUser(tableUser.id) && (
                           <button 
                             className="btn btn-sm" 
                             onClick={(e) => {
@@ -357,9 +391,9 @@ function Users({ user }) {
                           value={formData.role}
                           onChange={handleInputChange}
                         >
-                          <option value="nhân viên">Nhân viên</option>
-                          <option value="quản lý">Quản lý</option>
-                          {user.role === 'admin' && <option value="admin">Admin</option>}
+                          {availableRoles.map(role => (
+                            <option key={role} value={role}>{role}</option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -399,27 +433,33 @@ function Users({ user }) {
                   </button>
                 )}
                 
-                {modalMode === 'view' && user.role === 'admin' && selectedUser && selectedUser.id !== user.id && (
+                {modalMode === 'view' && selectedUser && (
                   <>
-                    <button 
-                      type="button" 
-                      className="btn btn-primary" 
-                      onClick={() => {
-                        handleEditClick(selectedUser.id);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      type="button" 
-                      className="btn btn-danger" 
-                      onClick={() => {
-                        setShowUserModal(false);
-                        handleDeleteClick(selectedUser.id);
-                      }}
-                    >
-                      Delete
-                    </button>
+                    {canEditUser(selectedUser.id) && (
+                      <button 
+                        type="button" 
+                        className="btn btn-primary" 
+                        onClick={() => {
+                          handleEditClick(selectedUser.id);
+                        }}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    
+                    {/* Only show delete button if user has permission to delete this user */}
+                    {canDeleteUser(user, selectedUser) && selectedUser.id !== user.id && (
+                      <button 
+                        type="button" 
+                        className="btn btn-danger" 
+                        onClick={() => {
+                          setShowUserModal(false);
+                          handleDeleteClick(selectedUser.id);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </>
                 )}
               </div>

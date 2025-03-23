@@ -8,11 +8,11 @@ import MaterialRequests from './components/MaterialRequests';
 import Users from './components/Users';
 import Login from './components/Login';
 import { useAuthStatus } from './hooks/useAuth';
+import { hasAdminOrManagerAccess, hasAdminOnlyAccess } from './utils/rolePermissions';
 
 function App() {
   const { data: authData, isLoading } = useAuthStatus();
   const user = authData?.user || null;
-  const isAdmin = user?.role === 'admin';
 
   if (isLoading) {
     return <div className="text-center mt-5">Loading...</div>;
@@ -25,16 +25,16 @@ function App() {
       <Route path="/materials" element={user ? <Materials user={user} /> : <Navigate to="/login" />} />
       <Route path="/material/:id" element={user ? <MaterialDetail user={user} /> : <Navigate to="/login" />} />
       
-      {/* Restrict employees route to admin users only */}
+      {/* Allow both admin and manager access to employees route */}
       <Route 
         path="/employees" 
-        element={user && isAdmin ? <Users user={user} /> : <Navigate to="/dashboard" />} 
+        element={user && hasAdminOrManagerAccess(user) ? <Users user={user} /> : <Navigate to="/dashboard" />} 
       />
       
-      {/* Admin only routes */}
+      {/* Allow both admin and manager access to requests route */}
       <Route 
         path="/requests" 
-        element={user && isAdmin ? <MaterialRequests user={user} /> : <Navigate to="/dashboard" />} 
+        element={user && hasAdminOrManagerAccess(user) ? <MaterialRequests user={user} /> : <Navigate to="/dashboard" />} 
       />
       
       <Route path="/" element={<Navigate to="/dashboard" />} />

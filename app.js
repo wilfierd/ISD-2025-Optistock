@@ -51,6 +51,15 @@ const isAuthenticatedAPI = (req, res, next) => {
 
 // Admin role check middleware
 const isAdminAPI = (req, res, next) => {
+  if (req.session.user && (req.session.user.role === 'admin'|| req.session.user.role === 'quản lý')) {
+    next();
+  } else {
+    res.status(403).json({ success: false, error: 'Insufficient permissions' });
+  }
+};
+
+// Add a new middleware for admin-only routes
+const isStrictAdminAPI = (req, res, next) => {
   if (req.session.user && req.session.user.role === 'admin') {
     next();
   } else {
@@ -131,57 +140,6 @@ function safelyParseJSON(json) {
     return {};
   }
 }
-
-// Then update your API route
-app.get('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
-  try {
-    // Get request filter from query params
-    const status = req.query.status || 'pending';
-    
-    // Admins see all requests, regular users only see their own
-    const whereClause = req.session.user.role === 'admin' 
-      ? 'WHERE mr.status = ?' 
-      : 'WHERE mr.status = ? AND mr.user_id = ?';
-    
-    const queryParams = req.session.user.role === 'admin'
-      ? [status]
-      : [status, req.session.user.id];
-    
-    // Query with joins to get user info
-    const [requests] = await pool.query(
-      `SELECT mr.*, u.username as user_username, u.full_name as user_full_name
-       FROM material_requests mr
-       JOIN users u ON mr.user_id = u.id
-       ${whereClause}
-       ORDER BY mr.request_date DESC`,
-      queryParams
-    );
-    
-    // Pre-process the request data to ensure it's properly formatted
-    const processedRequests = requests.map(request => {
-      // Make a copy to avoid modifying the original
-      const processedRequest = {...request};
-      
-      // Process the request_data field
-      if (processedRequest.request_data) {
-        try {
-          // Parse JSON string if needed
-          processedRequest.request_data = safelyParseJSON(processedRequest.request_data);
-        } catch (error) {
-          console.error(`Error processing request data for ID ${request.id}:`, error);
-          processedRequest.request_data = {};
-        }
-      }
-      
-      return processedRequest;
-    });
-    
-    res.json({ success: true, data: processedRequests });
-  } catch (error) {
-    console.error('Error fetching material requests:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch material requests' });
-  }
-});
 
 // ===== API ROUTES =====
 
@@ -337,14 +295,31 @@ app.put('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
     const { id } = req.params;
     const { username, password, fullName, role, phone } = req.body;
     
-    // Normal users can only update their own information, admins can update any user
-    if (req.session.user.role !== 'admin' && req.session.user.id !== parseInt(id)) {
-      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
-    }
-    
     // Normal users cannot change their role
     if (req.session.user.role !== 'admin' && role && role !== req.session.user.role) {
       return res.status(403).json({ success: false, error: 'Cannot change role' });
+    }
+    
+    // Additional permission checks for managers
+    if (req.session.user.role === 'quản lý') {
+      // Managers can't modify admins or other managers
+      if (existingUser[0].role === 'admin' || existingUser[0].role === 'quản lý') {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Insufficient permissions to modify managers or admins' 
+        });
+      }
+      
+      // Managers can't assign admin role
+      if (role === 'admin') {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Insufficient permissions to assign admin role' 
+        });
+      }
+    } else if (req.session.user.role !== 'admin' && req.session.user.id !== parseInt(id)) {
+      // Regular users can only update their own information
+      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
     }
     
     // Check if user exists
@@ -424,6 +399,17 @@ app.delete('/api/users/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) =>
       return res.status(404).json({ success: false, error: 'User not found' });
     }
     
+    // Additional permission checks for managers
+    if (req.session.user.role === 'quản lý') {
+      // Managers can't delete admins or other managers
+      if (existingUser[0].role === 'admin' || existingUser[0].role === 'quản lý') {
+        return res.status(403).json({ 
+          success: false, 
+          error: 'Insufficient permissions to delete managers or admins' 
+        });
+      }
+    }
+
     await pool.query('DELETE FROM users WHERE id = ?', [id]);
     
     res.json({ success: true, message: 'User deleted successfully' });
@@ -572,17 +558,21 @@ app.get('/api/materials/:id', isAuthenticatedAPI, async (req, res) => {
 // ===== MATERIAL REQUESTS API =====
 
 // Get all material requests (admin only, with proper error handling)
+
+// Get material requests for current user
 app.get('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
   try {
     // Get request filter from query params
     const status = req.query.status || 'pending';
+    const isAdminOrManager = req.session.user.role === 'admin' || req.session.user.role === 'quản lý';
+
     
     // Admins see all requests, regular users only see their own
-    const whereClause = req.session.user.role === 'admin' 
+    const whereClause = isAdminOrManager
       ? 'WHERE mr.status = ?' 
       : 'WHERE mr.status = ? AND mr.user_id = ?';
     
-    const queryParams = req.session.user.role === 'admin'
+    const queryParams = isAdminOrManager
       ? [status]
       : [status, req.session.user.id];
     
@@ -596,31 +586,28 @@ app.get('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
       queryParams
     );
     
-    // Log the retrieved data for debugging
-    console.log(`Retrieved ${requests.length} ${status} material requests`);
+    // Pre-process the request data to ensure it's properly formatted
+    const processedRequests = requests.map(request => {
+      // Make a copy to avoid modifying the original
+      const processedRequest = {...request};
+      
+      // Process the request_data field
+      if (processedRequest.request_data) {
+        try {
+          // Parse JSON string if needed
+          processedRequest.request_data = safelyParseJSON(processedRequest.request_data);
+        } catch (error) {
+          console.error(`Error processing request data for ID ${request.id}:`, error);
+          processedRequest.request_data = {};
+        }
+      }
+      
+      return processedRequest;
+    });
     
-    res.json({ success: true, data: requests });
+    res.json({ success: true, data: processedRequests });
   } catch (error) {
     console.error('Error fetching material requests:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch material requests' });
-  }
-});
-
-// Get material requests for current user
-app.get('/api/my-material-requests', isAuthenticatedAPI, async (req, res) => {
-  try {
-    const [requests] = await pool.query(
-      `SELECT * FROM material_requests
-       WHERE user_id = ?
-       ORDER BY request_date DESC`,
-      [req.session.user.id]
-    );
-    
-    console.log(`Retrieved ${requests.length} material requests for user ${req.session.user.id}`);
-    
-    res.json({ success: true, data: requests });
-  } catch (error) {
-    console.error('Error fetching user material requests:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch material requests' });
   }
 });
@@ -679,16 +666,13 @@ app.post('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
-// Process a material request (admin only)
 app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, adminNotes } = req.body;
     
     console.log(`Processing material request ${id} with status ${status}`);
-    
-
-    
+     
     // Validate status
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, error: 'Invalid status' });

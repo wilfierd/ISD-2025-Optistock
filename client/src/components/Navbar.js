@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useNotifications, useMarkNotificationsAsRead } from '../hooks/useNotifications';
+import { hasAdminOnlyAccess, hasAdminOrManagerAccess } from '../utils/rolePermissions';
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
@@ -13,9 +14,6 @@ function Navbar({ user, onLogout }) {
   
   // Count unread notifications
   const unreadCount = notifications.filter(n => !n.is_read).length;
-  
-  // Check if user is admin
-  const isAdmin = user.role === 'admin';
   
   // Handle viewing all notifications
   const handleViewAllNotifications = () => {
@@ -46,8 +44,8 @@ function Navbar({ user, onLogout }) {
           >
             Nhà kho
           </Link>
-          {/* Only show Employees link for admin users */}
-          {isAdmin && (
+          {/* Show Employees link for admin and manager users */}
+          {hasAdminOrManagerAccess(user) && (
             <Link 
               className={`navbar-brand ${isActive('/employees') ? 'fw-bold' : ''}`} 
               to="/employees"
@@ -55,7 +53,8 @@ function Navbar({ user, onLogout }) {
               Nhân viên
             </Link>
           )}
-          {user.role === 'admin' && (
+          {/* Show Requests link to both admins and managers */}
+          {hasAdminOrManagerAccess(user) && (
             <Link 
               className={`navbar-brand ${isActive('/requests') ? 'fw-bold' : ''}`} 
               to="/requests"

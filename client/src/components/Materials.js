@@ -1,6 +1,7 @@
 // client/src/components/Materials.js with packet number uniqueness validation
 import React, { useState, useEffect, useMemo } from 'react';
 import Navbar from './Navbar';
+import { canManageMaterials } from '../utils/rolePermissions';
 import { useLogout } from '../hooks/useAuth';
 import { 
   useMaterials, 
@@ -52,8 +53,8 @@ function Materials({ user }) {
   const createRequest = useCreateMaterialRequest();
   const logoutMutation = useLogout();
 
-  // Check if user is admin
-  const isAdmin = user.role === 'admin';
+  // Check if user has permission to directly manage materials
+  const canEditMaterials = canManageMaterials(user);
 
   // Filter materials based on search term and search field
   const filteredMaterials = useMemo(() => {
@@ -191,7 +192,7 @@ function Materials({ user }) {
     });
     setValidationErrors({}); // Clear any previous validation errors
     
-    if (isAdmin) {
+    if (canEditMaterials) {
       setShowAddModal(true);
     } else {
       setRequestType('add');
@@ -201,7 +202,7 @@ function Materials({ user }) {
 
   // Toggle edit modal (in detail view)
   const handleEditClick = () => {
-    if (!isAdmin) {
+    if (!canEditMaterials) {
       setShowDetailsModal(false);
       setRequestType('edit');
       setShowRequestModal(true);
@@ -210,7 +211,7 @@ function Materials({ user }) {
 
   // Toggle delete modal (in detail view)
   const handleDeleteClick = () => {
-    if (isAdmin) {
+    if (canEditMaterials) {
       setShowDeleteModal(true);
       setShowDetailsModal(false);
     } else {
@@ -519,9 +520,9 @@ function Materials({ user }) {
             <button 
               className="btn btn-primary" 
               onClick={handleAddClick}
-              disabled={isAdmin ? createMaterial.isPending : createRequest.isPending}
+              disabled={canEditMaterials ? createMaterial.isPending : createRequest.isPending}
             >
-              {isAdmin ? 'Add' : 'Request Add'}
+              {canEditMaterials ? 'Add' : 'Request Add'}
             </button>
           </div>
         </div>
@@ -618,7 +619,7 @@ function Materials({ user }) {
                 ></button>
               </div>
               <div className="modal-body">
-                {isAdmin ? (
+                {canEditMaterials ? (
                   // Admin view - Edit form
                   <form id="materialForm">
                     <div className="row mb-3">
@@ -796,7 +797,7 @@ function Materials({ user }) {
                   Close
                 </button>
                 
-                {isAdmin ? (
+                {canEditMaterials ? (
                   <>
                     <button 
                       type="button" 
