@@ -395,11 +395,11 @@ INSERT INTO material_tags (tag_name, color, created_by) VALUES
 -- Insert sample data for materials
 INSERT INTO materials (packet_no, part_name, length, width, height, quantity, supplier, updated_by, last_updated) VALUES
 (1, 'xxxxxxxxxxxxxxxxxxxxxxxxx', 3000, 3455, 2255, 10, 'SHENZEN', 'Khai', '05/03/2025'),
-(1, 'Máy móc', 3000, 345, 10, 10, 'Khai', 'Khai', '05/03/2025'),
-(1, 'Máy móc', 3000, 345, 345, 10, 'Khai', 'Khai', '05/03/2025'),
-(1, 'Máy móc', 3000, 345, 35, 10, 'Khai', 'Khai', '05/03/2025'),
-(1, 'Máy móc', 3000, 345, 345, 10, 'Khai', 'Khai', '05/03/2025'),
-(1, 'Máy móc', 3000, 345, 345, 10, 'Khai', 'Khai', '05/03/2025');
+(1, '10100070001A (FIN 1)', 3000, 345, 10, 11000, 'NCCV', 'Khai', '05/03/2025'),
+(1, '10100070002A (FIN 2)', 3000, 345, 345, 11000, 'NCCV', 'Khai', '05/03/2025'),
+(1, '10100070003A (FIN 3)', 3000, 345, 35, 11000, 'NCCV', 'Khai', '05/03/2025'),
+(2, '10100070008A (BASE)', 3000, 345, 345, 98000, 'NCCV', 'Khai', '05/03/2025'),
+(3, '1010007010A (BLOCK)', 3000, 345, 345, 98000, 'NCCV', 'Khai', '05/03/2025');
 
 -- Add some sample category mappings
 INSERT INTO material_category_mapping (material_id, category_id) VALUES
@@ -427,7 +427,3 @@ VALUES
 ('add', NULL, '{"packetNo": 2, "partName": "New Component", "length": 500, "width": 300, "height": 200, "quantity": 25, "supplier": "Local Supplier"}',
  'Required for new product line', 'medium', 4, 'pending'),
 ('delete', 3, '{}', 'No longer needed in production', 'low', 4, 'pending');
-
--- ===============================================
--- END OF SCHEMA
--- ===============================================
