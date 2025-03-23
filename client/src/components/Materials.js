@@ -54,7 +54,8 @@ function Materials({ user }) {
 
   // Check if user is admin
   const isAdmin = user.role === 'admin';
-
+  const isManager = user.role === 'quản lý';
+  const hasAdminAccess = isAdmin || isManager; // This check allows both roles to have the same access
   // Filter materials based on search term and search field
   const filteredMaterials = useMemo(() => {
     if (!searchTerm) return materials;
@@ -191,7 +192,7 @@ function Materials({ user }) {
     });
     setValidationErrors({}); // Clear any previous validation errors
     
-    if (isAdmin) {
+    if (hasAdminAccess) {
       setShowAddModal(true);
     } else {
       setRequestType('add');
@@ -201,7 +202,7 @@ function Materials({ user }) {
 
   // Toggle edit modal (in detail view)
   const handleEditClick = () => {
-    if (!isAdmin) {
+    if (!hasAdminAccess) {
       setShowDetailsModal(false);
       setRequestType('edit');
       setShowRequestModal(true);
@@ -210,7 +211,7 @@ function Materials({ user }) {
 
   // Toggle delete modal (in detail view)
   const handleDeleteClick = () => {
-    if (isAdmin) {
+    if (hasAdminAccess) {
       setShowDeleteModal(true);
       setShowDetailsModal(false);
     } else {
@@ -519,9 +520,9 @@ function Materials({ user }) {
             <button 
               className="btn btn-primary" 
               onClick={handleAddClick}
-              disabled={isAdmin ? createMaterial.isPending : createRequest.isPending}
+              disabled={hasAdminAccess ? createMaterial.isPending : createRequest.isPending}
             >
-              {isAdmin ? 'Add' : 'Request Add'}
+              {hasAdminAccess ? 'Add' : 'Request Add'}
             </button>
           </div>
         </div>
@@ -538,64 +539,62 @@ function Materials({ user }) {
         ) : error ? (
           <div className="alert alert-danger">{error.message}</div>
         ) : (
-          <div className="custom-table-container"> 
-            <div className="table-responsive">
-              <table className="table table-hover">
-                <thead>
-                  <tr>
-                    <th width="5%"></th>
-                    <th width="5%">Packet No</th>
-                    <th width="20%">Part Name</th>
-                    <th width="10%">Dài</th>
-                    <th width="10%">Rộng</th>
-                    <th width="10%">Cao</th>
-                    <th width="5%">Quantity</th>
-                    <th width="15%">Supplier</th>
-                    <th width="10%">Updated by</th>
-                    <th width="10%">Last Updated</th>
-                    <th width="5%"></th>
+          <div className="table-responsive">
+            <table className="table table-hover">
+              <thead>
+                <tr>
+                  <th width="5%"></th>
+                  <th width="5%">Packet No</th>
+                  <th width="20%">Part Name</th>
+                  <th width="10%">Dài</th>
+                  <th width="10%">Rộng</th>
+                  <th width="10%">Cao</th>
+                  <th width="5%">Quantity</th>
+                  <th width="15%">Supplier</th>
+                  <th width="10%">Updated by</th>
+                  <th width="10%">Last Updated</th>
+                  <th width="5%"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMaterials.map(material => (
+                  <tr 
+                    key={material.id} 
+                    onClick={() => handleMaterialClick(material)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td>
+                      <div 
+                        className={`status-dot ${selectedMaterial?.id === material.id ? 'active' : ''}`}
+                      ></div>
+                    </td>
+                    <td>{material.packetNo}</td>
+                    <td>{material.partName}</td>
+                    <td>{material.length}</td>
+                    <td>{material.width}</td>
+                    <td>{material.height}</td>
+                    <td>{material.quantity}</td>
+                    <td>{material.supplier}</td>
+                    <td>{material.updatedBy}</td>
+                    <td>{material.lastUpdated}</td>
+                    <td>
+                      <button 
+                        className="btn btn-sm" 
+                        onClick={(e) => handlePrint(material.id, e)}
+                        title="Generate QR Code"
+                      >
+                        <i className="fas fa-print"></i>
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredMaterials.map(material => (
-                    <tr 
-                      key={material.id} 
-                      onClick={() => handleMaterialClick(material)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td>
-                        <div 
-                          className={`status-dot ${selectedMaterial?.id === material.id ? 'active' : ''}`}
-                        ></div>
-                      </td>
-                      <td>{material.packetNo}</td>
-                      <td>{material.partName}</td>
-                      <td>{material.length}</td>
-                      <td>{material.width}</td>
-                      <td>{material.height}</td>
-                      <td>{material.quantity}</td>
-                      <td>{material.supplier}</td>
-                      <td>{material.updatedBy}</td>
-                      <td>{material.lastUpdated}</td>
-                      <td>
-                        <button 
-                          className="btn btn-sm" 
-                          onClick={(e) => handlePrint(material.id, e)}
-                          title="Generate QR Code"
-                        >
-                          <i className="fas fa-print"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredMaterials.length === 0 && (
-                    <tr>
-                      <td colSpan="11" className="text-center py-3">No materials found</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ))}
+                {filteredMaterials.length === 0 && (
+                  <tr>
+                    <td colSpan="11" className="text-center py-3">No materials found</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -618,7 +617,7 @@ function Materials({ user }) {
                 ></button>
               </div>
               <div className="modal-body">
-                {isAdmin ? (
+                {hasAdminAccess ? (
                   // Admin view - Edit form
                   <form id="materialForm">
                     <div className="row mb-3">
@@ -796,7 +795,7 @@ function Materials({ user }) {
                   Close
                 </button>
                 
-                {isAdmin ? (
+                {hasAdminAccess ? (
                   <>
                     <button 
                       type="button" 

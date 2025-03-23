@@ -12,6 +12,8 @@ import {
   useDeleteUser
 } from '../hooks/useUsers';
 
+
+
 function Users({ user }) {
   // State for user ID being viewed or edited
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -30,7 +32,10 @@ function Users({ user }) {
     role: 'nhân viên',
     phone: ''
   });
-
+  // Check if user is admin or managerhandleEditClick 
+  const isAdmin = user.role === 'admin';
+  const isManager = user.role === 'quản lý';
+  const hasAdminAccess = isAdmin || isManager;
   // React Query hooks
   const { data: users = [], isLoading, error } = useUsers();
   const { data: selectedUser } = useUser(selectedUserId);
@@ -83,6 +88,12 @@ function Users({ user }) {
     const userToEdit = users.find(u => u.id === id);
     
     if (userToEdit) {
+      // Check if manager is trying to edit an admin (not allowed)
+      if (isManager && userToEdit.role === 'admin') {
+        toast.error('Managers cannot edit admin users');
+        return;
+      }
+      
       setSelectedUserId(id);
       setFormData({
         username: userToEdit.username,
@@ -98,8 +109,17 @@ function Users({ user }) {
 
   // Handle delete user click
   const handleDeleteClick = (id) => {
+    const userToDelete = users.find(u => u.id === id);
+    
+    // Check if manager is trying to delete an admin (not allowed)
+    if (isManager && userToDelete.role === 'admin') {
+      toast.error('Managers cannot delete admin users');
+      return;
+    }
+    
     setSelectedUserId(id);
     setShowDeleteModal(true);
+    setShowUserModal(false);
   };
 
   // Handle form input changes
@@ -125,6 +145,12 @@ function Users({ user }) {
       userData.password = formData.password;
     }
 
+    // If manager is trying to set someone as admin, prevent it
+    if (isManager && formData.role === 'admin') {
+      toast.error('Managers cannot assign admin role');
+      return;
+    }
+
     if (modalMode === 'add') {
       // Password is required for new users
       if (!formData.password) {
@@ -139,6 +165,13 @@ function Users({ user }) {
         }
       });
     } else {
+      // If editing, check if manager is trying to edit an admin
+      const userBeingEdited = users.find(u => u.id === selectedUserId);
+      if (isManager && userBeingEdited.role === 'admin') {
+        toast.error('Managers cannot modify admin users');
+        return;
+      }
+      
       updateUser.mutate({ 
         id: selectedUserId, 
         data: userData 
@@ -153,12 +186,21 @@ function Users({ user }) {
 
   // Handle delete confirmation
   const handleConfirmDelete = () => {
-    deleteUser.mutate(selectedUserId, {
-      onSuccess: () => {
+    if (selectedUserId) {
+      // Final check to prevent deleting admin users by managers
+      const userToDelete = users.find(u => u.id === selectedUserId);
+      if (isManager && userToDelete.role === 'admin') {
+        toast.error('Managers cannot delete admin users');
         setShowDeleteModal(false);
-        setSelectedUserId(null);
+        return;
       }
-    });
+      
+      deleteUser.mutate(selectedUserId, {
+        onSuccess: () => {
+          setShowDeleteModal(false);
+        }
+      });
+    }
   };
 
   // Close all modals and clear selection
@@ -213,50 +255,48 @@ function Users({ user }) {
         ) : error ? (
           <div className="alert alert-danger">{error.message}</div>
         ) : (
-          <div className="custom-table-container">
-            <div className="table-responsive">
-              <table className="table table-hover">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Tên đăng nhập</th>
-                    <th>Họ và tên</th>
-                    <th>Chức vụ</th>
-                    <th>SĐT</th>
-                    <th></th>
+          <div className="table-responsive">
+            <table className="table table-hover">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Tên đăng nhập</th>
+                  <th>Họ và tên</th>
+                  <th>Chức vụ</th>
+                  <th>SĐT</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map(tableUser => (
+                  <tr key={tableUser.id} onClick={() => handleViewUser(tableUser.id)} style={{ cursor: 'pointer' }}>
+                    <td>{tableUser.id}</td>
+                    <td>{tableUser.username}</td>
+                    <td>{tableUser.full_name}</td>
+                    <td>{tableUser.role}</td>
+                    <td>{tableUser.phone || '-'}</td>
+                    <td className="text-end">
+                    {((hasAdminAccess && !(isManager && tableUser.role === 'admin')) || user.id === tableUser.id) && (
+                        <button 
+                          className="btn btn-sm" 
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent row click
+                            handleEditClick(tableUser.id);
+                          }}
+                        >
+                          <i className="fas fa-edit"></i>
+                        </button>
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map(tableUser => (
-                    <tr key={tableUser.id} onClick={() => handleViewUser(tableUser.id)} style={{ cursor: 'pointer' }}>
-                      <td>{tableUser.id}</td>
-                      <td>{tableUser.username}</td>
-                      <td>{tableUser.full_name}</td>
-                      <td>{tableUser.role}</td>
-                      <td>{tableUser.phone || '-'}</td>
-                      <td className="text-end">
-                      {(user.role === 'admin' || user.id === tableUser.id) && (
-                          <button 
-                            className="btn btn-sm" 
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent row click
-                              handleEditClick(tableUser.id);
-                            }}
-                          >
-                            <i className="fas fa-edit"></i>
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredUsers.length === 0 && (
-                    <tr>
-                      <td colSpan="6" className="text-center py-3">No users found</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ))}
+                {filteredUsers.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="text-center py-3">No users found</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -359,7 +399,7 @@ function Users({ user }) {
                         >
                           <option value="nhân viên">Nhân viên</option>
                           <option value="quản lý">Quản lý</option>
-                          {user.role === 'admin' && <option value="admin">Admin</option>}
+                          {isAdmin && <option value="admin">Admin</option>}
                         </select>
                       </div>
                     </div>
@@ -401,25 +441,29 @@ function Users({ user }) {
                 
                 {modalMode === 'view' && user.role === 'admin' && selectedUser && selectedUser.id !== user.id && (
                   <>
-                    <button 
-                      type="button" 
-                      className="btn btn-primary" 
-                      onClick={() => {
-                        handleEditClick(selectedUser.id);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      type="button" 
-                      className="btn btn-danger" 
-                      onClick={() => {
-                        setShowUserModal(false);
-                        handleDeleteClick(selectedUser.id);
-                      }}
-                    >
-                      Delete
-                    </button>
+                    {(isAdmin || (isManager && selectedUser && selectedUser.role !== 'admin')) && (
+                      <button 
+                        type="button" 
+                        className="btn btn-primary" 
+                        onClick={() => {
+                          handleEditClick(selectedUser.id);
+                        }}
+                      >
+                        Edit
+                      </button>
+                    )}
+                    {(isAdmin || (isManager && selectedUser && selectedUser.role !== 'admin')) && selectedUser && selectedUser.id !== user.id && (
+                      <button 
+                        type="button" 
+                        className="btn btn-danger" 
+                        onClick={() => {
+                          setShowUserModal(false);
+                          handleDeleteClick(selectedUser.id);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </>
                 )}
               </div>
