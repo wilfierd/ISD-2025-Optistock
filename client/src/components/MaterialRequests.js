@@ -56,7 +56,6 @@ function MaterialRequests({ user }) {
       },
       {
         onSuccess: () => {
-          toast.success(t(`Request ${processingData.status} successfully`));
           setShowViewModal(false);
           setSelectedRequest(null);
           refetch();

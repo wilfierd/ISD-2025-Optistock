@@ -925,11 +925,6 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
 
 // ===== SERVE REACT APP =====
 
-// For React Single Page Application routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build/index.html'));
-});
-
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

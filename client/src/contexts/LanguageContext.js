@@ -338,6 +338,12 @@ const translations = {
     "Error processing request": "Lỗi khi xử lý yêu cầu",
 
     // Users
+    employeeAdded: "Đã thêm nhân viên thành công",
+    employeeUpdated: "Đã cập nhật nhân viên thành công",
+    employeeDeleted: "Đã xóa nhân viên thành công",
+    employeeAddFailed: "Không thể thêm nhân viên",
+    employeeUpdateFailed: "Không thể cập nhật nhân viên",
+    employeeDeleteFailed: "Không thể xóa nhân viên",
     usersList: "Số nhân viên",
     searchByName: "Tìm nhân viên theo tên",
     addUser: "Thêm người dùng",
