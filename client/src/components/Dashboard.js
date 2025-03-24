@@ -5,10 +5,12 @@ import Chart from 'chart.js/auto';
 import Navbar from './Navbar';
 import { useDashboard } from '../hooks/useDashboard';
 import { useLogout } from '../hooks/useAuth';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function Dashboard({ user }) {
   const { data: dashboardData, isLoading, error } = useDashboard();
   const logoutMutation = useLogout();
+  const { t } = useLanguage(); // Import translation function
   
   // Using refs to store chart instances for cleanup
   const materialTypesChartRef = useRef(null);
@@ -111,7 +113,7 @@ function Dashboard({ user }) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: '100vh' }}>
         <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
+          <span className="visually-hidden">{t('loading')}</span>
         </div>
       </div>
     );
@@ -131,7 +133,7 @@ function Dashboard({ user }) {
 
       {/* Main Content */}
       <div className="container-fluid mt-4">
-        <h2 className="mb-4">Dashboard</h2>
+        <h2 className="mb-4">{t('dashboard')}</h2>
         
         {/* Stats Cards Row */}
         <div className="row mb-4">
@@ -139,28 +141,28 @@ function Dashboard({ user }) {
             <div className="dashboard-card bg-primary text-white p-4 text-center">
               <i className="fas fa-box card-icon"></i>
               <div className="stat-value">{dashboardData?.totalMaterials || 0}</div>
-              <div>Total Materials</div>
+              <div>{t('totalMaterials')}</div>
             </div>
           </div>
           <div className="col-md-3 mb-3">
             <div className="dashboard-card bg-success text-white p-4 text-center">
               <i className="fas fa-truck card-icon"></i>
               <div className="stat-value">{dashboardData?.totalSuppliers || 0}</div>
-              <div>Suppliers</div>
+              <div>{t('suppliers')}</div>
             </div>
           </div>
           <div className="col-md-3 mb-3">
             <div className="dashboard-card bg-warning text-white p-4 text-center">
               <i className="fas fa-shopping-cart card-icon"></i>
               <div className="stat-value">{dashboardData?.ordersThisWeek || 0}</div>
-              <div>This Week's Orders</div>
+              <div>{t('thisWeeksOrders')}</div>
             </div>
           </div>
           <div className="col-md-3 mb-3">
             <div className="dashboard-card bg-info text-white p-4 text-center">
               <i className="fas fa-users card-icon"></i>
               <div className="stat-value">{dashboardData?.systemUsers || 0}</div>
-              <div>System Users</div>
+              <div>{t('systemUsers')}</div>
             </div>
           </div>
         </div>
@@ -169,13 +171,13 @@ function Dashboard({ user }) {
         <div className="row mb-4">
           <div className="col-md-6">
             <div className="dashboard-chart bg-white p-3 rounded shadow-sm">
-              <h4>Material Types Distribution</h4>
+              <h4>{t('materialTypesDistribution')}</h4>
               <canvas id="materialTypesChart"></canvas>
             </div>
           </div>
           <div className="col-md-6">
             <div className="dashboard-chart bg-white p-3 rounded shadow-sm">
-              <h4>Monthly Inventory Changes</h4>
+              <h4>{t('monthlyInventoryChanges')}</h4>
               <canvas id="inventoryChart"></canvas>
             </div>
           </div>
@@ -185,18 +187,18 @@ function Dashboard({ user }) {
         <div className="row mb-4">
           <div className="col-md-12">
             <div className="recent-items bg-white p-3 rounded shadow-sm">
-              <h4 className="mb-4">Recently Updated Materials</h4>
+              <h4 className="mb-4">{t('recentlyUpdatedMaterials')}</h4>
               <div className="table-responsive">
                 <table className="table table-hover">
                   <thead>
                     <tr>
-                      <th>Packet No</th>
-                      <th>Part Name</th>
-                      <th>Dimensions</th>
-                      <th>Quantity</th>
-                      <th>Supplier</th>
-                      <th>Updated By</th>
-                      <th>Last Updated</th>
+                      <th>{t('packetNo')}</th>
+                      <th>{t('partName')}</th>
+                      <th>{t('dimensions')}</th>
+                      <th>{t('quantity')}</th>
+                      <th>{t('supplier')}</th>
+                      <th>{t('updatedBy')}</th>
+                      <th>{t('lastUpdated')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -247,7 +249,7 @@ function Dashboard({ user }) {
                 </table>
               </div>
               <div className="text-end mt-3">
-                <Link to="/materials" className="btn btn-primary">View All Materials</Link>
+                <Link to="/materials" className="btn btn-primary">{t('viewAllMaterials')}</Link>
               </div>
             </div>
           </div>
@@ -257,26 +259,26 @@ function Dashboard({ user }) {
         <div className="row mb-4">
           <div className="col-md-12">
             <div className="recent-items bg-white p-3 rounded shadow-sm">
-              <h4 className="mb-4">Quick Actions</h4>
+              <h4 className="mb-4">{t('quickActions')}</h4>
               <div className="row">
                 <div className="col-md-3 mb-2">
                   <Link to="/materials" className="btn btn-outline-primary w-100">
-                    <i className="fas fa-boxes me-2"></i> Manage Materials
+                    <i className="fas fa-boxes me-2"></i> {t('manageMaterials')}
                   </Link>
                 </div>
                 <div className="col-md-3 mb-2">
                   <button className="btn btn-outline-success w-100">
-                    <i className="fas fa-file-export me-2"></i> Export Inventory Report
+                    <i className="fas fa-file-export me-2"></i> {t('exportInventoryReport')}
                   </button>
                 </div>
                 <div className="col-md-3 mb-2">
                   <button className="btn btn-outline-warning w-100">
-                    <i className="fas fa-truck-loading me-2"></i> Register New Shipment
+                    <i className="fas fa-truck-loading me-2"></i> {t('registerNewShipment')}
                   </button>
                 </div>
                 <div className="col-md-3 mb-2">
                   <button className="btn btn-outline-info w-100">
-                    <i className="fas fa-user-plus me-2"></i> Add New User
+                    <i className="fas fa-user-plus me-2"></i> {t('addNewUser')}
                   </button>
                 </div>
               </div>
