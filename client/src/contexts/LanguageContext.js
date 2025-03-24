@@ -1,4 +1,4 @@
-// client/src/contexts/LanguageContext.js
+// client/src/contexts/LanguageContext.js (with enhanced translations)
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
 // Create translation files for English and Vietnamese
@@ -31,6 +31,11 @@ const translations = {
     validationError: "Please correct the errors",
     networkError: "Network error. Please try again",
     serverError: "Server error. Please try again later",
+    materialAddFailed: "Failed to add material",
+    materialUpdateFailed: "Failed to update material",
+    materialDeleteFailed: "Failed to delete material",
+    requestSubmitFailed: "Failed to submit request",
+    requestProcessFailed: "Failed to process request",
 
     // Dashboard
     totalMaterials: "Total Materials",
@@ -84,6 +89,17 @@ const translations = {
     materialQRCode: "Material QR Code: {materialName}",
     scanQRCode: "Scan this QR code to view material details:",
     print: "Print",
+    edit: "Edit",
+    generate: "Generate",
+    generateQRCode: "Generate QR Code",
+    "is required": "is required",
+    "This packet number already exists. Packet numbers must be unique.": "This packet number already exists. Packet numbers must be unique.",
+    "Fill in the details for your": "Fill in the details for your",
+    "add": "add",
+    "edit": "edit",
+    "request": "request",
+    "This request will be sent to an administrator for approval.": "This request will be sent to an administrator for approval.",
+    
 
     // Requests
     materialRequests: "Material Requests",
@@ -113,6 +129,17 @@ const translations = {
     approveRequest: "Approve Request",
     rejectRequest: "Reject Request",
     processing: "Processing...",
+    "Request ID": "Request ID",
+    "Error loading requests": "Error loading requests",
+    "requests found": "requests found",
+    "No": "No",
+    "Request Details": "Request Details",
+    "No request data available": "No request data available",
+    "Error parsing request data": "Error parsing request data",
+    "Raw data type": "Raw data type",
+    "First 100 chars": "First 100 chars",
+    "No request selected": "No request selected",
+    "Error processing request": "Error processing request",
 
     // Users
     usersList: "Users List",
@@ -128,6 +155,12 @@ const translations = {
     passwordEdit: "Password (Leave blank to keep current)",
     phoneNumber: "Phone Number",
     createdAt: "Created At",
+    "Adding...": "Adding...",
+    "Password is required for new users": "Password is required for new users",
+    "You don't have permission to delete this user": "You don't have permission to delete this user",
+    "User not found": "User not found",
+    "Error loading user details": "Error loading user details",
+    "Are you sure you want to delete this user?": "Are you sure you want to delete this user?",
 
     // Login
     inventoryManagement: "Inventory Management",
@@ -140,6 +173,7 @@ const translations = {
     loading: "Loading...",
     error: "Error",
     retry: "Retry",
+    dimensions: "Dimensions",
     
     // Language
     language: "Language",
@@ -149,7 +183,6 @@ const translations = {
 
     // Warehouse
     warehouseItems: "Warehouse Items",
-    dimensions: "Dimensions",
     
     // Table common terms
     noRecordsFound: "No records found",
@@ -165,7 +198,6 @@ const translations = {
     update: "Update",
     detail: "Detail",
     confirmAction: "Confirm",
-    generate: "Generate",
     backToList: "Back to List"
   },
   vi: {
@@ -196,6 +228,11 @@ const translations = {
     validationError: "Vui lòng sửa các lỗi",
     networkError: "Lỗi kết nối. Vui lòng thử lại",
     serverError: "Lỗi máy chủ. Vui lòng thử lại sau",
+    materialAddFailed: "Không thể thêm nguyên vật liệu",
+    materialUpdateFailed: "Không thể cập nhật nguyên vật liệu",
+    materialDeleteFailed: "Không thể xóa nguyên vật liệu",
+    requestSubmitFailed: "Không thể gửi yêu cầu",
+    requestProcessFailed: "Không thể xử lý yêu cầu",
 
     // Dashboard
     totalMaterials: "Tổng nguyên vật liệu",
@@ -249,7 +286,17 @@ const translations = {
     materialQRCode: "Mã QR nguyên vật liệu: {materialName}",
     scanQRCode: "Quét mã QR này để xem chi tiết nguyên vật liệu:",
     print: "In",
-
+    edit: "Sửa",
+    generate: "Tạo",
+    generateQRCode: "Tạo mã QR",
+    "is required": "là bắt buộc",
+    "This packet number already exists. Packet numbers must be unique.": "Số packet này đã tồn tại. Số packet phải là duy nhất.",
+    "Fill in the details for your": "Điền thông tin cho yêu cầu",
+    "add": "thêm",
+    "edit": "sửa",
+    "request": "của bạn",
+    "This request will be sent to an administrator for approval.": "Yêu cầu này sẽ được gửi đến quản trị viên để phê duyệt.",
+    
     // Requests
     materialRequests: "Yêu cầu nguyên vật liệu",
     status: "Trạng thái",
@@ -278,6 +325,17 @@ const translations = {
     approveRequest: "Duyệt yêu cầu",
     rejectRequest: "Từ chối yêu cầu",
     processing: "Đang xử lý...",
+    "Request ID": "ID Yêu cầu",
+    "Error loading requests": "Lỗi khi tải yêu cầu",
+    "requests found": "yêu cầu được tìm thấy",
+    "No": "Không có",
+    "Request Details": "Chi tiết yêu cầu",
+    "No request data available": "Không có dữ liệu yêu cầu",
+    "Error parsing request data": "Lỗi phân tích dữ liệu yêu cầu",
+    "Raw data type": "Loại dữ liệu thô",
+    "First 100 chars": "100 ký tự đầu tiên",
+    "No request selected": "Không có yêu cầu nào được chọn",
+    "Error processing request": "Lỗi khi xử lý yêu cầu",
 
     // Users
     usersList: "Số nhân viên",
@@ -293,6 +351,12 @@ const translations = {
     passwordEdit: "Mật khẩu (Để trống nếu giữ nguyên)",
     phoneNumber: "Số điện thoại",
     createdAt: "Ngày tạo",
+    "Adding...": "Đang thêm...",
+    "Password is required for new users": "Mật khẩu là bắt buộc cho người dùng mới",
+    "You don't have permission to delete this user": "Bạn không có quyền xóa người dùng này",
+    "User not found": "Không tìm thấy người dùng",
+    "Error loading user details": "Lỗi khi tải thông tin người dùng",
+    "Are you sure you want to delete this user?": "Bạn có chắc chắn muốn xóa người dùng này?",
 
     // Login
     inventoryManagement: "Quản lý kho",
@@ -305,6 +369,7 @@ const translations = {
     loading: "Đang tải...",
     error: "Lỗi",
     retry: "Thử lại",
+    dimensions: "Kích thước",
     
     // Language
     language: "Ngôn ngữ",
@@ -314,7 +379,6 @@ const translations = {
 
     // Warehouse
     warehouseItems: "Hàng trong kho",
-    dimensions: "Kích thước",
     
     // Table common terms
     noRecordsFound: "Không tìm thấy bản ghi nào",
@@ -330,7 +394,6 @@ const translations = {
     update: "Cập nhật",
     detail: "Chi tiết",
     confirmAction: "Xác nhận",
-    generate: "Tạo",
     backToList: "Quay lại danh sách"
   }
 };

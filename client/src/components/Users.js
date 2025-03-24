@@ -1,4 +1,4 @@
-// client/src/components/Users.js
+// client/src/components/Users.js (with complete language support)
 import React, { useState, useMemo } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
@@ -18,8 +18,12 @@ import {
   getAvailableRoles,
   canEditUser as utilsCanEditUser // Import the utility function with a different name
 } from '../utils/rolePermissions';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function Users({ user }) {
+  // Get translation function
+  const { t } = useLanguage();
+  
   // State for user ID being viewed or edited
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,7 +120,7 @@ function Users({ user }) {
     
     // Check if user can delete the target user
     if (targetUser && !canDeleteUser(user, targetUser)) {
-      toast.error("You don't have permission to delete this user");
+      toast.error(t("You don't have permission to delete this user"));
       return;
     }
     
@@ -150,7 +154,7 @@ function Users({ user }) {
     if (modalMode === 'add') {
       // Password is required for new users
       if (!formData.password) {
-        toast.error('Password is required for new users');
+        toast.error(t('Password is required for new users'));
         return;
       }
       
@@ -211,7 +215,7 @@ function Users({ user }) {
               <input 
                 type="text" 
                 className="form-control" 
-                placeholder="Tìm nhân viên theo tên"
+                placeholder={t('searchByName')}
                 value={searchTerm}
                 onChange={handleSearch}
               />
@@ -224,19 +228,19 @@ function Users({ user }) {
                 onClick={handleAddClick}
                 disabled={createUser.isPending}
               >
-                {createUser.isPending ? 'Adding...' : 'Add User'}
+                {createUser.isPending ? t('Adding...') : t('addUser')}
               </button>
             )}
           </div>
         </div>
 
         {/* Users List */}
-        <h4>Số nhân viên ({filteredUsers.length})</h4>
+        <h4>{t('usersList')} ({filteredUsers.length})</h4>
         
         {isLoading ? (
           <div className="text-center my-5">
             <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
+              <span className="visually-hidden">{t('loading')}</span>
             </div>
           </div>
         ) : error ? (
@@ -247,11 +251,11 @@ function Users({ user }) {
               <table className="table table-hover">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Tên đăng nhập</th>
-                    <th>Họ và tên</th>
-                    <th>Chức vụ</th>
-                    <th>SĐT</th>
+                    <th>{t('id')}</th>
+                    <th>{t('username')}</th>
+                    <th>{t('fullName')}</th>
+                    <th>{t('role')}</th>
+                    <th>{t('phone')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -280,7 +284,7 @@ function Users({ user }) {
                   ))}
                   {filteredUsers.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="text-center py-3">No users found</td>
+                      <td colSpan="6" className="text-center py-3">{t('noRecordsFound')}</td>
                     </tr>
                   )}
                 </tbody>
@@ -298,10 +302,10 @@ function Users({ user }) {
               <div className="modal-header">
                 <h5 className="modal-title">
                   {modalMode === 'view' 
-                    ? 'User Details' 
+                    ? t('userDetails') 
                     : modalMode === 'add' 
-                      ? 'Add New User' 
-                      : 'Edit User'}
+                      ? t('addUser') 
+                      : t('editUser')}
                 </h5>
                 <button 
                   type="button" 
@@ -317,46 +321,46 @@ function Users({ user }) {
                   isLoadingUser ? (
                     <div className="text-center my-3">
                       <div className="spinner-border text-primary" role="status">
-                        <span className="visually-hidden">Loading user details...</span>
+                        <span className="visually-hidden">{t('loading')}</span>
                       </div>
                     </div>
                   ) : userError ? (
                     <div className="alert alert-danger">
-                      Error loading user details: {userError.message}
+                      {t('Error loading user details')}: {userError.message}
                     </div>
                   ) : selectedUser ? (
                     <div className="user-details-container">
                       <div className="user-detail-row">
-                        <div className="user-detail-label">Username</div>
+                        <div className="user-detail-label">{t('username')}</div>
                         <div className="user-detail-value">{selectedUser.username}</div>
                       </div>
                       <div className="user-detail-row">
-                        <div className="user-detail-label">Full Name</div>
+                        <div className="user-detail-label">{t('fullName')}</div>
                         <div className="user-detail-value">{selectedUser.full_name}</div>
                       </div>
                       <div className="user-detail-row">
-                        <div className="user-detail-label">Role</div>
+                        <div className="user-detail-label">{t('role')}</div>
                         <div className="user-detail-value">{selectedUser.role}</div>
                       </div>
                       <div className="user-detail-row">
-                        <div className="user-detail-label">Phone</div>
+                        <div className="user-detail-label">{t('phone')}</div>
                         <div className="user-detail-value">{selectedUser.phone || '-'}</div>
                       </div>
                       <div className="user-detail-row">
-                        <div className="user-detail-label">Created At</div>
+                        <div className="user-detail-label">{t('createdAt')}</div>
                         <div className="user-detail-value">
                           {new Date(selectedUser.created_at).toLocaleString()}
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="alert alert-warning">User not found</div>
+                    <div className="alert alert-warning">{t('User not found')}</div>
                   )
                 ) : (
                   <form id="userForm">
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <label htmlFor="username" className="form-label">Username</label>
+                        <label htmlFor="username" className="form-label">{t('username')}</label>
                         <input 
                           type="text" 
                           className="form-control" 
@@ -368,7 +372,7 @@ function Users({ user }) {
                       </div>
                       <div className="col-md-6">
                         <label htmlFor="password" className="form-label">
-                          Password {modalMode === 'edit' && '(Leave blank to keep current)'}
+                          {modalMode === 'edit' ? t('passwordEdit') : t('password')}
                         </label>
                         <input 
                           type="password" 
@@ -382,7 +386,7 @@ function Users({ user }) {
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-6">
-                        <label htmlFor="fullName" className="form-label">Full Name</label>
+                        <label htmlFor="fullName" className="form-label">{t('fullName')}</label>
                         <input 
                           type="text" 
                           className="form-control" 
@@ -393,7 +397,7 @@ function Users({ user }) {
                         />
                       </div>
                       <div className="col-md-6">
-                        <label htmlFor="role" className="form-label">Role</label>
+                        <label htmlFor="role" className="form-label">{t('role')}</label>
                         <select 
                           className="form-select" 
                           id="role" 
@@ -407,7 +411,7 @@ function Users({ user }) {
                       </div>
                     </div>
                     <div className="mb-3">
-                      <label htmlFor="phone" className="form-label">Phone Number</label>
+                      <label htmlFor="phone" className="form-label">{t('phoneNumber')}</label>
                       <input 
                         type="text" 
                         className="form-control" 
@@ -428,7 +432,7 @@ function Users({ user }) {
                     setSelectedUserId(null);
                   }}
                 >
-                  {modalMode === 'view' ? 'Close' : 'Cancel'}
+                  {modalMode === 'view' ? t('close') : t('cancel')}
                 </button>
                 
                 {modalMode !== 'view' && (
@@ -438,7 +442,7 @@ function Users({ user }) {
                     onClick={handleSaveClick}
                     disabled={createUser.isPending || updateUser.isPending}
                   >
-                    {(createUser.isPending || updateUser.isPending) ? 'Saving...' : 'Save'}
+                    {(createUser.isPending || updateUser.isPending) ? t('saving') : t('saveChanges')}
                   </button>
                 )}
                 
@@ -452,7 +456,7 @@ function Users({ user }) {
                           handleEditClick(selectedUser.id);
                         }}
                       >
-                        Edit
+                        {t('edit')}
                       </button>
                     )}
                     
@@ -466,7 +470,7 @@ function Users({ user }) {
                           handleDeleteClick(selectedUser.id);
                         }}
                       >
-                        Delete
+                        {t('delete')}
                       </button>
                     )}
                   </>
@@ -483,7 +487,7 @@ function Users({ user }) {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title">Confirm Delete</h5>
+                <h5 className="modal-title">{t('confirmDelete')}</h5>
                 <button 
                   type="button" 
                   className="btn-close" 
@@ -491,7 +495,7 @@ function Users({ user }) {
                 ></button>
               </div>
               <div className="modal-body">
-                Are you sure you want to delete this user?
+                {t('Are you sure you want to delete this user?')}
               </div>
               <div className="modal-footer">
                 <button 
@@ -499,7 +503,7 @@ function Users({ user }) {
                   className="btn btn-secondary" 
                   onClick={() => setShowDeleteModal(false)}
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button 
                   type="button" 
@@ -507,7 +511,7 @@ function Users({ user }) {
                   onClick={handleConfirmDelete}
                   disabled={deleteUser.isPending}
                 >
-                  {deleteUser.isPending ? 'Deleting...' : 'Delete'}
+                  {deleteUser.isPending ? t('deleting') : t('delete')}
                 </button>
               </div>
             </div>

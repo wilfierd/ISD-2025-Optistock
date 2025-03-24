@@ -1,11 +1,15 @@
-// client/src/components/MaterialRequests.js
+// client/src/components/MaterialRequests.js (with enhanced language support)
 import React, { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
 import { useMaterialRequests, useProcessMaterialRequest } from '../hooks/useMaterialRequests';
 import { toast } from 'react-toastify';
+import { useLanguage } from '../contexts/LanguageContext';
 
 function MaterialRequests({ user }) {
+  // Use language context
+  const { t } = useLanguage();
+  
   const [selectedStatus, setSelectedStatus] = useState('pending');
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -41,7 +45,7 @@ function MaterialRequests({ user }) {
   // Handle processing a request
   const handleProcessRequest = () => {
     if (!selectedRequest) {
-      toast.error("No request selected");
+      toast.error(t("No request selected"));
       return;
     }
     
@@ -52,13 +56,13 @@ function MaterialRequests({ user }) {
       },
       {
         onSuccess: () => {
-          toast.success(`Request ${processingData.status} successfully`);
+          toast.success(t(`Request ${processingData.status} successfully`));
           setShowViewModal(false);
           setSelectedRequest(null);
           refetch();
         },
         onError: (error) => {
-          toast.error(`Error processing request: ${error.message}`);
+          toast.error(`${t("Error processing request")}: ${error.message}`);
         }
       }
     );
@@ -109,9 +113,9 @@ const formatRequestData = (requestData) => {
     console.error("Error handling request data:", error, "Data:", requestData);
     return (
       <div className="alert alert-danger">
-        <p>Error parsing request data: {error.message}</p>
-        <p>Raw data type: {typeof requestData}</p>
-        {typeof requestData === 'string' && <p>First 100 chars: {requestData.substring(0, 100)}</p>}
+        <p>{t("Error parsing request data")}: {error.message}</p>
+        <p>{t("Raw data type")}: {typeof requestData}</p>
+        {typeof requestData === 'string' && <p>{t("First 100 chars")}: {requestData.substring(0, 100)}</p>}
       </div>
     );
   }
@@ -129,9 +133,9 @@ const formatRequestData = (requestData) => {
       {/* Main Content */}
       <div className="container-fluid mt-4">
         <div className="d-flex justify-content-between align-items-center mb-4">
-          <h2>Material Requests</h2>
+          <h2>{t("materialRequests")}</h2>
           <div className="d-flex align-items-center">
-            <label htmlFor="statusFilter" className="me-2">Status:</label>
+            <label htmlFor="statusFilter" className="me-2">{t("status")}:</label>
             <select 
               id="statusFilter" 
               className="form-select" 
@@ -139,9 +143,9 @@ const formatRequestData = (requestData) => {
               onChange={handleFilterChange}
               style={{ width: '150px' }}
             >
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="pending">{t("pending")}</option>
+              <option value="approved">{t("approved")}</option>
+              <option value="rejected">{t("rejected")}</option>
             </select>
           </div>
         </div>
@@ -149,35 +153,35 @@ const formatRequestData = (requestData) => {
         {isLoading ? (
           <div className="text-center my-5">
             <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
+              <span className="visually-hidden">{t("loading")}</span>
             </div>
           </div>
         ) : error ? (
           <div className="alert alert-danger">
-            <h5>Error loading requests</h5>
+            <h5>{t("Error loading requests")}</h5>
             <p>{error.message}</p>
             <button className="btn btn-primary" onClick={() => refetch()}>
-              Retry
+              {t("retry")}
             </button>
           </div>
         ) : (
           <div className="custom-table-container">
               {requests.length === 0 ? (
                 <div className="text-center py-5">
-                  <div className="text-muted">No {selectedStatus} requests found</div>
+                  <div className="text-muted">{t("No")} {selectedStatus} {t("requests found")}</div>
                 </div>
               ) : (
                 <div className="table-responsive">
                   <table className="table table-hover">
                     <thead>
                       <tr>
-                        <th>ID</th>
-                        <th>Type</th>
-                        <th>Material ID</th>
-                        <th>User</th>
-                        <th>Request Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th>{t("id")}</th>
+                        <th>{t("type")}</th>
+                        <th>{t("materialID")}</th>
+                        <th>{t("user")}</th>
+                        <th>{t("requestDate")}</th>
+                        <th>{t("status")}</th>
+                        <th>{t("actions")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -202,7 +206,7 @@ const formatRequestData = (requestData) => {
                               request.status === 'approved' ? 'success' :
                               'danger'
                             }`}>
-                              {request.status}
+                              {t(request.status)}
                             </span>
                           </td>
                           <td>
@@ -210,7 +214,7 @@ const formatRequestData = (requestData) => {
                               className="btn btn-sm btn-primary me-2"
                               onClick={() => handleViewRequest(request)}
                             >
-                              View Details
+                              {t("viewDetails")}
                             </button>
                             {request.status === 'pending' && (
                               <>
@@ -222,7 +226,7 @@ const formatRequestData = (requestData) => {
                                     setShowViewModal(true);
                                   }}
                                 >
-                                  Approve
+                                  {t("approve")}
                                 </button>
                                 <button 
                                   className="btn btn-sm btn-danger"
@@ -232,7 +236,7 @@ const formatRequestData = (requestData) => {
                                     setShowViewModal(true);
                                   }}
                                 >
-                                  Reject
+                                  {t("reject")}
                                 </button>
                               </>
                             )}
@@ -255,7 +259,7 @@ const formatRequestData = (requestData) => {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  {selectedRequest.request_type.charAt(0).toUpperCase() + selectedRequest.request_type.slice(1)} Request Details
+                  {selectedRequest.request_type.charAt(0).toUpperCase() + selectedRequest.request_type.slice(1)} {t("Request Details")}
                 </h5>
                 <button 
                   type="button" 
@@ -268,12 +272,12 @@ const formatRequestData = (requestData) => {
                   <div className="col-md-6">
                     <div className="card mb-3">
                       <div className="card-header bg-light">
-                        <h5 className="mb-0">Request Information</h5>
+                        <h5 className="mb-0">{t("requestInformation")}</h5>
                       </div>
                       <div className="card-body">
-                        <p><strong>Request ID:</strong> {selectedRequest.id}</p>
+                        <p><strong>{t("Request ID")}:</strong> {selectedRequest.id}</p>
                         <p>
-                          <strong>Type:</strong> 
+                          <strong>{t("type")}:</strong> 
                           <span className={`badge ms-2 bg-${
                             selectedRequest.request_type === 'add' ? 'success' : 
                             selectedRequest.request_type === 'edit' ? 'primary' :
@@ -283,28 +287,28 @@ const formatRequestData = (requestData) => {
                           </span>
                         </p>
                         <p>
-                          <strong>Status:</strong> 
+                          <strong>{t("status")}:</strong> 
                           <span className={`badge ms-2 bg-${
                             selectedRequest.status === 'pending' ? 'warning' : 
                             selectedRequest.status === 'approved' ? 'success' :
                             'danger'
                           }`}>
-                            {selectedRequest.status}
+                            {t(selectedRequest.status)}
                           </span>
                         </p>
                         {selectedRequest.material_id && (
-                          <p><strong>Material ID:</strong> {selectedRequest.material_id}</p>
+                          <p><strong>{t("materialID")}:</strong> {selectedRequest.material_id}</p>
                         )}
-                        <p><strong>Requested By:</strong> {selectedRequest.user_username || selectedRequest.requested_by || 'Unknown'}</p>
-                        <p><strong>Request Date:</strong> {new Date(selectedRequest.request_date).toLocaleString()}</p>
+                        <p><strong>{t("requestedBy")}:</strong> {selectedRequest.user_username || selectedRequest.requested_by || 'Unknown'}</p>
+                        <p><strong>{t("requestDate")}:</strong> {new Date(selectedRequest.request_date).toLocaleString()}</p>
                         
                         {selectedRequest.status !== 'pending' && (
                           <>
-                            <p><strong>Response Date:</strong> {new Date(selectedRequest.response_date).toLocaleString()}</p>
-                            <p><strong>Processed By:</strong> {selectedRequest.admin_id ? `ID: ${selectedRequest.admin_id}` : 'Unknown'}</p>
+                            <p><strong>{t("responseDate")}:</strong> {new Date(selectedRequest.response_date).toLocaleString()}</p>
+                            <p><strong>{t("processedBy")}:</strong> {selectedRequest.admin_id ? `ID: ${selectedRequest.admin_id}` : 'Unknown'}</p>
                             {selectedRequest.admin_notes && (
                               <div>
-                                <strong>Admin Notes:</strong>
+                                <strong>{t("adminNotes")}:</strong>
                                 <p className="p-2 bg-light rounded">{selectedRequest.admin_notes}</p>
                               </div>
                             )}
@@ -316,7 +320,7 @@ const formatRequestData = (requestData) => {
                   <div className="col-md-6">
                     <div className="card">
                       <div className="card-header bg-light">
-                        <h5 className="mb-0">Request Data</h5>
+                        <h5 className="mb-0">{t("requestData")}</h5>
                       </div>
                       <div className="card-body">
                         {selectedRequest.request_data ? (
@@ -324,7 +328,7 @@ const formatRequestData = (requestData) => {
                             {formatRequestData(selectedRequest.request_data)}
                           </div>
                         ) : (
-                          <p className="text-muted">No request data available</p>
+                          <p className="text-muted">{t("No request data available")}</p>
                         )}
                       </div>
                     </div>
@@ -333,28 +337,28 @@ const formatRequestData = (requestData) => {
                 
                 {selectedRequest.status === 'pending' && (
                   <div className="mt-4 border-top pt-3">
-                    <h5>Process This Request</h5>
+                    <h5>{t("processRequest")}</h5>
                     <div className="mb-3">
-                      <label htmlFor="status" className="form-label">Decision</label>
+                      <label htmlFor="status" className="form-label">{t("decision")}</label>
                       <select 
                         id="status" 
                         className="form-select" 
                         value={processingData.status}
                         onChange={handleInputChange}
                       >
-                        <option value="approved">Approve</option>
-                        <option value="rejected">Reject</option>
+                        <option value="approved">{t("approve")}</option>
+                        <option value="rejected">{t("reject")}</option>
                       </select>
                     </div>
                     <div className="mb-3">
-                      <label htmlFor="adminNotes" className="form-label">Notes (Optional)</label>
+                      <label htmlFor="adminNotes" className="form-label">{t("notes")}</label>
                       <textarea 
                         id="adminNotes" 
                         className="form-control" 
                         value={processingData.adminNotes}
                         onChange={handleInputChange}
                         rows="3"
-                        placeholder="Explain your decision (will be visible to the requester)"
+                        placeholder={t("notesPlaceholder")}
                       ></textarea>
                     </div>
                   </div>
@@ -366,7 +370,7 @@ const formatRequestData = (requestData) => {
                   className="btn btn-secondary" 
                   onClick={() => setShowViewModal(false)}
                 >
-                  Close
+                  {t("close")}
                 </button>
                 {selectedRequest.status === 'pending' && (
                   <button 
@@ -375,8 +379,8 @@ const formatRequestData = (requestData) => {
                     onClick={handleProcessRequest}
                     disabled={processRequest.isPending}
                   >
-                    {processRequest.isPending ? 'Processing...' : 
-                      processingData.status === 'approved' ? 'Approve Request' : 'Reject Request'}
+                    {processRequest.isPending ? t("processing") : 
+                      processingData.status === 'approved' ? t("approveRequest") : t("rejectRequest")}
                   </button>
                 )}
               </div>
