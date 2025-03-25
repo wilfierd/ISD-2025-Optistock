@@ -28,13 +28,117 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'inventory-management-secret-key',
   resave: false,
-  saveUninitialized: true,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } 
+  saveUninitialized: false,
+  cookie: { 
+    maxAge: 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    // The key change - don't set a specific domain for cookies
+    // This allows the cookies to work with IP addresses
+  }
 }));
 
+// Add a direct login test page for debugging
+app.get('/login-test', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Login Test</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+    </head>
+    <body>
+      <h2>Login Test</h2>
+      <div id="status"></div>
+      <form id="loginForm">
+        <div>
+          <label>Username:</label>
+          <input type="text" id="username" name="username" value="nguyenhieu">
+        </div>
+        <div style="margin-top: 10px;">
+          <label>Password:</label>
+          <input type="password" id="password" name="password" value="password123">
+        </div>
+        <div style="margin-top: 15px;">
+          <button type="submit">Login</button>
+        </div>
+      </form>
+
+      <div style="margin-top: 20px;">
+        <button id="checkStatus">Check Status</button>
+      </div>
+
+      <script>
+        // Check initial status
+        fetch('/api/auth/status', {
+          credentials: 'include'
+        })
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('status').innerHTML = 
+            'Current status: ' + (data.authenticated ? 'Logged in as ' + data.user.username : 'Not logged in');
+        });
+
+        // Login form
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+          e.preventDefault();
+          
+          fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+              username: document.getElementById('username').value,
+              password: document.getElementById('password').value
+            })
+          })
+          .then(res => res.json())
+          .then(data => {
+            alert(JSON.stringify(data));
+            
+            if(data.success) {
+              document.getElementById('status').innerHTML = 
+                'Current status: Logged in as ' + data.user.username;
+            }
+          })
+          .catch(err => {
+            alert('Error: ' + err.message);
+          });
+        });
+
+        // Check status button
+        document.getElementById('checkStatus').addEventListener('click', function() {
+          fetch('/api/auth/status', {
+            credentials: 'include'
+          })
+          .then(res => res.json())
+          .then(data => {
+            alert(JSON.stringify(data));
+            document.getElementById('status').innerHTML = 
+              'Current status: ' + (data.authenticated ? 'Logged in as ' + data.user.username : 'Not logged in');
+          });
+        });
+      </script>
+    </body>
+    </html>
+  `);
+});
 // CORS configuration
 app.use(cors({
-  origin: ['http://localhost:3001', 'http://localhost:3000'],
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if(!origin) return callback(null, true);
+    
+    // Allow all origins in development
+    if(process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    // In production, you would be more restrictive
+    callback(null, true);
+  },
   credentials: true
 }));
 
@@ -926,7 +1030,7 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
 // ===== SERVE REACT APP =====
 
 // Start the server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
 
