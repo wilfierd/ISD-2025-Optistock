@@ -57,8 +57,8 @@ function Materials({ user }) {
   const createRequest = useCreateMaterialRequest();
   const logoutMutation = useLogout();
 
-  // Check if user is admin
-  const isAdmin = user.role === 'admin';
+  // Check if user has permission to directly manage materials
+  const canEditMaterials = canManageMaterials(user);
 
   // Filter materials based on search term and search field
   const filteredMaterials = useMemo(() => {
@@ -196,7 +196,7 @@ function Materials({ user }) {
     });
     setValidationErrors({}); // Clear any previous validation errors
     
-    if (isAdmin) {
+    if (canEditMaterials) {
       setShowAddModal(true);
     } else {
       setRequestType('add');
@@ -206,7 +206,7 @@ function Materials({ user }) {
 
   // Toggle edit modal (in detail view)
   const handleEditClick = () => {
-    if (!isAdmin) {
+    if (!canEditMaterials) {
       setShowDetailsModal(false);
       setRequestType('edit');
       setShowRequestModal(true);
@@ -215,7 +215,7 @@ function Materials({ user }) {
 
   // Toggle delete modal (in detail view)
   const handleDeleteClick = () => {
-    if (isAdmin) {
+    if (canEditMaterials) {
       setShowDeleteModal(true);
       setShowDetailsModal(false);
     } else {
@@ -552,9 +552,9 @@ function Materials({ user }) {
             <button 
               className="btn btn-primary" 
               onClick={handleAddClick}
-              disabled={isAdmin ? createMaterial.isPending : createRequest.isPending}
+              disabled={canEditMaterials ? createMaterial.isPending : createRequest.isPending}
             >
-              {isAdmin ? 'Add' : 'Request Add'}
+              {canEditMaterials ? t('addMaterial') : t('requestAdd')}
             </button>
           </div>
         </div>
@@ -577,15 +577,15 @@ function Materials({ user }) {
                 <thead>
                   <tr>
                     <th width="5%"></th>
-                    <th width="5%">Packet No</th>
-                    <th width="20%">Part Name</th>
-                    <th width="10%">Dài</th>
-                    <th width="10%">Rộng</th>
-                    <th width="10%">Cao</th>
-                    <th width="5%">Quantity</th>
-                    <th width="15%">Supplier</th>
-                    <th width="10%">Updated by</th>
-                    <th width="10%">Last Updated</th>
+                    <th width="5%">{t('packetNo')}</th>
+                    <th width="20%">{t('partName')}</th>
+                    <th width="10%">{t('length')}</th>
+                    <th width="10%">{t('width')}</th>
+                    <th width="10%">{t('height')}</th>
+                    <th width="5%">{t('quantity')}</th>
+                    <th width="15%">{t('supplier')}</th>
+                    <th width="10%">{t('updatedBy')}</th>
+                    <th width="10%">{t('lastUpdated')}</th>
                     <th width="5%"></th>
                   </tr>
                 </thead>
@@ -614,7 +614,7 @@ function Materials({ user }) {
                         <button 
                           className="btn btn-sm" 
                           onClick={(e) => handlePrint(material.id, e)}
-                          title="Generate QR Code"
+                          title={t('generateQRCode')}
                         >
                           <i className="fas fa-print"></i>
                         </button>
@@ -623,7 +623,7 @@ function Materials({ user }) {
                   ))}
                   {filteredMaterials.length === 0 && (
                     <tr>
-                      <td colSpan="11" className="text-center py-3">No materials found</td>
+                      <td colSpan="11" className="text-center py-3">{t('noRecordsFound')}</td>
                     </tr>
                   )}
                 </tbody>
@@ -651,7 +651,7 @@ function Materials({ user }) {
                 ></button>
               </div>
               <div className="modal-body">
-                {isAdmin ? (
+                {canEditMaterials ? (
                   // Admin view - Edit form
                   <form id="materialForm">
                     <div className="row mb-3">
@@ -829,7 +829,7 @@ function Materials({ user }) {
                   {t('close')}
                 </button>
                 
-                {isAdmin ? (
+                {canEditMaterials ? (
                   <>
                     <button 
                       type="button" 
