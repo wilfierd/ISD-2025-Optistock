@@ -14,7 +14,6 @@ import { LanguageProvider } from './contexts/LanguageContext';
 function App() {
   const { data: authData, isLoading } = useAuthStatus();
   const user = authData?.user || null;
-  const isAdmin = user?.role === 'admin';
 
   if (isLoading) {
     return <div className="text-center mt-5">Loading...</div>;
