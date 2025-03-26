@@ -2,32 +2,31 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useNotifications, useMarkNotificationsAsRead } from '../hooks/useNotifications';
-import { hasAdminOnlyAccess, hasAdminOrManagerAccess } from '../utils/rolePermissions';
-import { useLanguage } from '../contexts/LanguageContext';
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
   const isActive = (path) => location.pathname === path;
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   
   const { data: notifications = [] } = useNotifications();
   const markAsRead = useMarkNotificationsAsRead();
-  const { language, toggleLanguage, t } = useLanguage();
   
   // Count unread notifications
   const unreadCount = notifications.filter(n => !n.is_read).length;
+  
+  // Check if user is admin
+  const isAdmin = user.role === 'admin';
   
   // Handle viewing all notifications
   const handleViewAllNotifications = () => {
     if (unreadCount > 0) {
       const unreadIds = notifications
-        .filter(n => !n.is_read)
-        .map(n => n.id);
-      
+        .filter((n) => !n.is_read)
+        .map((n) => n.id);
+
       markAsRead.mutate(unreadIds);
     }
-    
+
     setShowNotifications(false);
   };
 
@@ -35,20 +34,24 @@ function Navbar({ user, onLogout }) {
     <nav className="navbar navbar-expand-lg navbar-dark">
       <div className="container-fluid">
         <div className="d-flex">
-          <Link 
-            className={`navbar-brand ${isActive('/dashboard') ? 'fw-bold' : ''}`} 
+          <Link
+            className={`navbar-brand ${
+              isActive("/dashboard") ? "fw-bold" : ""
+            }`}
             to="/dashboard"
           >
             {t('dashboard')}
           </Link>
-          <Link 
-            className={`navbar-brand ${isActive('/materials') ? 'fw-bold' : ''}`} 
+          <Link
+            className={`navbar-brand ${
+              isActive("/materials") ? "fw-bold" : ""
+            }`}
             to="/materials"
           >
             {t('warehouse')}
           </Link>
-          {/* Show Employees link for admin and manager users */}
-          {hasAdminOrManagerAccess(user) && (
+          {/* Only show Employees link for admin users */}
+          {isAdmin && (
             <Link 
               className={`navbar-brand ${isActive('/employees') ? 'fw-bold' : ''}`} 
               to="/employees"
@@ -56,8 +59,7 @@ function Navbar({ user, onLogout }) {
               {t('employees')}
             </Link>
           )}
-          {/* Show Requests link to both admins and managers */}
-          {hasAdminOrManagerAccess(user) && (
+          {user.role === 'admin' && (
             <Link 
               className={`navbar-brand ${isActive('/requests') ? 'fw-bold' : ''}`} 
               to="/requests"
@@ -104,8 +106,8 @@ function Navbar({ user, onLogout }) {
           
           {/* Notification bell icon */}
           <div className="position-relative me-3">
-            <button 
-              className="btn btn-link text-white" 
+            <button
+              className="btn btn-link text-white"
               onClick={() => setShowNotifications(!showNotifications)}
             >
               <i className="fas fa-bell"></i>
@@ -115,12 +117,15 @@ function Navbar({ user, onLogout }) {
                 </span>
               )}
             </button>
-            
+
             {/* Notifications dropdown */}
             {showNotifications && (
-              <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show" style={{ width: '300px' }}>
+              <div
+                className="position-absolute top-100 end-0 mt-2 dropdown-menu show"
+                style={{ width: "300px" }}
+              >
                 <div className="d-flex justify-content-between align-items-center px-3 py-2">
-                  <h6 className="mb-0">{t('notifications')}</h6>
+                  <h6 className="mb-0">Notifications</h6>
                   <button 
                     className="btn btn-sm btn-link" 
                     onClick={handleViewAllNotifications}
@@ -129,16 +134,18 @@ function Navbar({ user, onLogout }) {
                   </button>
                 </div>
                 <div className="dropdown-divider"></div>
-                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                <div style={{ maxHeight: "300px", overflowY: "auto" }}>
                   {notifications.length === 0 ? (
                     <div className="dropdown-item text-center text-muted">
                       {t('noNotifications')}
                     </div>
                   ) : (
-                    notifications.slice(0, 10).map(notification => (
-                      <div 
-                        key={notification.id} 
-                        className={`dropdown-item ${!notification.is_read ? 'bg-light' : ''}`}
+                    notifications.slice(0, 10).map((notification) => (
+                      <div
+                        key={notification.id}
+                        className={`dropdown-item ${
+                          !notification.is_read ? "bg-light" : ""
+                        }`}
                       >
                         <div className="small text-muted">
                           {new Date(notification.created_at).toLocaleString()}
@@ -155,14 +162,14 @@ function Navbar({ user, onLogout }) {
               </div>
             )}
           </div>
-          
+
           <span className="me-3 text-white">Hi, {user.username}</span>
           <div className="avatar me-3">{user.username.charAt(0).toUpperCase()}</div>
           <button 
             className="btn btn-outline-light btn-sm" 
             onClick={onLogout}
           >
-            {t('logout')}
+            Logout
           </button>
         </div>
       </div>
