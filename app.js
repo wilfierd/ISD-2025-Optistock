@@ -954,7 +954,7 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
             `INSERT INTO materials 
              (packet_no, part_name, length, width, height, quantity, supplier, updated_by, last_updated) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [packetNo, partName, length, width, height, quantity, supplier, req.session.user.username, currentDate]
+            [packetNo, partName, length, width, height, quantity, supplier, (await connection.query('SELECT username FROM users WHERE id = ?', [request.user_id]))[0][0].username, currentDate]
           );
           
           console.log(`Added new material with ID ${addResult.insertId}`);
@@ -983,7 +983,7 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
                  quantity = ?, supplier = ?, updated_by = ?, last_updated = ? 
              WHERE id = ?`,
             [packetNo, partName, length, width, height, quantity, supplier, 
-             req.session.user.username, currentDate, request.material_id]
+              (await connection.query('SELECT username FROM users WHERE id = ?', [request.user_id]))[0][0].username, currentDate, request.material_id]
           );
           
           console.log(`Updated material ${request.material_id}`);
