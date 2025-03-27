@@ -1,4 +1,4 @@
-// client/src/components/Navbar.js
+// client/src/components/Navbar.js with updated role-based access control
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useNotifications, useMarkNotificationsAsRead } from '../hooks/useNotifications';
@@ -10,6 +10,7 @@ function Navbar({ user, onLogout }) {
   const isActive = (path) => location.pathname === path;
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
   
   const { data: notifications = [] } = useNotifications();
   const markAsRead = useMarkNotificationsAsRead();
@@ -47,6 +48,17 @@ function Navbar({ user, onLogout }) {
           >
             {t('warehouse')}
           </Link>
+          
+          {/* Show Warehouse Check link only for admin and manager users */}
+          {hasAdminOrManagerAccess(user) && (
+            <Link 
+              className={`navbar-brand ${isActive('/warehouse-check') ? 'fw-bold' : ''}`} 
+              to="/warehouse-check"
+            >
+              {t("Kiểm kho")}
+            </Link>
+          )}
+          
           {/* Show Employees link for admin and manager users */}
           {hasAdminOrManagerAccess(user) && (
             <Link 
@@ -56,6 +68,7 @@ function Navbar({ user, onLogout }) {
               {t('employees')}
             </Link>
           )}
+          
           {/* Show Requests link to both admins and managers */}
           {hasAdminOrManagerAccess(user) && (
             <Link 
@@ -157,13 +170,28 @@ function Navbar({ user, onLogout }) {
           </div>
           
           <span className="me-3 text-white">Hi, {user.username}</span>
-          <div className="avatar me-3">{user.username.charAt(0).toUpperCase()}</div>
-          <button 
-            className="btn btn-outline-light btn-sm" 
-            onClick={onLogout}
-          >
-            {t('logout')}
-          </button>
+          
+          {/* User Avatar with Dropdown Logout */}
+          <div className="position-relative me-3">
+            <button 
+              className="btn btn-link text-white" 
+              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+            >
+              <div className="avatar">{user.username.charAt(0).toUpperCase()}</div>
+            </button>
+            
+            {/* Logout dropdown */}
+            {showLogoutDropdown && (
+              <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show" style={{ minWidth: '150px' }}>
+                <button 
+                  className="dropdown-item" 
+                  onClick={onLogout}
+                >
+                  {t('logout')}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </nav>
