@@ -299,6 +299,59 @@ h4 {
   background-color: #f0f8ff !important; /* Light blue highlight on hover */
 }
 
+.focus-highlight {
+  border: 2px solid #4caf50 !important;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}
+
+/* Animation for the "Ready to scan" indicator */
+.pulse-animation {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Summary item styling */
+.summary-item {
+  transition: all 0.3s ease;
+}
+
+.summary-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+/* Improved status dot animation when changing state */
+.status-dot {
+  transition: all 0.3s ease-in-out;
+}
+
+.status-dot.active {
+  animation: activate-dot 0.5s ease-in-out;
+}
+
+@keyframes activate-dot {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
   .modal-dialog {
