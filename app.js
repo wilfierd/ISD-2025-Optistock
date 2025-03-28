@@ -871,7 +871,52 @@ app.post('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
     res.status(500).json({ success: false, error: `Failed to create material request: ${error.message}` });
   }
 });
-
+// Get a single material request by ID
+app.get('/api/material-requests/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.session.user.id;
+    const isAdminOrManager = req.session.user.role === 'admin' || req.session.user.role === 'quản lý';
+    
+    // Build query to get the request with user information
+    const query = `
+      SELECT mr.*, u.username as requested_by_username, u.full_name as requested_by_fullname,
+             a.username as admin_username, a.full_name as admin_fullname
+      FROM material_requests mr
+      LEFT JOIN users u ON mr.user_id = u.id
+      LEFT JOIN users a ON mr.admin_id = a.id
+      WHERE mr.id = ?
+    `;
+    
+    // Add permission check - admins see all, users only see their own
+    const permissionCheck = isAdminOrManager ? '' : ' AND mr.user_id = ?';
+    
+    const [requests] = await pool.query(
+      query + permissionCheck,
+      isAdminOrManager ? [id] : [id, userId]
+    );
+    
+    if (requests.length === 0) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
+    
+    // Format the request data if it's a string
+    const request = requests[0];
+    if (typeof request.request_data === 'string') {
+      try {
+        request.request_data = JSON.parse(request.request_data);
+      } catch (error) {
+        console.error('Error parsing request data:', error);
+        // Keep the original string if parsing fails
+      }
+    }
+    
+    res.json({ success: true, data: request });
+  } catch (error) {
+    console.error('Error fetching material request:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch material request' });
+  }
+});
 app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
   try {
     const { id } = req.params;

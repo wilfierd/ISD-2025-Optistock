@@ -367,10 +367,13 @@ h4 {
     padding: 0.5rem;
   }
 }
-
-
-/* Thêm vào client/src/index.css */
-
+.notification-dropdown .dropdown-footer {
+  background-color: #f8f9fa;
+  border-top: 1px solid #eee;
+  border-radius: 0 0 8px 8px;
+  padding: 10px 15px;
+  text-align: center;
+}
 /* Notification styling */
 .notification-item {
   transition: all 0.2s ease-in-out;
@@ -459,14 +462,6 @@ h4 {
   border-bottom: 1px solid #eee;
   border-radius: 8px 8px 0 0;
   padding: 10px 15px;
-}
-
-.notification-dropdown .dropdown-footer {
-  background-color: #f8f9fa;
-  border-top: 1px solid #eee;
-  border-radius: 0 0 8px 8px;
-  padding: 10px 15px;
-  text-align: center;
 }
 
 .notifications-scrollable {

@@ -47,7 +47,7 @@ function App() {
           path="/warehouse-check" 
           element={user && hasAdminOrManagerAccess(user) ? <WarehouseStockCheck user={user} /> : <Navigate to="/dashboard" />} 
         />
-                {/* Thêm route mới cho trang Notifications - tất cả người dùng đều có thể xem thông báo của họ */}
+        {/* Thêm route mới cho trang Notifications - tất cả người dùng đều có thể xem thông báo của họ */}
         <Route 
           path="/notifications" 
           element={user ? <Notifications user={user} /> : <Navigate to="/login" />} 
