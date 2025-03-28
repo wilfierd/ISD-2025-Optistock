@@ -367,3 +367,157 @@ h4 {
     padding: 0.5rem;
   }
 }
+
+
+/* Thêm vào client/src/index.css */
+
+/* Notification styling */
+.notification-item {
+  transition: all 0.2s ease-in-out;
+  border-left: 3px solid transparent;
+}
+
+.notification-item:hover {
+  background-color: #f8f9fa;
+  transform: translateY(-2px);
+}
+
+.notification-item.unread {
+  border-left-color: #0a4d8c;
+  background-color: rgba(10, 77, 140, 0.05);
+}
+
+.notification-badge {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+}
+
+.notification-badge.info {
+  background-color: #d9f2ff;
+  color: #0a4d8c;
+}
+
+.notification-badge.success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.notification-badge.danger {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.notification-badge.warning {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.notification-message {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.notification-time {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+/* Animation for new notification */
+@keyframes notification-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.notification-new {
+  animation: notification-pulse 1s ease-in-out;
+}
+
+/* Notification dropdown styling */
+.notification-dropdown {
+  min-width: 350px;
+  max-width: 400px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  border: none;
+}
+
+.notification-dropdown .dropdown-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #eee;
+  border-radius: 8px 8px 0 0;
+  padding: 10px 15px;
+}
+
+.notification-dropdown .dropdown-footer {
+  background-color: #f8f9fa;
+  border-top: 1px solid #eee;
+  border-radius: 0 0 8px 8px;
+  padding: 10px 15px;
+  text-align: center;
+}
+
+.notifications-scrollable {
+  max-height: 350px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.notifications-scrollable::-webkit-scrollbar {
+  width: 4px;
+}
+
+.notifications-scrollable::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.notifications-scrollable::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}
+
+/* Badge animation on new notification */
+@keyframes badge-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.badge-pulse {
+  animation: badge-pulse 1s infinite;
+}
+
+/* Empty state */
+.notification-empty {
+  padding: 30px 15px;
+  text-align: center;
+}
+
+.notification-empty i {
+  font-size: 2.5rem;
+  color: #dee2e6;
+  margin-bottom: 10px;
+}
+
+.notification-empty p {
+  color: #6c757d;
+  margin-bottom: 0;
+}

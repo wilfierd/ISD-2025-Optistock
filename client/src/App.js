@@ -11,6 +11,7 @@ import WarehouseStockCheck from './components/WarehouseStockCheck';
 import { useAuthStatus } from './hooks/useAuth';
 import { hasAdminOrManagerAccess } from './utils/rolePermissions';
 import { LanguageProvider } from './contexts/LanguageContext';
+import Notifications from './components/Notifications'; // Import thêm component Notifications
 
 function App() {
   const { data: authData, isLoading } = useAuthStatus();
@@ -46,7 +47,11 @@ function App() {
           path="/warehouse-check" 
           element={user && hasAdminOrManagerAccess(user) ? <WarehouseStockCheck user={user} /> : <Navigate to="/dashboard" />} 
         />
-        
+                {/* Thêm route mới cho trang Notifications - tất cả người dùng đều có thể xem thông báo của họ */}
+        <Route 
+          path="/notifications" 
+          element={user ? <Notifications user={user} /> : <Navigate to="/login" />} 
+        />
         <Route path="/" element={<Navigate to="/dashboard" />} />
       </Routes>
     </LanguageProvider>

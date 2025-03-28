@@ -77,7 +77,10 @@ const apiService = {
   // Notifications endpoints
   notifications: {
     getAll: () => api.get('/notifications'),
+    getUnreadCount: () => api.get('/notifications/unread-count'),
     markAsRead: (notificationIds) => api.put('/notifications/read', { notificationIds }),
+    delete: (id) => api.delete(`/notifications/${id}`),
+    clearAll: () => api.delete('/notifications'),
   },
 };
 

@@ -998,10 +998,54 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
       await connection.commit();
       
       // Create notification for the requester
+      // Cập nhật phần xử lý yêu cầu trong app.js
+
+      // Thay thế đoạn code tạo thông báo trong hàm xử lý yêu cầu:
+
+      // Tạo thông báo chi tiết hơn cho người yêu cầu dựa trên loại yêu cầu và trạng thái
+      let notificationMessage = '';
+      const requestTypeMap = {
+        'add': 'thêm',
+        'edit': 'sửa',
+        'delete': 'xóa'
+      };
+
+      const requestTypeInVietnamese = requestTypeMap[request.request_type] || request.request_type;
+
+      // Lấy thông tin về nguyên vật liệu nếu có
+      let materialInfo = '';
+      if (request.material_id) {
+        try {
+          const [materialResult] = await connection.query(
+            'SELECT part_name FROM materials WHERE id = ?',
+            [request.material_id]
+          );
+          
+          if (materialResult.length > 0) {
+            materialInfo = materialResult[0].part_name;
+          }
+        } catch (err) {
+          console.error('Error fetching material info:', err);
+        }
+      }
+
+      // Tạo thông báo chi tiết
+      if (status === 'approved') {
+        notificationMessage = `Yêu cầu ${requestTypeInVietnamese} nguyên vật liệu${materialInfo ? ` "${materialInfo}"` : ''} đã được phê duyệt`;
+      } else {
+        notificationMessage = `Yêu cầu ${requestTypeInVietnamese} nguyên vật liệu${materialInfo ? ` "${materialInfo}"` : ''} đã bị từ chối`;
+      }
+
+      // Thêm lý do từ chối nếu có
+      if (status === 'rejected' && adminNotes) {
+        notificationMessage += `. Lý do: ${adminNotes}`;
+      }
+
+      // Tạo thông báo cho người yêu cầu
       await pool.query(
-        `INSERT INTO admin_notifications (user_id, message)
-         VALUES (?, ?)`,
-        [request.user_id, `Your ${request.request_type} material request has been ${status}`]
+        `INSERT INTO admin_notifications (user_id, related_request_id, message, notification_type)
+        VALUES (?, ?, ?, 'request')`,
+        [request.user_id, request.id, notificationMessage]
       );
       
       res.json({ 
@@ -1025,8 +1069,115 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
   }
 });
 
+// ===== NOTIFICATIONS API =====
 
+// Lấy tất cả thông báo của người dùng hiện tại
+app.get('/api/notifications', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    // Lấy tất cả thông báo của người dùng
+    const [notifications] = await pool.query(
+      `SELECT * FROM admin_notifications 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 100`,  // Giới hạn 100 thông báo gần nhất
+      [userId]
+    );
+    
+    res.json({ success: true, data: notifications });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete notification' });
+  }
+});
 
+// Clear all notifications for a user
+app.delete('/api/notifications', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    // Delete all notifications for the current user
+    await pool.query(
+      'DELETE FROM admin_notifications WHERE user_id = ?',
+      [userId]
+    );
+    
+    res.json({ success: true, message: 'All notifications cleared' });
+  } catch (error) {
+    console.error('Error clearing notifications:', error);
+    res.status(500).json({ success: false, error: 'Failed to clear notifications' });
+  }
+});({ success: false, error: 'Failed to fetch notifications' });
+;
+
+// Lấy số lượng thông báo chưa đọc
+app.get('/api/notifications/unread-count', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    // Đếm số lượng thông báo chưa đọc
+    const [result] = await pool.query(
+      `SELECT COUNT(*) as count FROM admin_notifications 
+       WHERE user_id = ? AND is_read = 0`,
+      [userId]
+    );
+    
+    const unreadCount = result[0].count;
+    
+    res.json({ success: true, count: unreadCount });
+  } catch (error) {
+    console.error('Error counting unread notifications:', error);
+    res.status(500).json({ success: false, error: 'Failed to count unread notifications', count: 0 });
+  }
+});
+
+// Đánh dấu thông báo là đã đọc
+app.put('/api/notifications/read', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { notificationIds } = req.body;
+    const userId = req.session.user.id;
+    
+    if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'Invalid notification IDs' });
+    }
+    
+    // Tạo placeholders cho câu truy vấn SQL
+    const placeholders = notificationIds.map(() => '?').join(',');
+    
+    // Cập nhật là đã đọc (chỉ đối với thông báo của người dùng hiện tại)
+    await pool.query(
+      `UPDATE admin_notifications 
+       SET is_read = 1 
+       WHERE id IN (${placeholders}) AND user_id = ?`,
+      [...notificationIds, userId]
+    );
+    
+    res.json({ success: true, message: 'Notifications marked as read' });
+  } catch (error) {
+    console.error('Error marking notifications as read:', error);
+    res.status(500).json({ success: false, error: 'Failed to mark notifications as read' });
+  }
+});
+
+// Xóa thông báo (tùy chọn)
+app.delete('/api/notifications/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.session.user.id;
+    
+    // Xóa thông báo (chỉ thông báo của người dùng hiện tại)
+    await pool.query(
+      'DELETE FROM admin_notifications WHERE id = ? AND user_id = ?',
+      [id, userId]
+    );
+    
+    res.json({ success: true, message: 'Notification deleted' });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json
+  }
+});
 // ===== SERVE REACT APP =====
 
 // Start the server
