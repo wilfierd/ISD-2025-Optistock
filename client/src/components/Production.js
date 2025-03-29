@@ -3,23 +3,26 @@ import React, { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
 import { useQueryClient } from '@tanstack/react-query';
-import { 
-  useMachines, 
-  useUpdateMachineStatus
-} from '../hooks/useMachines';
+import { useMachines } from '../hooks/useMachines';
 import { useMolds } from '../hooks/useMolds';
 import { useMaterials } from '../hooks/useMaterials';
 import apiService from '../services/api';
 import { toast } from 'react-toastify';
+import './Production.css';
 
 function Production({ user }) {
-  const queryClient = useQueryClient();
+  // State for active tab
+  const [activeTab, setActiveTab] = useState('production');
+  
+  // State for batch management
+  const [batches, setBatches] = useState([]);
+  const [isLoadingBatches, setIsLoadingBatches] = useState(false);
   
   // State for batch creation modal
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   
-  // Material form state with auto-fill functionality
+  // Form state with data selection
   const [materialFormData, setMaterialFormData] = useState({
     id: '',
     partName: '',
@@ -30,7 +33,6 @@ function Production({ user }) {
     supplier: ''
   });
   
-  // Machine and mold form state
   const [machineFormData, setMachineFormData] = useState({
     id: '',
     tenMayDap: '',
@@ -44,97 +46,48 @@ function Production({ user }) {
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [selectedMold, setSelectedMold] = useState(null);
   
-  // State for stop reason modal
-  const [showStopReasonModal, setShowStopReasonModal] = useState(false);
-  const [stopReason, setStopReason] = useState('');
-  const [machineToStop, setMachineToStop] = useState(null);
-  const [stopTime, setStopTime] = useState('');
-  const [stopDate, setStopDate] = useState('');
-
-  // State for batch management
-  const [batches, setBatches] = useState([]);
-  const [isLoadingBatches, setIsLoadingBatches] = useState(false);
-
+  // Detail view state
+  const [selectedBatch, setSelectedBatch] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  
   // React Query hooks
   const { data: machines = [], isLoading: isLoadingMachines } = useMachines();
   const { data: molds = [], isLoading: isLoadingMolds } = useMolds();
   const { data: materials = [], isLoading: isLoadingMaterials } = useMaterials();
-  const updateMachineStatus = useUpdateMachineStatus();
   const logoutMutation = useLogout();
 
   // Load batches on component mount
   useEffect(() => {
-    const fetchBatches = async () => {
-      setIsLoadingBatches(true);
-      try {
-        const response = await apiService.batches.getAll();
-        if (response.data.success) {
-          setBatches(response.data.data || []);
-        }
-      } catch (error) {
-        console.error('Error fetching batches:', error);
-        toast.error('Không thể tải dữ liệu lô sản xuất');
-      } finally {
-        setIsLoadingBatches(false);
-      }
-    };
-    
     fetchBatches();
   }, []);
+
+  // Function to fetch batches
+  const fetchBatches = async () => {
+    setIsLoadingBatches(true);
+    try {
+      const response = await apiService.batches.getAll();
+      if (response.data && response.data.success) {
+        setBatches(response.data.data || []);
+      } else {
+        console.error('Unexpected response format:', response);
+        toast.error('Định dạng phản hồi không mong đợi khi lấy dữ liệu lô');
+      }
+    } catch (error) {
+      console.error('Error fetching batches:', error);
+      toast.error('Không thể tải dữ liệu lô sản xuất');
+    } finally {
+      setIsLoadingBatches(false);
+    }
+  };
 
   // Handle logout
   const handleLogout = () => {
     logoutMutation.mutate();
   };
 
-  // Handle stopping a machine
-  const handleStopMachine = (machine) => {
-    setMachineToStop(machine);
-    // Set current time and date for the form
-    const now = new Date();
-    setStopTime(now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    setStopDate(now.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }));
-    setShowStopReasonModal(true);
-  };
-
-  // Handle starting a machine
-  const handleStartMachine = (id) => {
-    updateMachineStatus.mutate({ 
-      id: id, 
-      data: { status: 'running' }
-    });
-  };
-
-  // Handle stop reason confirmation
-  const handleConfirmStop = () => {
-    if (!stopReason.trim()) {
-      toast.error("Vui lòng nhập lý do dừng máy");
-      return;
-    }
-
-    updateMachineStatus.mutate({ 
-      id: machineToStop.id, 
-      data: {
-        status: 'stopped',
-        reason: stopReason,
-        stopTime,
-        stopDate
-      }
-    }, {
-      onSuccess: () => {
-        // Reset the form and close the modal
-        setStopReason('');
-        setMachineToStop(null);
-        setShowStopReasonModal(false);
-      }
-    });
-  };
-
-  // Handle cancel stop
-  const handleCancelStop = () => {
-    setStopReason('');
-    setMachineToStop(null);
-    setShowStopReasonModal(false);
+  // Handle tab changes
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
   };
 
   // Handle opening the batch creation modal
@@ -177,15 +130,16 @@ function Production({ user }) {
       [id]: value
     }));
     
-    // If part_name is being changed, look for matching material to auto-fill
+    // If partName is being changed, look for matching material to auto-fill
     if (id === 'partName') {
-      const matchingMaterial = materials.find(m => m.part_name === value);
+      // Find the matching material using the transformed partName property
+      const matchingMaterial = materials.find(m => m.partName === value);
       
       if (matchingMaterial) {
         // Auto-fill material data
         setMaterialFormData({
           id: matchingMaterial.id,
-          partName: matchingMaterial.part_name,
+          partName: matchingMaterial.partName,
           length: matchingMaterial.length,
           width: matchingMaterial.width,
           height: matchingMaterial.height || '0',
@@ -271,13 +225,21 @@ function Production({ user }) {
     }
 
     try {
+      // Check if material is selected properly
+      if (!selectedMaterial) {
+        toast.error('Vui lòng chọn nguyên vật liệu có sẵn trong hệ thống');
+        return;
+      }
+      
       // Prepare the batch data using IDs of existing records
       const batchData = {
         materialId: selectedMaterial?.id,
         machineId: selectedMachine?.id,
         moldId: selectedMold?.id,
         expectedOutput: parseInt(machineFormData.thanhPham || machineFormData.soLuong),
-        notes: `Batch created with material: ${materialFormData.partName}, machine: ${machineFormData.tenMayDap}, mold: ${machineFormData.maKhuon}`
+        notes: `Lô sản xuất: ${materialFormData.partName}, máy: ${machineFormData.tenMayDap}, khuôn: ${machineFormData.maKhuon}`,
+        status: 'in_progress', // Automatically set status to in_progress
+        start_date: new Date().toISOString() // Set start date to now
       };
       
       // Handle case where material, machine, or mold doesn't exist in database yet
@@ -294,10 +256,7 @@ function Production({ user }) {
         setShowBatchModal(false);
         
         // Refresh the batches list
-        const batchesResponse = await apiService.batches.getAll();
-        if (batchesResponse.data.success) {
-          setBatches(batchesResponse.data.data || []);
-        }
+        fetchBatches();
       } else {
         throw new Error(response.data.error || 'Không thể tạo lô sản xuất');
       }
@@ -307,13 +266,67 @@ function Production({ user }) {
     }
   };
 
+  // Handle stopping a machine/batch
+  const handleStopBatch = async (batch) => {
+    try {
+      // Update batch status to stopped
+      await apiService.batches.updateStatus(batch.id, { 
+        status: 'completed',
+        end_date: new Date().toISOString()
+      });
+      
+      toast.success('Đã dừng lô sản xuất thành công');
+      fetchBatches();
+    } catch (error) {
+      console.error('Error stopping batch:', error);
+      toast.error('Không thể dừng lô sản xuất');
+    }
+  };
+
+  // Handle starting a machine/batch  
+  const handleStartBatch = async (batch) => {
+    try {
+      // Update batch status to running
+      await apiService.batches.updateStatus(batch.id, { 
+        status: 'in_progress',
+        start_date: new Date().toISOString()
+      });
+      
+      toast.success('Đã bắt đầu lô sản xuất thành công');
+      fetchBatches();
+    } catch (error) {
+      console.error('Error starting batch:', error);
+      toast.error('Không thể bắt đầu lô sản xuất');
+    }
+  };
+  
+  // Handle batch deletion
+  const handleDeleteBatch = async (batchId) => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa lô sản xuất này?')) {
+      try {
+        await apiService.batches.delete(batchId);
+        toast.success('Xóa lô sản xuất thành công');
+        fetchBatches();
+      } catch (error) {
+        console.error('Error deleting batch:', error);
+        toast.error('Không thể xóa lô sản xuất');
+      }
+    }
+  };
+  
+  // Handle viewing batch details
+  const handleViewDetails = (batch) => {
+    setSelectedBatch(batch);
+    setShowDetailModal(true);
+  };
+
   return (
     <div>
       <Navbar user={user} onLogout={handleLogout} />
 
       {/* Main Content */}
       <div className="container-fluid mt-4">
-        {/* Search Bar */}
+        {/* Search Bar and Add Button */}
         <div className="row mb-4">
           <div className="col-md-8">
             <div className="search-container d-flex">
@@ -348,189 +361,228 @@ function Production({ user }) {
           <div className="col-12">
             <ul className="nav nav-tabs">
               <li className="nav-item">
-                <a className="nav-link active" href="#machines">Danh sách máy dập</a>
+                <a 
+                  className={`nav-link ${activeTab === 'production' ? 'active' : ''}`} 
+                  href="#production"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleTabChange('production');
+                  }}
+                >
+                  Danh sách lô đang sản xuất
+                </a>
               </li>
               <li className="nav-item">
-                <a className="nav-link" href="#batches">Danh sách lô sản xuất</a>
+                <a 
+                  className={`nav-link ${activeTab === 'planning' ? 'active' : ''}`} 
+                  href="#planning"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleTabChange('planning');
+                  }}
+                >
+                  Danh sách mặt
+                </a>
               </li>
             </ul>
           </div>
         </div>
         
-        {/* Machines Section */}
-        <div className="row mb-4">
-          <div className="col-md-12">
-            <div className="card shadow">
-              <div className="card-body p-0">
-                {isLoadingMachines ? (
-                  <div className="text-center my-3">
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Loading...</span>
+        {/* Production Tab Content */}
+        {activeTab === 'production' && (
+          <div className="row mb-4">
+            <div className="col-md-12">
+              <div className="card shadow">
+                <div className="card-body p-0">
+                  {isLoadingBatches ? (
+                    <div className="text-center my-3">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-hover mb-0">
-                      <thead className="bg-light">
-                        <tr>
-                          <th>Trạng thái</th>
-                          <th>Tên máy dập</th>
-                          <th>Mã khuôn</th>
-                          <th>Số lượng</th>
-                          <th>Ngày, giờ bắt đầu</th>
-                          <th style={{ width: '180px' }}>Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {machines.map(machine => {
-                          // Find mold associated with this machine
-                          const associatedMold = molds.find(mold => mold.machine_id === machine.id);
-                          const isRunning = machine.status === 'running';
-                          
-                          return (
-                            <tr key={machine.id}>
-                              <td>
-                                <div className="d-flex align-items-center">
-                                  <span 
-                                    className={`status-indicator ${isRunning ? 'bg-success' : 'bg-secondary'}`}
-                                    style={{ width: '12px', height: '12px', borderRadius: '50%', marginRight: '8px', display: 'inline-block' }}
-                                  ></span>
-                                  <span>
-                                    {isRunning ? 'Đang chạy' : 'Đã dừng'}
-                                  </span>
-                                </div>
-                              </td>
-                              <td>{machine.ten_may_dap}</td>
-                              <td>{associatedMold ? associatedMold.ma_khuon : '-'}</td>
-                              <td>{associatedMold ? associatedMold.so_luong : '-'}</td>
-                              <td>
-                                {machine.last_updated ? new Date(machine.last_updated).toLocaleString() : '-'}
-                              </td>
-                              <td>
-                                {/* Both buttons are always visible but disabled based on status */}
-                                <button 
-                                  className="btn btn-sm btn-danger me-2"
-                                  onClick={() => handleStopMachine(machine)}
-                                  disabled={!isRunning || updateMachineStatus.isPending}
-                                >
-                                  Dừng
-                                </button>
-                                <button 
-                                  className="btn btn-sm btn-primary"
-                                  onClick={() => handleStartMachine(machine.id)}
-                                  disabled={isRunning || updateMachineStatus.isPending}
-                                >
-                                  Bắt đầu
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {machines.length === 0 && (
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table table-hover mb-0">
+                        <thead className="bg-light">
                           <tr>
-                            <td colSpan="6" className="text-center py-3">Không tìm thấy máy nào!</td>
+                            <th>Trạng thái</th>
+                            <th>Tên máy dập</th>
+                            <th>Mã khuôn</th>
+                            <th>Số lượng</th>
+                            <th>Ngày, giờ bắt đầu</th>
+                            <th style={{ width: '180px' }}>Thao tác</th>
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody>
+                          {batches
+                            .filter(batch => batch.status === 'in_progress' || batch.status === 'planned')
+                            .map(batch => {
+                              // Find related data using foreign keys
+                              const machine = machines.find(m => m.id === batch.machine_id);
+                              const mold = molds.find(m => m.id === batch.mold_id);
+                              const isRunning = batch.status === 'in_progress';
+                              
+                              return (
+                                <tr key={batch.id}>
+                                  <td>
+                                    <div className="d-flex align-items-center">
+                                      <span 
+                                        className={`status-indicator ${isRunning ? 'bg-success' : 'bg-secondary'}`}
+                                        style={{ width: '12px', height: '12px', borderRadius: '50%', marginRight: '8px', display: 'inline-block' }}
+                                      ></span>
+                                      <span>
+                                        {isRunning ? 'Đang chạy' : 'Đã dừng'}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td>{machine?.ten_may_dap || '-'}</td>
+                                  <td>{mold?.ma_khuon || '-'}</td>
+                                  <td>{batch.expected_output || mold?.so_luong || '-'}</td>
+                                  <td>
+                                    {batch.start_date ? new Date(batch.start_date).toLocaleString() : '19:00:10 05/03/2025'}
+                                  </td>
+                                  <td>
+                                    {/* Show both buttons but disable one based on status */}
+                                    <button 
+                                      className="btn btn-sm btn-danger me-2"
+                                      onClick={() => handleStopBatch(batch)}
+                                      disabled={!isRunning}
+                                    >
+                                      Dừng
+                                    </button>
+                                    <button 
+                                      className="btn btn-sm btn-primary"
+                                      onClick={() => handleStartBatch(batch)}
+                                      disabled={isRunning}
+                                    >
+                                      Tiếp tục
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          }
+                          {batches.filter(batch => batch.status === 'in_progress' || batch.status === 'planned').length === 0 && (
+                            <tr>
+                              <td colSpan="6" className="text-center py-3">Không có lô sản xuất nào đang hoạt động!</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
         
-        {/* Batches Section */}
-        <div className="row mb-4">
-          <div className="col-md-12">
-            <div className="card shadow">
-              <div className="card-header bg-light">
-                <h5 className="mb-0">Danh sách lô sản xuất</h5>
-              </div>
-              <div className="card-body p-0">
-                {isLoadingBatches ? (
-                  <div className="text-center my-3">
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">Loading...</span>
+        {/* Planning Tab Content */}
+        {activeTab === 'planning' && (
+          <div className="row mb-4">
+            <div className="col-md-12">
+              <div className="card shadow">
+                <div className="card-header bg-light">
+                  <h5 className="mb-0">Danh sách lô sản xuất</h5>
+                </div>
+                <div className="card-body p-0">
+                  {isLoadingBatches ? (
+                    <div className="text-center my-3">
+                      <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-hover mb-0">
-                      <thead className="bg-light">
-                        <tr>
-                          <th>ID</th>
-                          <th>Nguyên vật liệu</th>
-                          <th>Kích thước (D×R×C)</th>
-                          <th>Máy dập</th>
-                          <th>Mã khuôn</th>
-                          <th>Số lượng</th>
-                          <th>Dự kiến</th>
-                          <th>Trạng thái</th>
-                          <th>Ngày tạo</th>
-                          <th>Thao tác</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {batches.map(batch => {
-                          // Find related data
-                          const material = materials.find(m => m.id === batch.material_id);
-                          const machine = machines.find(m => m.id === batch.machine_id);
-                          const mold = molds.find(m => m.id === batch.mold_id);
-                          
-                          return (
-                            <tr key={batch.id}>
-                              <td>{batch.id}</td>
-                              <td>{material?.part_name || '-'}</td>
-                              <td>
-                                {material ? `${material.length}×${material.width}×${material.height}` : '-'}
-                              </td>
-                              <td>{machine?.ten_may_dap || '-'}</td>
-                              <td>{mold?.ma_khuon || '-'}</td>
-                              <td>{mold?.so_luong || '-'}</td>
-                              <td>{batch.expected_output || '-'}</td>
-                              <td>
-                                <span className={`badge bg-${
-                                  batch.status === 'planned' ? 'secondary' :
-                                  batch.status === 'in_progress' ? 'primary' :
-                                  batch.status === 'completed' ? 'success' : 'danger'
-                                }`}>
-                                  {batch.status === 'planned' ? 'Lên kế hoạch' :
-                                   batch.status === 'in_progress' ? 'Đang thực hiện' :
-                                   batch.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
-                                </span>
-                              </td>
-                              <td>{new Date(batch.created_at).toLocaleDateString()}</td>
-                              <td>
-                                <button className="btn btn-sm btn-info me-1">
-                                  <i className="fas fa-eye"></i>
-                                </button>
-                                <button className="btn btn-sm btn-primary me-1">
-                                  <i className="fas fa-edit"></i>
-                                </button>
-                                <button className="btn btn-sm btn-danger">
-                                  <i className="fas fa-trash"></i>
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {batches.length === 0 && (
+                  ) : (
+                    <div className="table-responsive">
+                      <table className="table table-hover mb-0">
+                        <thead className="bg-light">
                           <tr>
-                            <td colSpan="10" className="text-center py-3">Chưa có lô sản xuất nào được tạo.</td>
+                            <th>ID</th>
+                            <th>Nguyên vật liệu</th>
+                            <th>Kích thước (D×R×C)</th>
+                            <th>Máy dập</th>
+                            <th>Mã khuôn</th>
+                            <th>Dự kiến</th>
+                            <th>Trạng thái</th>
+                            <th>Ngày tạo</th>
+                            <th>Thao tác</th>
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody>
+                          {batches.map(batch => {
+                            // Find related data using foreign keys
+                            const material = materials.find(m => m.id === batch.material_id);
+                            const machine = machines.find(m => m.id === batch.machine_id);
+                            const mold = molds.find(m => m.id === batch.mold_id);
+                            
+                            return (
+                              <tr key={batch.id}>
+                                <td>{batch.id}</td>
+                                <td>{material?.partName || '-'}</td>
+                                <td>
+                                  {material ? `${material.length}×${material.width}×${material.height}` : '-'}
+                                </td>
+                                <td>{machine?.ten_may_dap || '-'}</td>
+                                <td>{mold?.ma_khuon || '-'}</td>
+                                <td>{batch.expected_output || '-'}</td>
+                                <td>
+                                  <span className={`badge bg-${
+                                    batch.status === 'planned' ? 'secondary' :
+                                    batch.status === 'in_progress' ? 'primary' :
+                                    batch.status === 'completed' ? 'success' : 'danger'
+                                  }`}>
+                                    {batch.status === 'planned' ? 'Lên kế hoạch' :
+                                     batch.status === 'in_progress' ? 'Đang thực hiện' :
+                                     batch.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
+                                  </span>
+                                </td>
+                                <td>{new Date(batch.created_at).toLocaleDateString()}</td>
+                                <td>
+                                  <button 
+                                    className="btn btn-sm btn-info me-1"
+                                    onClick={() => handleViewDetails(batch)}
+                                  >
+                                    <i className="fas fa-eye"></i>
+                                  </button>
+                                  <button 
+                                    className="btn btn-sm btn-primary me-1"
+                                    onClick={() => {
+                                      if (batch.status === 'in_progress') {
+                                        handleStopBatch(batch);
+                                      } else {
+                                        handleStartBatch(batch);
+                                      }
+                                    }}
+                                  >
+                                    <i className="fas fa-edit"></i>
+                                  </button>
+                                  <button 
+                                    className="btn btn-sm btn-danger"
+                                    onClick={() => handleDeleteBatch(batch.id)}
+                                  >
+                                    <i className="fas fa-trash"></i>
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {batches.length === 0 && (
+                            <tr>
+                              <td colSpan="9" className="text-center py-3">Chưa có lô sản xuất nào được tạo.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Multi-Step Batch Creation Modal */}
+      {/* Batch Creation Modal */}
       {showBatchModal && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
           <div className="modal-dialog modal-lg">
@@ -567,7 +619,7 @@ function Production({ user }) {
                       <p className="text-muted">Chọn nguyên vật liệu có sẵn hoặc nhập thông tin của nguyên vật liệu mới</p>
                       
                       <div className="mb-3">
-                        <label htmlFor="partName" className="form-label">part_name</label>
+                        <label htmlFor="partName" className="form-label">Tên bộ phận</label>
                         <input 
                           type="text" 
                           className="form-control" 
@@ -579,7 +631,7 @@ function Production({ user }) {
                         />
                         <datalist id="partNameOptions">
                           {materials.map(material => (
-                            <option key={material.id} value={material.part_name} />
+                            <option key={material.id} value={material.partName} />
                           ))}
                         </datalist>
                         <small className="text-muted">
@@ -779,93 +831,105 @@ function Production({ user }) {
         </div>
       )}
 
-      {/* Stop Reason Modal */}
-      {showStopReasonModal && (
+      {/* Batch Detail Modal */}
+      {showDetailModal && selectedBatch && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
-          <div className="modal-dialog">
+          <div className="modal-dialog modal-lg">
             <div className="modal-content">
               <div className="modal-header">
-                <h5 className="modal-title text-center">LÝ DO DỪNG MÁY</h5>
+                <h5 className="modal-title">Chi tiết lô sản xuất #{selectedBatch.id}</h5>
                 <button 
                   type="button" 
                   className="btn-close" 
-                  onClick={handleCancelStop}
+                  onClick={() => setShowDetailModal(false)}
                 ></button>
               </div>
               <div className="modal-body">
-                <p className="text-center">(Nhập lý do dừng máy)</p>
-                
-                <hr />
-                
-                <div className="row mb-3 align-items-center">
-                  <div className="col-4">
-                    <label htmlFor="stopTime" className="form-label">Thời gian:</label>
+                <div className="row">
+                  <div className="col-md-6">
+                    <h6 className="border-bottom pb-2 mb-3">Thông tin cơ bản</h6>
+                    <p>
+                      <strong>Trạng thái:</strong> 
+                      <span className={`badge bg-${
+                        selectedBatch.status === 'planned' ? 'secondary' :
+                        selectedBatch.status === 'in_progress' ? 'primary' :
+                        selectedBatch.status === 'completed' ? 'success' : 'danger'
+                      } ms-2`}>
+                        {selectedBatch.status === 'planned' ? 'Lên kế hoạch' :
+                         selectedBatch.status === 'in_progress' ? 'Đang thực hiện' :
+                         selectedBatch.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
+                      </span>
+                    </p>
+                    <p><strong>Ngày tạo:</strong> {new Date(selectedBatch.created_at).toLocaleString()}</p>
+                    <p><strong>Bắt đầu:</strong> {selectedBatch.start_date ? new Date(selectedBatch.start_date).toLocaleString() : 'Chưa bắt đầu'}</p>
+                    <p><strong>Kết thúc:</strong> {selectedBatch.end_date ? new Date(selectedBatch.end_date).toLocaleString() : 'Chưa kết thúc'}</p>
+                    <p><strong>Ghi chú:</strong> {selectedBatch.notes || 'Không có ghi chú'}</p>
                   </div>
-                  <div className="col-8">
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      id="stopTime" 
-                      value={stopTime}
-                      onChange={(e) => setStopTime(e.target.value)}
-                      placeholder="hh:mm:ss"
-                    />
-                  </div>
-                </div>
-                
-                <div className="row mb-3 align-items-center">
-                  <div className="col-4">
-                    <label htmlFor="stopDate" className="form-label">Ngày:</label>
-                  </div>
-                  <div className="col-8">
-                    <input 
-                      type="text" 
-                      className="form-control" 
-                      id="stopDate" 
-                      value={stopDate}
-                      onChange={(e) => setStopDate(e.target.value)}
-                      placeholder="dd/mm/yyyy"
-                    />
-                  </div>
-                </div>
-                
-                <div className="row mb-3 align-items-center">
-                  <div className="col-4">
-                    <label htmlFor="stopReason" className="form-label">Lý do:</label>
-                  </div>
-                  <div className="col-8">
-                    <textarea 
-                      className="form-control" 
-                      id="stopReason" 
-                      value={stopReason}
-                      onChange={(e) => setStopReason(e.target.value)}
-                      placeholder="Nhập lý do"
-                      rows={4}
-                      required
-                    ></textarea>
+                  <div className="col-md-6">
+                    <h6 className="border-bottom pb-2 mb-3">Thông tin sản xuất</h6>
+                    <p><strong>Dự kiến sản xuất:</strong> {selectedBatch.expected_output || 'Không xác định'}</p>
+                    <p><strong>Đã sản xuất:</strong> {selectedBatch.actual_output || 'Chưa có dữ liệu'}</p>
+                    
+                    {/* Related data from other tables */}
+                    {(() => {
+                      const material = materials.find(m => m.id === selectedBatch.material_id);
+                      const machine = machines.find(m => m.id === selectedBatch.machine_id);
+                      const mold = molds.find(m => m.id === selectedBatch.mold_id);
+                      
+                      return (
+                        <>
+                          <h6 className="border-bottom pb-2 mb-2 mt-4">Thông tin liên quan</h6>
+                          <p><strong>Nguyên vật liệu:</strong> {material?.partName || 'Không xác định'}</p>
+                          <p><strong>Kích thước:</strong> {material ? `${material.length}×${material.width}×${material.height}` : 'Không xác định'}</p>
+                          <p><strong>Máy dập:</strong> {machine?.ten_may_dap || 'Không xác định'}</p>
+                          <p><strong>Mã khuôn:</strong> {mold?.ma_khuon || 'Không xác định'}</p>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
-              <div className="modal-footer justify-content-center">
+              <div className="modal-footer">
                 <button 
                   type="button" 
-                  className="btn btn-primary" 
-                  onClick={handleConfirmStop}
-                  disabled={updateMachineStatus.isPending}
+                  className="btn btn-secondary" 
+                  onClick={() => setShowDetailModal(false)}
                 >
-                  Xác nhận
+                  Đóng
                 </button>
-                <button 
-                  type="button" 
-                  className="btn btn-danger" 
-                  onClick={handleCancelStop}
-                >
-                  Huỷ
-                </button>
+                {selectedBatch.status === 'planned' && (
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={() => {
+                      handleStartBatch(selectedBatch);
+                      setShowDetailModal(false);
+                    }}
+                  >
+                    Bắt đầu sản xuất
+                  </button>
+                )}
+                {selectedBatch.status === 'in_progress' && (
+                  <button 
+                    type="button" 
+                    className="btn btn-success"
+                    onClick={() => {
+                      handleStopBatch(selectedBatch);
+                      setShowDetailModal(false);
+                    }}
+                  >
+                    Hoàn thành sản xuất
+                  </button>
+                )}
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Backdrop */}
+      {(showBatchModal || showDetailModal) && (
+        <div className="modal-backdrop fade show"></div>
       )}
     </div>
   );
