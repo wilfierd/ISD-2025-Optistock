@@ -1025,7 +1025,591 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
   }
 });
 
+// Add these routes to app.js after the existing API routes
 
+// ===== PRODUCTION (SAN XUAT) API =====
+
+// Create machine_stop_logs table if it doesn't exist
+pool.query(`
+    CREATE TABLE IF NOT EXISTS machine_stop_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      machine_id INT NOT NULL,
+      reason TEXT NOT NULL,
+      stop_time VARCHAR(50),
+      stop_date VARCHAR(50),
+      user_id INT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `).catch(err => {
+    console.error('Error creating machine_stop_logs table:', err);
+  });
+  
+  // Modify molds table to add material_id column if needed
+  pool.query(`
+    ALTER TABLE molds
+    ADD COLUMN IF NOT EXISTS material_id INT,
+    ADD CONSTRAINT IF NOT EXISTS fk_molds_material
+    FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE SET NULL
+  `).catch(err => {
+    console.error('Error modifying molds table:', err);
+  });
+  
+  // Get all machines
+  app.get('/api/machines', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const [machines] = await pool.query(`
+        SELECT m.*, 
+          (SELECT ma_khuon FROM molds WHERE machine_id = m.id LIMIT 1) as mold_code,
+          (SELECT so_luong FROM molds WHERE machine_id = m.id LIMIT 1) as mold_quantity
+        FROM machines m 
+        ORDER BY m.id
+      `);
+      
+      res.json({ success: true, data: machines });
+    } catch (error) {
+      console.error('Error fetching machines:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch machines' });
+    }
+  });
+  
+  // Get a specific machine
+  app.get('/api/machines/:id', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [machines] = await pool.query(`
+        SELECT m.*, 
+          (SELECT ma_khuon FROM molds WHERE machine_id = m.id LIMIT 1) as mold_code,
+          (SELECT so_luong FROM molds WHERE machine_id = m.id LIMIT 1) as mold_quantity
+        FROM machines m 
+        WHERE m.id = ?
+      `, [id]);
+      
+      if (machines.length === 0) {
+        return res.status(404).json({ success: false, error: 'Machine not found' });
+      }
+      
+      res.json({ success: true, data: machines[0] });
+    } catch (error) {
+      console.error('Error fetching machine:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch machine' });
+    }
+  });
+  
+  // Create a new machine
+  app.post('/api/machines', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { tenMayDap, status } = req.body;
+      
+      // Validate required fields
+      if (!tenMayDap) {
+        return res.status(400).json({ success: false, error: 'Missing required fields' });
+      }
+      
+      // Check if machine with this name already exists
+      const [existingMachines] = await pool.query(
+        'SELECT id FROM machines WHERE ten_may_dap = ?',
+        [tenMayDap]
+      );
+      
+      if (existingMachines.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'A machine with this name already exists. Machine names must be unique.' 
+        });
+      }
+      
+      const [result] = await pool.query(
+        'INSERT INTO machines (ten_may_dap, status) VALUES (?, ?)',
+        [tenMayDap, status || 'stopped']
+      );
+      
+      res.status(201).json({ 
+        success: true, 
+        message: 'Machine created successfully', 
+        machineId: result.insertId 
+      });
+    } catch (error) {
+      console.error('Error creating machine:', error);
+      res.status(500).json({ success: false, error: 'Failed to create machine' });
+    }
+  });
+  
+  // Update machine status with improved error handling and transaction support
+  app.put('/api/machines/:id/status', isAuthenticatedAPI, async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      const { id } = req.params;
+      const { status, reason, stopTime, stopDate } = req.body;
+      
+      // Validate required fields
+      if (!status || !['running', 'stopped'].includes(status)) {
+        return res.status(400).json({ success: false, error: 'Invalid status value' });
+      }
+      
+      // If stopping a machine, require a reason
+      if (status === 'stopped' && !reason) {
+        return res.status(400).json({ success: false, error: 'Reason is required when stopping a machine' });
+      }
+      
+      // Check if machine exists
+      const [machines] = await connection.query('SELECT * FROM machines WHERE id = ?', [id]);
+      if (machines.length === 0) {
+        return res.status(404).json({ success: false, error: 'Machine not found' });
+      }
+      
+      // Update the machine status
+      await connection.query(
+        'UPDATE machines SET status = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
+        [status, id]
+      );
+      
+      // If stopping with a reason, log the stop event
+      if (status === 'stopped' && reason) {
+        // Make sure the machine_stop_logs table exists
+        await connection.query(`
+          CREATE TABLE IF NOT EXISTS machine_stop_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            machine_id INT NOT NULL,
+            reason TEXT NOT NULL,
+            stop_time VARCHAR(50),
+            stop_date VARCHAR(50),
+            user_id INT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+          )
+        `);
+        
+        // Insert the stop log
+        await connection.query(
+          `INSERT INTO machine_stop_logs 
+           (machine_id, reason, stop_time, stop_date, user_id) 
+           VALUES (?, ?, ?, ?, ?)`,
+          [id, reason, stopTime || null, stopDate || null, req.session.user.id]
+        );
+      }
+      
+      // Commit the transaction
+      await connection.commit();
+      
+      res.json({ 
+        success: true, 
+        message: 'Machine status updated successfully'
+      });
+    } catch (error) {
+      // Rollback on error
+      await connection.rollback();
+      console.error('Error updating machine status:', error);
+      res.status(500).json({ success: false, error: 'Failed to update machine status: ' + error.message });
+    } finally {
+      connection.release();
+    }
+  });
+  
+  // Get all molds with machine info
+  app.get('/api/molds', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const [molds] = await pool.query(`
+        SELECT m.*, mc.ten_may_dap as machine_name 
+        FROM molds m
+        LEFT JOIN machines mc ON m.machine_id = mc.id
+        ORDER BY m.id
+      `);
+      res.json({ success: true, data: molds });
+    } catch (error) {
+      console.error('Error fetching molds:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch molds' });
+    }
+  });
+  
+  // Get a specific mold
+  app.get('/api/molds/:id', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [molds] = await pool.query(`
+        SELECT m.*, mc.ten_may_dap as machine_name 
+        FROM molds m
+        LEFT JOIN machines mc ON m.machine_id = mc.id
+        WHERE m.id = ?
+      `, [id]);
+      
+      if (molds.length === 0) {
+        return res.status(404).json({ success: false, error: 'Mold not found' });
+      }
+      
+      res.json({ success: true, data: molds[0] });
+    } catch (error) {
+      console.error('Error fetching mold:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch mold' });
+    }
+  });
+  
+  // Create a new mold
+  app.post('/api/molds', isAuthenticatedAPI, async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      const { maKhuon, soLuong, machineId, materialId } = req.body;
+      
+      // Validate required fields
+      if (!maKhuon || soLuong === undefined) {
+        return res.status(400).json({ success: false, error: 'Missing required fields' });
+      }
+      
+      // Check if mold code already exists
+      const [existingMolds] = await connection.query(
+        'SELECT id FROM molds WHERE ma_khuon = ?',
+        [maKhuon]
+      );
+      
+      if (existingMolds.length > 0) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'A mold with this code already exists. Mold codes must be unique.' 
+        });
+      }
+      
+      // Insert the mold
+      const [result] = await connection.query(
+        'INSERT INTO molds (ma_khuon, so_luong, machine_id, material_id) VALUES (?, ?, ?, ?)',
+        [maKhuon, soLuong, machineId || null, materialId || null]
+      );
+      
+      await connection.commit();
+      
+      res.status(201).json({ 
+        success: true, 
+        message: 'Mold created successfully', 
+        moldId: result.insertId 
+      });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error creating mold:', error);
+      res.status(500).json({ success: false, error: 'Failed to create mold: ' + error.message });
+    } finally {
+      connection.release();
+    }
+  });
+  
+  // Update a mold
+  app.put('/api/molds/:id', isAuthenticatedAPI, async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      const { id } = req.params;
+      const { maKhuon, soLuong, machineId, materialId } = req.body;
+      
+      // Validate required fields
+      if (!maKhuon || soLuong === undefined) {
+        return res.status(400).json({ success: false, error: 'Missing required fields' });
+      }
+      
+      // Check if mold exists
+      const [existingMold] = await connection.query(
+        'SELECT id FROM molds WHERE id = ?',
+        [id]
+      );
+      
+      if (existingMold.length === 0) {
+        return res.status(404).json({ success: false, error: 'Mold not found' });
+      }
+      
+      // Check for duplicate mold code
+      if (maKhuon) {
+        const [duplicateMolds] = await connection.query(
+          'SELECT id FROM molds WHERE ma_khuon = ? AND id != ?',
+          [maKhuon, id]
+        );
+        
+        if (duplicateMolds.length > 0) {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Another mold with this code already exists' 
+          });
+        }
+      }
+      
+      // Update the mold
+      await connection.query(
+        'UPDATE molds SET ma_khuon = ?, so_luong = ?, machine_id = ?, material_id = ? WHERE id = ?',
+        [maKhuon, soLuong, machineId || null, materialId || null, id]
+      );
+      
+      await connection.commit();
+      
+      res.json({ 
+        success: true, 
+        message: 'Mold updated successfully' 
+      });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error updating mold:', error);
+      res.status(500).json({ success: false, error: 'Failed to update mold: ' + error.message });
+    } finally {
+      connection.release();
+    }
+  });
+  
+  // Delete a mold
+  app.delete('/api/molds/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      await pool.query('DELETE FROM molds WHERE id = ?', [id]);
+      
+      res.json({ 
+        success: true, 
+        message: 'Mold deleted successfully' 
+      });
+    } catch (error) {
+      console.error('Error deleting mold:', error);
+      res.status(500).json({ success: false, error: 'Failed to delete mold: ' + error.message });
+    }
+  });
+  
+  // Create a batch with improved error handling and validation
+  app.post('/api/batches', isAuthenticatedAPI, async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      const { material, machine, mold } = req.body;
+      
+      // Validate required fields
+      if (!material || !machine || !mold) {
+        return res.status(400).json({ success: false, error: 'Missing required data' });
+      }
+      
+      // Ensure material has all required fields
+      if (!material.partName || !material.length || !material.width || !material.quantity || !material.supplier) {
+        return res.status(400).json({ success: false, error: 'Missing required material fields' });
+      }
+      
+      // Ensure machine has required fields
+      if (!machine.tenMayDap) {
+        return res.status(400).json({ success: false, error: 'Missing required machine fields' });
+      }
+      
+      // Ensure mold has required fields
+      if (!mold.maKhuon || mold.soLuong === undefined) {
+        return res.status(400).json({ success: false, error: 'Missing required mold fields' });
+      }
+      
+      // Validate numeric fields
+      if (isNaN(material.length) || isNaN(material.width) || 
+          isNaN(material.quantity) || isNaN(mold.soLuong)) {
+        return res.status(400).json({ success: false, error: 'Numeric fields must contain valid numbers' });
+      }
+      
+      // Check if mold code already exists
+      const [existingMolds] = await connection.query(
+        'SELECT id FROM molds WHERE ma_khuon = ?',
+        [mold.maKhuon]
+      );
+      
+      // If we found the mold, update its quantity instead of creating a new one
+      let moldExists = false;
+      let existingMoldId = null;
+      
+      if (existingMolds.length > 0) {
+        moldExists = true;
+        existingMoldId = existingMolds[0].id;
+      }
+      
+      // Generate a unique packet number (timestamp + random)
+      let packetNo = Math.floor(Date.now() / 1000) % 100000;
+      let isPacketNoUnique = false;
+      let attempts = 0;
+      
+      // Try up to 5 times to generate a unique packet number
+      while (!isPacketNoUnique && attempts < 5) {
+        const [existingPackets] = await connection.query(
+          'SELECT id FROM materials WHERE packet_no = ?',
+          [packetNo]
+        );
+        
+        if (existingPackets.length === 0) {
+          isPacketNoUnique = true;
+        } else {
+          // If duplicate, add a random offset and try again
+          packetNo = (packetNo + Math.floor(Math.random() * 1000)) % 100000;
+          attempts++;
+        }
+      }
+      
+      if (!isPacketNoUnique) {
+        return res.status(500).json({ 
+          success: false, 
+          error: 'Failed to generate a unique packet number. Please try again.' 
+        });
+      }
+  
+      // Step 1: Create material record
+      const currentDate = new Date().toLocaleDateString('en-GB');
+      const [materialResult] = await connection.query(
+        `INSERT INTO materials 
+         (packet_no, part_name, length, width, height, quantity, supplier, updated_by, last_updated) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          packetNo,
+          material.partName,
+          material.length,
+          material.width,
+          material.height || 0,
+          material.quantity,
+          material.supplier,
+          req.session.user.username,
+          currentDate
+        ]
+      );
+      
+      const materialId = materialResult.insertId;
+      
+      // Step 2: Check if machine exists, if not create it
+      let machineId;
+      const [existingMachines] = await connection.query(
+        'SELECT id FROM machines WHERE ten_may_dap = ?',
+        [machine.tenMayDap]
+      );
+      
+      if (existingMachines.length > 0) {
+        machineId = existingMachines[0].id;
+      } else {
+        const [machineResult] = await connection.query(
+          'INSERT INTO machines (ten_may_dap, status) VALUES (?, ?)',
+          [machine.tenMayDap, 'stopped']
+        );
+        machineId = machineResult.insertId;
+      }
+      
+      // Step 3: Create or update mold record
+      let moldId;
+      
+      if (moldExists) {
+        // Update existing mold
+        await connection.query(
+          'UPDATE molds SET so_luong = ?, machine_id = ?, material_id = ? WHERE id = ?',
+          [mold.soLuong, machineId, materialId, existingMoldId]
+        );
+        moldId = existingMoldId;
+      } else {
+        // Create new mold
+        const [moldResult] = await connection.query(
+          'INSERT INTO molds (ma_khuon, so_luong, machine_id, material_id) VALUES (?, ?, ?, ?)',
+          [mold.maKhuon, mold.soLuong, machineId, materialId]
+        );
+        moldId = moldResult.insertId;
+      }
+      
+      // Commit the transaction
+      await connection.commit();
+      
+      res.status(201).json({
+        success: true,
+        message: 'Batch created successfully',
+        data: {
+          packetNo,
+          materialId,
+          machineId,
+          moldId
+        }
+      });
+      
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error creating batch:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to create batch: ' + error.message
+      });
+    } finally {
+      connection.release();
+    }
+  });
+  
+  // Get machine stop logs
+  app.get('/api/machine-logs', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { machineId } = req.query;
+      
+      let query = `
+        SELECT l.*, m.ten_may_dap, u.username
+        FROM machine_stop_logs l
+        JOIN machines m ON l.machine_id = m.id
+        LEFT JOIN users u ON l.user_id = u.id
+        ORDER BY l.created_at DESC
+      `;
+      
+      let params = [];
+      
+      if (machineId) {
+        query = `
+          SELECT l.*, m.ten_may_dap, u.username
+          FROM machine_stop_logs l
+          JOIN machines m ON l.machine_id = m.id
+          LEFT JOIN users u ON l.user_id = u.id
+          WHERE l.machine_id = ?
+          ORDER BY l.created_at DESC
+        `;
+        params = [machineId];
+      }
+      
+      const [logs] = await pool.query(query, params);
+      
+      res.json({ success: true, data: logs });
+    } catch (error) {
+      console.error('Error fetching machine logs:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch machine logs' });
+    }
+  });
+  
+  // Delete a machine
+  app.delete('/api/machines/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      const { id } = req.params;
+      
+      // Check if machine exists
+      const [existingMachine] = await connection.query(
+        'SELECT id FROM machines WHERE id = ?', 
+        [id]
+      );
+      
+      if (existingMachine.length === 0) {
+        return res.status(404).json({ success: false, error: 'Machine not found' });
+      }
+      
+      // Remove machine from any molds
+      await connection.query(
+        'UPDATE molds SET machine_id = NULL WHERE machine_id = ?',
+        [id]
+      );
+      
+      // Delete the machine
+      await connection.query('DELETE FROM machines WHERE id = ?', [id]);
+      
+      await connection.commit();
+      
+      res.json({ 
+        success: true, 
+        message: 'Machine deleted successfully' 
+      });
+    } catch (error) {
+      await connection.rollback();
+      console.error('Error deleting machine:', error);
+      res.status(500).json({ success: false, error: 'Failed to delete machine: ' + error.message });
+    } finally {
+      connection.release();
+    }
+  });
 
 // ===== SERVE REACT APP =====
 
