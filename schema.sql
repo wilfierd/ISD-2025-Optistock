@@ -427,3 +427,41 @@ VALUES
 ('add', NULL, '{"packetNo": 2, "partName": "New Component", "length": 500, "width": 300, "height": 200, "quantity": 25, "supplier": "Local Supplier"}',
  'Required for new product line', 'medium', 4, 'pending'),
 ('delete', 3, '{}', 'No longer needed in production', 'low', 4, 'pending');
+
+-- NEW UPDATE
+-- Add machines table
+CREATE TABLE IF NOT EXISTS machines (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ten_may_dap VARCHAR(100) NOT NULL,
+    status ENUM('running', 'stopped') NOT NULL DEFAULT 'stopped',
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Add molds table
+CREATE TABLE IF NOT EXISTS molds (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ma_khuon VARCHAR(100) NOT NULL,
+    so_luong INT NOT NULL DEFAULT 0,
+    time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    machine_id INT,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE SET NULL
+);
+
+-- Insert sample data for machines
+INSERT INTO machines (ten_may_dap, status) VALUES
+('A7-45T', 'stopped'),
+('ZHG513-302', 'running'),
+('ZHG513-303', 'stopped'),
+('ZHG513-304', 'running'),
+('ZHG513-305', 'stopped');
+
+-- Insert sample data for molds
+INSERT INTO molds (ma_khuon, so_luong, machine_id) VALUES
+('ZHG513-302-V1', 10, 1),
+('C2021', 20, 2),
+('C2028', 30, 3),
+('C2022', 40, 4),
+('C2028', 10, 5);
+
+-- Bây giờ đang thiếu bảng lô hàng, tạo thêm bảng này gồm các trường part_name, chất liệu, dày, rộng + bảng machines (id, name) + bảng molds (id, name, quanity)
+-- Từ bảng materials, lưu ý bảng materials chưa có chất liệu dày
