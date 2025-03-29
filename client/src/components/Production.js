@@ -2,53 +2,47 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   useMachines, 
-  useCreateMachine, 
-  useUpdateMachineStatus, 
-  useDeleteMachine 
+  useUpdateMachineStatus
 } from '../hooks/useMachines';
-import {
-  useMolds,
-  useCreateMold,
-  useUpdateMold,
-  useDeleteMold
-} from '../hooks/useMolds';
+import { useMolds } from '../hooks/useMolds';
 import { useMaterials } from '../hooks/useMaterials';
 import apiService from '../services/api';
 import { toast } from 'react-toastify';
 
 function Production({ user }) {
+  const queryClient = useQueryClient();
+  
   // State for batch creation modal
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Material form state with auto-fill functionality
   const [materialFormData, setMaterialFormData] = useState({
+    id: '',
     partName: '',
     length: '',
     width: '',
+    height: '0',
     quantity: '',
     supplier: ''
   });
+  
+  // Machine and mold form state
   const [machineFormData, setMachineFormData] = useState({
+    id: '',
     tenMayDap: '',
     maKhuon: '',
     soLuong: '',
     thanhPham: ''
   });
-  const [selectedMoldData, setSelectedMoldData] = useState(null);
   
-  // State for machine modals
-  const [selectedMachineId, setSelectedMachineId] = useState(null);
-  
-  // State for mold modals
-  const [showMoldModal, setShowMoldModal] = useState(false);
-  const [moldModalMode, setMoldModalMode] = useState('add'); // 'add' or 'edit'
-  const [selectedMoldId, setSelectedMoldId] = useState(null);
-  const [moldFormData, setMoldFormData] = useState({
-    maKhuon: '',
-    soLuong: 0,
-    machineId: ''
-  });
+  // Selected data references
+  const [selectedMaterial, setSelectedMaterial] = useState(null);
+  const [selectedMachine, setSelectedMachine] = useState(null);
+  const [selectedMold, setSelectedMold] = useState(null);
   
   // State for stop reason modal
   const [showStopReasonModal, setShowStopReasonModal] = useState(false);
@@ -57,16 +51,36 @@ function Production({ user }) {
   const [stopTime, setStopTime] = useState('');
   const [stopDate, setStopDate] = useState('');
 
+  // State for batch management
+  const [batches, setBatches] = useState([]);
+  const [isLoadingBatches, setIsLoadingBatches] = useState(false);
+
   // React Query hooks
   const { data: machines = [], isLoading: isLoadingMachines } = useMachines();
   const { data: molds = [], isLoading: isLoadingMolds } = useMolds();
   const { data: materials = [], isLoading: isLoadingMaterials } = useMaterials();
   const updateMachineStatus = useUpdateMachineStatus();
-  const deleteMachine = useDeleteMachine();
-  const createMold = useCreateMold();
-  const updateMold = useUpdateMold();
-  const deleteMold = useDeleteMold();
   const logoutMutation = useLogout();
+
+  // Load batches on component mount
+  useEffect(() => {
+    const fetchBatches = async () => {
+      setIsLoadingBatches(true);
+      try {
+        const response = await apiService.batches.getAll();
+        if (response.data.success) {
+          setBatches(response.data.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching batches:', error);
+        toast.error('Không thể tải dữ liệu lô sản xuất');
+      } finally {
+        setIsLoadingBatches(false);
+      }
+    };
+    
+    fetchBatches();
+  }, []);
 
   // Handle logout
   const handleLogout = () => {
@@ -85,23 +99,27 @@ function Production({ user }) {
 
   // Handle starting a machine
   const handleStartMachine = (id) => {
-    updateMachineStatus.mutate({ id, status: 'running' });
+    updateMachineStatus.mutate({ 
+      id: id, 
+      data: { status: 'running' }
+    });
   };
 
   // Handle stop reason confirmation
   const handleConfirmStop = () => {
     if (!stopReason.trim()) {
-      alert("Vui lòng nhập lý do dừng máy");
+      toast.error("Vui lòng nhập lý do dừng máy");
       return;
     }
 
-    // Stop the machine with the provided reason
     updateMachineStatus.mutate({ 
       id: machineToStop.id, 
-      status: 'stopped',
-      reason: stopReason,
-      stopTime,
-      stopDate
+      data: {
+        status: 'stopped',
+        reason: stopReason,
+        stopTime,
+        stopDate
+      }
     }, {
       onSuccess: () => {
         // Reset the form and close the modal
@@ -112,7 +130,7 @@ function Production({ user }) {
     });
   };
 
-  // Handle stop reason cancel
+  // Handle cancel stop
   const handleCancelStop = () => {
     setStopReason('');
     setMachineToStop(null);
@@ -122,59 +140,109 @@ function Production({ user }) {
   // Handle opening the batch creation modal
   const handleAddBatchClick = () => {
     setCurrentStep(1);
+    
+    // Reset all form data
     setMaterialFormData({
+      id: '',
       partName: '',
       length: '',
       width: '',
+      height: '0',
       quantity: '',
       supplier: ''
     });
+    
     setMachineFormData({
+      id: '',
       tenMayDap: '',
       maKhuon: '',
       soLuong: '',
       thanhPham: ''
     });
-    setSelectedMoldData(null);
+    
+    setSelectedMaterial(null);
+    setSelectedMachine(null);
+    setSelectedMold(null);
+    
     setShowBatchModal(true);
   };
 
-  // Handle material form input changes
+  // Handle material form input changes with auto-fill
   const handleMaterialInputChange = (e) => {
     const { id, value } = e.target;
+    
+    // Update the form data
     setMaterialFormData(prev => ({
       ...prev,
       [id]: value
     }));
+    
+    // If part_name is being changed, look for matching material to auto-fill
+    if (id === 'partName') {
+      const matchingMaterial = materials.find(m => m.part_name === value);
+      
+      if (matchingMaterial) {
+        // Auto-fill material data
+        setMaterialFormData({
+          id: matchingMaterial.id,
+          partName: matchingMaterial.part_name,
+          length: matchingMaterial.length,
+          width: matchingMaterial.width,
+          height: matchingMaterial.height || '0',
+          quantity: matchingMaterial.quantity,
+          supplier: matchingMaterial.supplier
+        });
+        
+        setSelectedMaterial(matchingMaterial);
+      } else {
+        // Reset the selected material reference if no match
+        setSelectedMaterial(null);
+      }
+    }
   };
 
-  // Handle machine form input changes
+  // Handle machine form input changes with auto-fill
   const handleMachineInputChange = (e) => {
     const { id, value } = e.target;
     
-    if (id === 'maKhuon') {
-      // Find selected mold data
-      const selectedMold = molds.find(mold => mold.ma_khuon === value);
-      if (selectedMold) {
-        setSelectedMoldData(selectedMold);
-        // Auto-fill the quantity field with the mold's quantity
+    // Update the form data
+    setMachineFormData(prev => ({
+      ...prev,
+      [id]: value
+    }));
+    
+    // If machine name is being changed, look for matching machine
+    if (id === 'tenMayDap') {
+      const matchingMachine = machines.find(m => m.ten_may_dap === value);
+      
+      if (matchingMachine) {
         setMachineFormData(prev => ({
           ...prev,
-          [id]: value,
-          soLuong: selectedMold.so_luong.toString()
+          id: matchingMachine.id,
+          tenMayDap: matchingMachine.ten_may_dap
         }));
+        
+        setSelectedMachine(matchingMachine);
       } else {
-        setSelectedMoldData(null);
+        setSelectedMachine(null);
+      }
+    }
+    
+    // If mold code is being changed, look for matching mold
+    if (id === 'maKhuon') {
+      const matchingMold = molds.find(m => m.ma_khuon === value);
+      
+      if (matchingMold) {
         setMachineFormData(prev => ({
           ...prev,
-          [id]: value
+          maKhuon: matchingMold.ma_khuon,
+          soLuong: matchingMold.so_luong.toString()
         }));
+        
+        setSelectedMold(matchingMold);
+      } else {
+        setSelectedMold(null);
       }
-    } else {
-      setMachineFormData(prev => ({
-        ...prev,
-        [id]: value
-      }));
     }
   };
 
@@ -203,114 +271,39 @@ function Production({ user }) {
     }
 
     try {
-      // Step 1: Create material
-      const materialResponse = await apiService.materials.create({
-        partName: materialFormData.partName,
-        length: parseInt(materialFormData.length),
-        width: parseInt(materialFormData.width),
-        quantity: parseInt(materialFormData.quantity),
-        supplier: materialFormData.supplier
-      });
-
-      if (!materialResponse.data.success) {
-        throw new Error('Failed to create material');
+      // Prepare the batch data using IDs of existing records
+      const batchData = {
+        materialId: selectedMaterial?.id,
+        machineId: selectedMachine?.id,
+        moldId: selectedMold?.id,
+        expectedOutput: parseInt(machineFormData.thanhPham || machineFormData.soLuong),
+        notes: `Batch created with material: ${materialFormData.partName}, machine: ${machineFormData.tenMayDap}, mold: ${machineFormData.maKhuon}`
+      };
+      
+      // Handle case where material, machine, or mold doesn't exist in database yet
+      if (!batchData.materialId || !batchData.machineId || !batchData.moldId) {
+        toast.error('Vui lòng chọn nguyên vật liệu, máy dập và khuôn đã có trong hệ thống');
+        return;
       }
 
-      // Step 2: Create or find machine
-      let machineId;
-      const existingMachine = machines.find(m => m.ten_may_dap === machineFormData.tenMayDap);
+      // Create the batch
+      const response = await apiService.batches.create(batchData);
       
-      if (existingMachine) {
-        machineId = existingMachine.id;
-      } else {
-        const machineResponse = await apiService.machines.create({
-          tenMayDap: machineFormData.tenMayDap,
-          status: 'stopped'
-        });
+      if (response.data.success) {
+        toast.success('Tạo lô sản xuất thành công');
+        setShowBatchModal(false);
         
-        if (!machineResponse.data.success) {
-          throw new Error('Failed to create machine');
+        // Refresh the batches list
+        const batchesResponse = await apiService.batches.getAll();
+        if (batchesResponse.data.success) {
+          setBatches(batchesResponse.data.data || []);
         }
-        
-        machineId = machineResponse.data.machineId;
+      } else {
+        throw new Error(response.data.error || 'Không thể tạo lô sản xuất');
       }
-
-      // Step 3: Create mold
-      await apiService.molds.create({
-        maKhuon: machineFormData.maKhuon,
-        soLuong: parseInt(machineFormData.soLuong),
-        machineId
-      });
-
-      // Success - close modal and refresh data
-      toast.success('Đã tạo lô mới thành công');
-      setShowBatchModal(false);
-      
-      // Refresh queries
-      // Since we're using React Query, this will happen automatically
-      // But we can force a refetch if needed
-      
     } catch (error) {
       console.error('Error creating batch:', error);
-      toast.error(error.message || 'Failed to create batch');
-    }
-  };
-
-  // Handle add mold click
-  const handleAddMoldClick = () => {
-    setMoldFormData({
-      maKhuon: '',
-      soLuong: 0,
-      machineId: ''
-    });
-    setMoldModalMode('add');
-    setShowMoldModal(true);
-  };
-
-  // Handle edit mold click
-  const handleEditMoldClick = (mold) => {
-    setSelectedMoldId(mold.id);
-    setMoldFormData({
-      maKhuon: mold.ma_khuon,
-      soLuong: mold.so_luong,
-      machineId: mold.machine_id || ''
-    });
-    setMoldModalMode('edit');
-    setShowMoldModal(true);
-  };
-
-  // Handle mold form input changes
-  const handleMoldInputChange = (e) => {
-    const { id, value } = e.target;
-    setMoldFormData(prev => ({
-      ...prev,
-      [id]: value
-    }));
-  };
-
-  // Handle mold form submission
-  const handleSaveMoldClick = () => {
-    const moldData = {
-      maKhuon: moldFormData.maKhuon,
-      soLuong: parseInt(moldFormData.soLuong),
-      machineId: moldFormData.machineId ? parseInt(moldFormData.machineId) : null
-    };
-
-    if (moldModalMode === 'add') {
-      createMold.mutate(moldData, {
-        onSuccess: () => {
-          setShowMoldModal(false);
-        }
-      });
-    } else {
-      updateMold.mutate({
-        id: selectedMoldId,
-        data: moldData
-      }, {
-        onSuccess: () => {
-          setShowMoldModal(false);
-        }
-      });
+      toast.error(error.message || 'Không thể tạo lô sản xuất');
     }
   };
 
@@ -328,7 +321,7 @@ function Production({ user }) {
                 <input 
                   type="text" 
                   className="form-control" 
-                  placeholder="Tìm sản phẩm theo tên" 
+                  placeholder="Tìm lô sản xuất theo tên sản phẩm" 
                   style={{ paddingLeft: '40px' }}
                 />
                 <span className="position-absolute" style={{ left: '15px', top: '10px' }}>
@@ -358,7 +351,7 @@ function Production({ user }) {
                 <a className="nav-link active" href="#machines">Danh sách máy dập</a>
               </li>
               <li className="nav-item">
-                <a className="nav-link" href="#molds">Danh sách mạ</a>
+                <a className="nav-link" href="#batches">Danh sách lô sản xuất</a>
               </li>
             </ul>
           </div>
@@ -447,66 +440,84 @@ function Production({ user }) {
           </div>
         </div>
         
-        {/* Molds Section - Hidden by default */}
-        <div className="row" style={{ display: 'none' }}>
+        {/* Batches Section */}
+        <div className="row mb-4">
           <div className="col-md-12">
             <div className="card shadow">
-              <div className="card-header bg-info text-white d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">Danh sách mã khuôn</h5>
-                <button 
-                  className="btn btn-sm btn-light" 
-                  onClick={handleAddMoldClick}
-                  disabled={createMold.isPending}
-                >
-                  {createMold.isPending ? 'Adding...' : 'Thêm mã khuôn mới'}
-                </button>
+              <div className="card-header bg-light">
+                <h5 className="mb-0">Danh sách lô sản xuất</h5>
               </div>
-              <div className="card-body">
-                {isLoadingMolds ? (
+              <div className="card-body p-0">
+                {isLoadingBatches ? (
                   <div className="text-center my-3">
-                    <div className="spinner-border text-info" role="status">
+                    <div className="spinner-border text-primary" role="status">
                       <span className="visually-hidden">Loading...</span>
                     </div>
                   </div>
                 ) : (
                   <div className="table-responsive">
-                    <table className="table table-hover">
-                      <thead>
+                    <table className="table table-hover mb-0">
+                      <thead className="bg-light">
                         <tr>
+                          <th>ID</th>
+                          <th>Nguyên vật liệu</th>
+                          <th>Kích thước (D×R×C)</th>
+                          <th>Máy dập</th>
                           <th>Mã khuôn</th>
                           <th>Số lượng</th>
-                          <th>Thời gian</th>
-                          <th>Máy sử dụng</th>
+                          <th>Dự kiến</th>
+                          <th>Trạng thái</th>
+                          <th>Ngày tạo</th>
                           <th>Thao tác</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {molds.map(mold => (
-                          <tr key={mold.id}>
-                            <td>{mold.ma_khuon}</td>
-                            <td>{mold.so_luong}</td>
-                            <td>{new Date(mold.time).toLocaleString()}</td>
-                            <td>{mold.machine_name || '-'}</td>
-                            <td>
-                              <button 
-                                className="btn btn-sm btn-secondary"
-                                onClick={() => handleEditMoldClick(mold)}
-                              >
-                                <i className="fas fa-edit"></i>
-                              </button>
-                              <button 
-                                className="btn btn-sm btn-danger ms-2"
-                                onClick={() => deleteMold.mutate(mold.id)}
-                                disabled={deleteMold.isPending}
-                              >
-                                <i className="fas fa-trash"></i>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                        {molds.length === 0 && (
+                        {batches.map(batch => {
+                          // Find related data
+                          const material = materials.find(m => m.id === batch.material_id);
+                          const machine = machines.find(m => m.id === batch.machine_id);
+                          const mold = molds.find(m => m.id === batch.mold_id);
+                          
+                          return (
+                            <tr key={batch.id}>
+                              <td>{batch.id}</td>
+                              <td>{material?.part_name || '-'}</td>
+                              <td>
+                                {material ? `${material.length}×${material.width}×${material.height}` : '-'}
+                              </td>
+                              <td>{machine?.ten_may_dap || '-'}</td>
+                              <td>{mold?.ma_khuon || '-'}</td>
+                              <td>{mold?.so_luong || '-'}</td>
+                              <td>{batch.expected_output || '-'}</td>
+                              <td>
+                                <span className={`badge bg-${
+                                  batch.status === 'planned' ? 'secondary' :
+                                  batch.status === 'in_progress' ? 'primary' :
+                                  batch.status === 'completed' ? 'success' : 'danger'
+                                }`}>
+                                  {batch.status === 'planned' ? 'Lên kế hoạch' :
+                                   batch.status === 'in_progress' ? 'Đang thực hiện' :
+                                   batch.status === 'completed' ? 'Hoàn thành' : 'Đã hủy'}
+                                </span>
+                              </td>
+                              <td>{new Date(batch.created_at).toLocaleDateString()}</td>
+                              <td>
+                                <button className="btn btn-sm btn-info me-1">
+                                  <i className="fas fa-eye"></i>
+                                </button>
+                                <button className="btn btn-sm btn-primary me-1">
+                                  <i className="fas fa-edit"></i>
+                                </button>
+                                <button className="btn btn-sm btn-danger">
+                                  <i className="fas fa-trash"></i>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {batches.length === 0 && (
                           <tr>
-                            <td colSpan="5" className="text-center py-3">Không tìm thấy mã khuôn nào!</td>
+                            <td colSpan="10" className="text-center py-3">Chưa có lô sản xuất nào được tạo.</td>
                           </tr>
                         )}
                       </tbody>
@@ -553,7 +564,7 @@ function Production({ user }) {
                   {currentStep === 1 && (
                     <div>
                       <h5 className="mb-3">Thông tin NVL</h5>
-                      <p className="text-muted">Nhập thông tin NVL để tạo lô mới</p>
+                      <p className="text-muted">Chọn nguyên vật liệu có sẵn hoặc nhập thông tin của nguyên vật liệu mới</p>
                       
                       <div className="mb-3">
                         <label htmlFor="partName" className="form-label">part_name</label>
@@ -563,8 +574,17 @@ function Production({ user }) {
                           id="partName" 
                           value={materialFormData.partName}
                           onChange={handleMaterialInputChange}
+                          list="partNameOptions"
                           required 
                         />
+                        <datalist id="partNameOptions">
+                          {materials.map(material => (
+                            <option key={material.id} value={material.part_name} />
+                          ))}
+                        </datalist>
+                        <small className="text-muted">
+                          {selectedMaterial ? 'Nguyên vật liệu có sẵn trong hệ thống' : 'Nhập tên để tìm kiếm nguyên vật liệu có sẵn'}
+                        </small>
                       </div>
                       
                       <div className="row mb-3">
@@ -577,6 +597,7 @@ function Production({ user }) {
                               id="length" 
                               value={materialFormData.length}
                               onChange={handleMaterialInputChange}
+                              readOnly={!!selectedMaterial}
                               required 
                             />
                             <span className="input-group-text">mm</span>
@@ -591,10 +612,26 @@ function Production({ user }) {
                               id="width" 
                               value={materialFormData.width}
                               onChange={handleMaterialInputChange}
+                              readOnly={!!selectedMaterial}
                               required 
                             />
                             <span className="input-group-text">mm</span>
                           </div>
+                        </div>
+                      </div>
+                      
+                      <div className="mb-3">
+                        <label htmlFor="height" className="form-label">Cao:</label>
+                        <div className="input-group">
+                          <input 
+                            type="number" 
+                            className="form-control" 
+                            id="height" 
+                            value={materialFormData.height}
+                            onChange={handleMaterialInputChange}
+                            readOnly={!!selectedMaterial}
+                          />
+                          <span className="input-group-text">mm</span>
                         </div>
                       </div>
                       
@@ -606,6 +643,7 @@ function Production({ user }) {
                           id="quantity" 
                           value={materialFormData.quantity}
                           onChange={handleMaterialInputChange}
+                          readOnly={!!selectedMaterial}
                           required 
                         />
                       </div>
@@ -618,6 +656,7 @@ function Production({ user }) {
                           id="supplier" 
                           value={materialFormData.supplier}
                           onChange={handleMaterialInputChange}
+                          readOnly={!!selectedMaterial}
                           required 
                         />
                       </div>
@@ -637,42 +676,50 @@ function Production({ user }) {
                   {currentStep === 2 && (
                     <div>
                       <h5 className="mb-3">Thông tin máy dập</h5>
-                      <p className="text-muted">Nhập thông tin máy dập để tạo lô mới</p>
+                      <p className="text-muted">Chọn máy dập và khuôn có sẵn để tạo lô sản xuất</p>
                       
+                      {/* Machine selection with autocomplete */}
                       <div className="mb-3">
                         <label htmlFor="tenMayDap" className="form-label">Tên máy dập:</label>
-                        <select 
-                          className="form-select" 
+                        <input 
+                          type="text" 
+                          className="form-control" 
                           id="tenMayDap" 
                           value={machineFormData.tenMayDap}
                           onChange={handleMachineInputChange}
-                          required
-                        >
-                          <option value="">-- Chọn máy dập --</option>
+                          list="machineOptions"
+                          required 
+                        />
+                        <datalist id="machineOptions">
                           {machines.map(machine => (
-                            <option key={machine.id} value={machine.ten_may_dap}>
-                              {machine.ten_may_dap}
-                            </option>
+                            <option key={machine.id} value={machine.ten_may_dap} />
                           ))}
-                        </select>
+                        </datalist>
+                        <small className="text-muted">
+                          {selectedMachine ? 'Máy dập có sẵn trong hệ thống' : 'Nhập tên để tìm kiếm máy dập có sẵn'}
+                        </small>
                       </div>
                       
+                      {/* Mold selection with autocomplete */}
                       <div className="mb-3">
                         <label htmlFor="maKhuon" className="form-label">Mã khuôn:</label>
-                        <select 
-                          className="form-select" 
+                        <input 
+                          type="text" 
+                          className="form-control" 
                           id="maKhuon" 
                           value={machineFormData.maKhuon}
                           onChange={handleMachineInputChange}
-                          required
-                        >
-                          <option value="">-- Chọn mã khuôn --</option>
+                          list="moldOptions"
+                          required 
+                        />
+                        <datalist id="moldOptions">
                           {molds.map(mold => (
-                            <option key={mold.id} value={mold.ma_khuon}>
-                              {mold.ma_khuon}
-                            </option>
+                            <option key={mold.id} value={mold.ma_khuon} />
                           ))}
-                        </select>
+                        </datalist>
+                        <small className="text-muted">
+                          {selectedMold ? 'Khuôn có sẵn trong hệ thống' : 'Nhập mã để tìm kiếm khuôn có sẵn'}
+                        </small>
                       </div>
                       
                       <div className="mb-3">
@@ -683,10 +730,10 @@ function Production({ user }) {
                           id="soLuong" 
                           value={machineFormData.soLuong}
                           onChange={handleMachineInputChange}
-                          readOnly={selectedMoldData !== null}
+                          readOnly={!!selectedMold}
                           required 
                         />
-                        {selectedMoldData && (
+                        {selectedMold && (
                           <small className="text-muted">
                             Số lượng được cập nhật tự động từ mã khuôn đã chọn.
                           </small>
@@ -701,8 +748,10 @@ function Production({ user }) {
                           id="thanhPham" 
                           value={machineFormData.thanhPham}
                           onChange={handleMachineInputChange}
-                          required 
                         />
+                        <small className="text-muted">
+                          Để trống sẽ sử dụng số lượng từ khuôn.
+                        </small>
                       </div>
                       
                       <div className="text-end mt-4">
@@ -718,7 +767,7 @@ function Production({ user }) {
                           className="btn btn-primary" 
                           onClick={handleCreateBatch}
                         >
-                          Xong
+                          Tạo lô
                         </button>
                       </div>
                     </div>
