@@ -1,4 +1,4 @@
-// client/src/components/Navbar.js with updated role-based access control
+// client/src/components/Navbar.js
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useNotifications, useMarkNotificationsAsRead } from '../hooks/useNotifications';
@@ -10,7 +10,7 @@ function Navbar({ user, onLogout }) {
   const isActive = (path) => location.pathname === path;
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [showLogoutDropdown, setshowLogoutDropdown] = useState(false);
   
   const { data: notifications = [] } = useNotifications();
   const markAsRead = useMarkNotificationsAsRead();
@@ -48,17 +48,6 @@ function Navbar({ user, onLogout }) {
           >
             {t('warehouse')}
           </Link>
-          
-          {/* Show Warehouse Check link only for admin and manager users */}
-          {hasAdminOrManagerAccess(user) && (
-            <Link 
-              className={`navbar-brand ${isActive('/warehouse-check') ? 'fw-bold' : ''}`} 
-              to="/warehouse-check"
-            >
-              {t("Kiểm kho")}
-            </Link>
-          )}
-          
           {/* Show Employees link for admin and manager users */}
           {hasAdminOrManagerAccess(user) && (
             <Link 
@@ -68,7 +57,13 @@ function Navbar({ user, onLogout }) {
               {t('employees')}
             </Link>
           )}
-          
+          {/* Production link for all users */}
+          <Link 
+            className={`navbar-brand ${isActive('/production') ? 'fw-bold' : ''}`} 
+            to="/production"
+          >
+            {t('production') || 'Sản xuất'}
+          </Link>
           {/* Show Requests link to both admins and managers */}
           {hasAdminOrManagerAccess(user) && (
             <Link 
@@ -170,12 +165,11 @@ function Navbar({ user, onLogout }) {
           </div>
           
           <span className="me-3 text-white">Hi, {user.username}</span>
-          
-          {/* User Avatar with Dropdown Logout */}
+
           <div className="position-relative me-3">
             <button 
               className="btn btn-link text-white" 
-              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
+              onClick={() => setshowLogoutDropdown(!showLogoutDropdown)}
             >
               <div className="avatar">{user.username.charAt(0).toUpperCase()}</div>
             </button>
