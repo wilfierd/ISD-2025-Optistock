@@ -100,6 +100,13 @@ const apiService = {
     update: (id, data) => api.put(`/molds/${id}`, data),
     delete: (id) => api.delete(`/molds/${id}`),
 },
+  batches: {
+    getAll: () => api.get('/batches'),
+    getById: (id) => api.get(`/batches/${id}`),
+    create: (data) => api.post('/batches', data),
+    updateStatus: (id, data) => api.put(`/batches/${id}/status`, data),
+    delete: (id) => api.delete(`/batches/${id}`),
+  },
 };
 
 export default apiService;
