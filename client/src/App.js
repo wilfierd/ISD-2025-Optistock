@@ -28,6 +28,7 @@ function App() {
         <Route path="/materials" element={user ? <Materials user={user} /> : <Navigate to="/login" />} />
         <Route path="/material/:id" element={user ? <MaterialDetail user={user} /> : <Navigate to="/login" />} />
         <Route path="/warehouse-check" element={user ? <WarehouseStockCheck user={user} /> : <Navigate to="/login" />} />
+        <Route path="/production" element={user ? <Production user={user} /> : <Navigate to="/login" />} /> {/* New route */}
         
         {/* Allow both admin and manager access to employees route */}
         <Route 
