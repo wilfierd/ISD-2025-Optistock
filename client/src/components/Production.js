@@ -50,6 +50,9 @@ function Production({ user }) {
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   
+  // Production view filter - Add a filter state for production view
+  const [productionFilter, setProductionFilter] = useState('active'); // 'active', 'all'
+  
   // React Query hooks
   const { data: machines = [], isLoading: isLoadingMachines } = useMachines();
   const { data: molds = [], isLoading: isLoadingMolds } = useMolds();
@@ -88,6 +91,11 @@ function Production({ user }) {
   // Handle tab changes
   const handleTabChange = (tab) => {
     setActiveTab(tab);
+  };
+
+  // Handle filter changes for production view
+  const handleFilterChange = (filter) => {
+    setProductionFilter(filter);
   };
 
   // Handle opening the batch creation modal
@@ -269,7 +277,7 @@ function Production({ user }) {
   // Handle stopping a machine/batch
   const handleStopBatch = async (batch) => {
     try {
-      // Update batch status to stopped
+      // Update batch status to completed
       await apiService.batches.updateStatus(batch.id, { 
         status: 'completed',
         end_date: new Date().toISOString()
@@ -318,6 +326,16 @@ function Production({ user }) {
   const handleViewDetails = (batch) => {
     setSelectedBatch(batch);
     setShowDetailModal(true);
+  };
+
+  // Filter batches for production tab based on filter state
+  const getFilteredProductionBatches = () => {
+    if (productionFilter === 'active') {
+      return batches.filter(batch => batch.status === 'in_progress' || batch.status === 'planned');
+    } else {
+      // Show all batches including completed ones
+      return batches;
+    }
   };
 
   return (
@@ -393,6 +411,24 @@ function Production({ user }) {
           <div className="row mb-4">
             <div className="col-md-12">
               <div className="card shadow">
+                <div className="card-header bg-light d-flex justify-content-between align-items-center">
+                  <h5 className="mb-0">Lô sản xuất đang hoạt động</h5>
+                  {/* Add filter options */}
+                  <div className="btn-group">
+                    <button 
+                      className={`btn btn-sm ${productionFilter === 'active' ? 'btn-primary' : 'btn-outline-primary'}`}
+                      onClick={() => handleFilterChange('active')}
+                    >
+                      Đang hoạt động
+                    </button>
+                    <button 
+                      className={`btn btn-sm ${productionFilter === 'all' ? 'btn-primary' : 'btn-outline-primary'}`}
+                      onClick={() => handleFilterChange('all')}
+                    >
+                      Tất cả
+                    </button>
+                  </div>
+                </div>
                 <div className="card-body p-0">
                   {isLoadingBatches ? (
                     <div className="text-center my-3">
@@ -414,24 +450,24 @@ function Production({ user }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {batches
-                            .filter(batch => batch.status === 'in_progress' || batch.status === 'planned')
+                          {getFilteredProductionBatches()
                             .map(batch => {
                               // Find related data using foreign keys
                               const machine = machines.find(m => m.id === batch.machine_id);
                               const mold = molds.find(m => m.id === batch.mold_id);
                               const isRunning = batch.status === 'in_progress';
+                              const isCompleted = batch.status === 'completed';
                               
                               return (
                                 <tr key={batch.id}>
                                   <td>
                                     <div className="d-flex align-items-center">
                                       <span 
-                                        className={`status-indicator ${isRunning ? 'bg-success' : 'bg-secondary'}`}
+                                        className={`status-indicator ${isRunning ? 'bg-success' : isCompleted ? 'bg-danger' : 'bg-secondary'}`}
                                         style={{ width: '12px', height: '12px', borderRadius: '50%', marginRight: '8px', display: 'inline-block' }}
                                       ></span>
                                       <span>
-                                        {isRunning ? 'Đang chạy' : 'Đã dừng'}
+                                        {isRunning ? 'Đang chạy' : isCompleted ? 'Đã dừng' : 'Chưa bắt đầu'}
                                       </span>
                                     </div>
                                   </td>
@@ -443,26 +479,45 @@ function Production({ user }) {
                                   </td>
                                   <td>
                                     {/* Show both buttons but disable one based on status */}
-                                    <button 
-                                      className="btn btn-sm btn-danger me-2"
-                                      onClick={() => handleStopBatch(batch)}
-                                      disabled={!isRunning}
-                                    >
-                                      Dừng
-                                    </button>
-                                    <button 
-                                      className="btn btn-sm btn-primary"
-                                      onClick={() => handleStartBatch(batch)}
-                                      disabled={isRunning}
-                                    >
-                                      Tiếp tục
-                                    </button>
+                                    {isCompleted ? (
+                                      <>
+                                        <button 
+                                          className="btn btn-sm btn-success me-2"
+                                          onClick={() => handleStartBatch(batch)}
+                                        >
+                                          Tiếp tục
+                                        </button>
+                                        <button 
+                                          className="btn btn-sm btn-danger"
+                                          onClick={() => handleDeleteBatch(batch.id)}
+                                        >
+                                          Xóa
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button 
+                                          className="btn btn-sm btn-danger me-2"
+                                          onClick={() => handleStopBatch(batch)}
+                                          disabled={!isRunning}
+                                        >
+                                          Dừng
+                                        </button>
+                                        <button 
+                                          className="btn btn-sm btn-primary"
+                                          onClick={() => handleStartBatch(batch)}
+                                          disabled={isRunning}
+                                        >
+                                          {batch.status === 'planned' ? 'Bắt đầu' : 'Tiếp tục'}
+                                        </button>
+                                      </>
+                                    )}
                                   </td>
                                 </tr>
                               );
                             })
                           }
-                          {batches.filter(batch => batch.status === 'in_progress' || batch.status === 'planned').length === 0 && (
+                          {getFilteredProductionBatches().length === 0 && (
                             <tr>
                               <td colSpan="6" className="text-center py-3">Không có lô sản xuất nào đang hoạt động!</td>
                             </tr>
@@ -919,6 +974,18 @@ function Production({ user }) {
                     }}
                   >
                     Hoàn thành sản xuất
+                  </button>
+                )}
+                {selectedBatch.status === 'completed' && (
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={() => {
+                      handleStartBatch(selectedBatch);
+                      setShowDetailModal(false);
+                    }}
+                  >
+                    Tiếp tục sản xuất
                   </button>
                 )}
               </div>
