@@ -79,6 +79,27 @@ const apiService = {
     getAll: () => api.get('/notifications'),
     markAsRead: (notificationIds) => api.put('/notifications/read', { notificationIds }),
   },
+
+  // NEW UPDATE
+  // Add these services to client/src/services/api.js in the apiService object
+
+// Machine endpoints
+  machines: {
+    getAll: () => api.get('/machines'),
+    getById: (id) => api.get(`/machines/${id}`),
+    create: (data) => api.post('/machines', data),
+    updateStatus: (id, status) => api.put(`/machines/${id}/status`, { status }),
+    delete: (id) => api.delete(`/machines/${id}`),
+  },
+  
+  // Mold endpoints
+  molds: {
+    getAll: () => api.get('/molds'),
+    getById: (id) => api.get(`/molds/${id}`),
+    create: (data) => api.post('/molds', data),
+    update: (id, data) => api.put(`/molds/${id}`, data),
+    delete: (id) => api.delete(`/molds/${id}`),
+},
 };
 
 export default apiService;
