@@ -465,3 +465,22 @@ INSERT INTO molds (ma_khuon, so_luong, machine_id) VALUES
 
 -- Bây giờ đang thiếu bảng lô hàng, tạo thêm bảng này gồm các trường part_name, chất liệu, dày, rộng + bảng machines (id, name) + bảng molds (id, name, quanity)
 -- Từ bảng materials, lưu ý bảng materials chưa có chất liệu dày
+
+CREATE TABLE IF NOT EXISTS batches (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    material_id INT,
+    machine_id INT,
+    mold_id INT,
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('planned', 'in_progress', 'completed', 'cancelled') DEFAULT 'planned',
+    expected_output INT,
+    actual_output INT DEFAULT 0,
+    notes TEXT,
+    start_date DATETIME,
+    end_date DATETIME,
+    FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE SET NULL,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE SET NULL,
+    FOREIGN KEY (mold_id) REFERENCES molds(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
