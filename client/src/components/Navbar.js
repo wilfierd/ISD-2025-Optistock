@@ -106,6 +106,13 @@ function Navbar({ user, onLogout }) {
           >
             {t('dashboard')}
           </Link>
+          {/* // Add this link inside the navbar links section in client/src/components/Navbar.js */}
+          <Link 
+            className={`navbar-brand ${isActive('/batch-grouping') ? 'fw-bold' : ''}`} 
+            to="/batch-grouping"
+          >
+            {t('Nhóm lô')}
+          </Link>
           <Link 
             className={`navbar-brand ${isActive('/materials') ? 'fw-bold' : ''}`} 
             to="/materials"
@@ -114,14 +121,13 @@ function Navbar({ user, onLogout }) {
           </Link>
           
           {/* Show Warehouse Check link only for admin and manager users */}
-          {hasAdminOrManagerAccess(user) && (
+
             <Link 
               className={`navbar-brand ${isActive('/warehouse-check') ? 'fw-bold' : ''}`} 
               to="/warehouse-check"
             >
               {t("Kiểm kho")}
             </Link>
-          )}
           
           {/* Show Employees link for admin and manager users */}
           {hasAdminOrManagerAccess(user) && (

@@ -11,6 +11,7 @@ import WarehouseStockCheck from './components/WarehouseStockCheck';
 import { useAuthStatus } from './hooks/useAuth';
 import { hasAdminOrManagerAccess } from './utils/rolePermissions';
 import { LanguageProvider } from './contexts/LanguageContext';
+import BatchGrouping from './components/BatchGrouping';
 import Notifications from './components/Notifications'; // Import thêm component Notifications
 
 function App() {
@@ -45,10 +46,13 @@ function App() {
         {/* Allow only admin and manager access to warehouse check route */}
         <Route 
           path="/warehouse-check" 
-          element={user && hasAdminOrManagerAccess(user) ? <WarehouseStockCheck user={user} /> : <Navigate to="/dashboard" />} 
-        />
-        {/* Thêm route mới cho trang Notifications - tất cả người dùng đều có thể xem thông báo của họ */}
+          element={user ? <WarehouseStockCheck user={user} /> : <Navigate to="/dashboard" />}         
+          />
         <Route 
+          path="/batch-grouping" 
+          element={user ? <BatchGrouping user={user} /> : <Navigate to="/login" />} 
+        />
+                <Route 
           path="/notifications" 
           element={user ? <Notifications user={user} /> : <Navigate to="/login" />} 
         />

@@ -579,9 +579,9 @@ function Materials({ user }) {
                     <th width="5%"></th>
                     <th width="5%">{t('packetNo')}</th>
                     <th width="20%">{t('partName')}</th>
-                    <th width="10%">{t('length')}</th>
-                    <th width="10%">{t('width')}</th>
-                    <th width="10%">{t('height')}</th>
+                    <th width="10%">{t('length')}(mm)</th>
+                    <th width="10%">{t('width')}(mm)</th>
+                    <th width="10%">{t('height')}(mm)</th>
                     <th width="5%">{t('quantity')}</th>
                     <th width="15%">{t('supplier')}</th>
                     <th width="10%">{t('updatedBy')}</th>

@@ -353,6 +353,51 @@ LEFT JOIN
 GROUP BY 
     m.id;
 
+-- Create batches table if it doesn't exist
+CREATE TABLE IF NOT EXISTS batches (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    part_name VARCHAR(100) NOT NULL,
+    machine_name VARCHAR(100) NOT NULL,
+    mold_code VARCHAR(100) NOT NULL,
+    quantity INT NOT NULL,
+    warehouse_entry_time VARCHAR(50) NOT NULL,
+    status VARCHAR(50) DEFAULT NULL,
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Create batch_groups_counter table for generating unique group IDs
+CREATE TABLE IF NOT EXISTS batch_groups_counter (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Create batch_groups table for mapping batches to groups
+CREATE TABLE IF NOT EXISTS batch_groups (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    group_id INT NOT NULL,
+    batch_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES batch_groups_counter(id),
+    FOREIGN KEY (batch_id) REFERENCES batches(id),
+    UNIQUE KEY (batch_id) -- Each batch can only be in one group
+);
+
+-- Create activity_logs table for tracking user actions
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    action_type VARCHAR(50) NOT NULL,
+    action_details JSON,
+    action_target VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+
 -- ===============================================
 -- INITIAL DATA
 -- ===============================================
@@ -427,3 +472,10 @@ VALUES
 ('add', NULL, '{"packetNo": 2, "partName": "New Component", "length": 500, "width": 300, "height": 200, "quantity": 25, "supplier": "Local Supplier"}',
  'Required for new product line', 'medium', 4, 'pending'),
 ('delete', 3, '{}', 'No longer needed in production', 'low', 4, 'pending');
+-- Insert sample data for batches
+INSERT INTO batches (part_name, machine_name, mold_code, quantity, warehouse_entry_time, status, created_by) VALUES
+('ZHG513-301', 'A7-45T', 'ZHG513-302-V1', 10, '19:00:10 05/03/2025', NULL, 1),
+('C2021', 'ZHG513-302', 'ZHG513-302-V2', 20, '19:00:10 05/03/2025', NULL, 1),
+('C2028', 'ZHG513-303', 'ZHG513-302-V3', 30, '19:00:10 05/03/2025', NULL, 1),
+('C2022', 'ZHG513-304', 'ZHG513-302-V4', 40, '19:00:10 05/03/2025', NULL, 1),
+('C2028', 'ZHG513-305', 'ZHG513-302-V4', 10, '19:00:10 05/03/2025', NULL, 1);

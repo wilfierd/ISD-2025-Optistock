@@ -321,7 +321,7 @@ const translations = {
     requestAdd: "Yêu cầu thêm",
     packetNo: "Packet No",
     partName: "Tên bộ phận",
-    length: "Dài",
+    length: "Dày",
     width: "Rộng",
     height: "Cao",
     quantity: "Số lượng",

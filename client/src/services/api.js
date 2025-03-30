@@ -82,6 +82,17 @@ const apiService = {
     delete: (id) => api.delete(`/notifications/${id}`),
     clearAll: () => api.delete('/notifications'),
   },
+  // Add these functions to client/src/services/api.js
+
+  // Inside the apiService object, add a new section for batches
+  batches: {
+    getAll: () => api.get('/batches'),
+    getById: (id) => api.get(`/batches/${id}`),
+    getUngrouped: () => api.get('/batches/ungrouped'),
+    getGrouped: () => api.get('/batches/grouped'),
+    groupBatches: (data) => api.post('/batches/group', data),
+    updateStatus: (id, status) => api.put(`/batches/${id}/status`, { status }),
+  },
 };
 
 export default apiService;
