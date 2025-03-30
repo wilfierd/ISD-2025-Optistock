@@ -50,14 +50,14 @@ function Navbar({ user, onLogout }) {
           </Link>
           
           {/* Show Warehouse Check link only for admin and manager users */}
-          {hasAdminOrManagerAccess(user) && (
+          
             <Link 
               className={`navbar-brand ${isActive('/warehouse-check') ? 'fw-bold' : ''}`} 
               to="/warehouse-check"
             >
               {t("Kiểm kho")}
             </Link>
-          )}
+          
           
           {/* Show Employees link for admin and manager users */}
           {hasAdminOrManagerAccess(user) && (

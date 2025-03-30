@@ -44,7 +44,7 @@ function App() {
         {/* Allow only admin and manager access to warehouse check route */}
         <Route 
           path="/warehouse-check" 
-          element={user && hasAdminOrManagerAccess(user) ? <WarehouseStockCheck user={user} /> : <Navigate to="/dashboard" />} 
+          element={user ? <WarehouseStockCheck user={user} /> : <Navigate to="/dashboard" />} 
         />
         
         <Route path="/" element={<Navigate to="/dashboard" />} />
