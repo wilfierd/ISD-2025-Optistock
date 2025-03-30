@@ -373,11 +373,11 @@ function WarehouseStockCheck({ user }) {
                 <thead>
                   <tr>
                     <th>{t("Trạng thái")}</th>
-                    <th>{t("packetNo")}</th>
                     <th>{t("partName")}</th>
-                    <th>{t("length")}</th>
-                    <th>{t("width")}</th>
-                    <th>{t("height")}</th>
+                    <th>{t("packetNo")}</th>
+                    <th>{t("length")}(mm)</th>
+                    <th>{t("width")}(mm)</th>
+                    <th>{t("height")}(mm)</th>
                     <th>{t("quantity")}</th>
                     <th>{t("supplier")}</th>
                     <th>{t("updatedBy")}</th>
@@ -399,8 +399,8 @@ function WarehouseStockCheck({ user }) {
                             title={checkedMaterials[material.id] ? t("Đã kiểm tra") : t("Chưa kiểm tra")}
                           ></div>
                         </td>
-                        <td>{material.packetNo}</td>
                         <td>{material.partName}</td>
+                        <td>{material.packetNo}</td>
                         <td>{material.length}</td>
                         <td>{material.width}</td>
                         <td>{material.height}</td>
