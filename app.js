@@ -335,7 +335,6 @@ app.get('/api/users', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
 });
 
 // Get a specific user
-// Get a specific user
 app.get('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
   try {
     const { id } = req.params;
@@ -410,153 +409,6 @@ app.post('/api/users', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
   }
 });
 
-// Update a user (admin only or self update)
-app.put('/api/users/:id', isAuthenticatedAPI, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { username, password, fullName, role, phone } = req.body;
-    
-    // First, check if user exists and get their role
-    const [existingUsers] = await pool.query('SELECT id, role FROM users WHERE id = ?', [id]);
-    if (existingUsers.length === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-    
-    const existingUser = existingUsers[0];
-
-    console.log('Update user request:');
-    console.log('Current user:', req.session.user.username, req.session.user.role);
-    console.log('Target user ID:', id, 'role:', existingUser.role);
-    console.log('New role to assign:', role);
-    
-    // Check if the user is a manager
-    const isManager = ['quản lý', 'quan ly', 'manager'].includes(req.session.user.role.toLowerCase());
-    // Regular users cannot change role, but admins and managers can (with restrictions)
-    if (!isManager && req.session.user.role !== 'admin' && role && role !== req.session.user.role) {
-      return res.status(403).json({ success: false, error: 'Cannot change role' });
-    } 
-    
-    if (isManager) {
-
-      console.log('User is a manager');
-      console.log('Existing user role:', existingUser.role);
-      console.log('Is admin?', existingUser.role === 'admin');
-      console.log('Is manager?', ['quản lý', 'quan ly', 'manager'].includes(existingUser.role.toLowerCase()));
-      
-      // Managers can't modify admins or other managers
-      const targetIsAdminOrManager = existingUser.role === 'admin' || 
-                                    ['quản lý', 'quan ly', 'manager'].includes(existingUser.role.toLowerCase());
-      
-      if (targetIsAdminOrManager) {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Insufficient permissions to modify managers or admins' 
-        });
-      }
-      
-      // Managers can't assign admin role
-      if (role === 'admin') {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Insufficient permissions to assign admin role' 
-        });
-      }
-    } else if (req.session.user.role !== 'admin' && req.session.user.id !== parseInt(id)) {
-      // Regular users can only update their own information
-      return res.status(403).json({ success: false, error: 'Insufficient permissions' });
-    }
-    
-    // Check if username exists (if changing username)
-    if (username) {
-      const [existingUsername] = await pool.query('SELECT id FROM users WHERE username = ? AND id != ?', [username, id]);
-      if (existingUsername.length > 0) {
-        return res.status(400).json({ success: false, error: 'Username already exists' });
-      }
-    }
-    
-    // Build the SQL update statement dynamically based on what's provided
-    let updateFields = [];
-    let queryParams = [];
-    
-    if (username) {
-      updateFields.push('username = ?');
-      queryParams.push(username);
-    }
-    
-    if (password) {
-      // In a real app, you would hash the password here
-      updateFields.push('password = ?');
-      queryParams.push(password);
-    }
-    
-    if (fullName) {
-      updateFields.push('full_name = ?');
-      queryParams.push(fullName);
-    }
-    
-    if (role && (req.session.user.role === 'admin'|| 
-      ['quản lý', 'quan ly', 'manager'].includes(req.session.user.role.toLowerCase()))) {
-      updateFields.push('role = ?');
-      queryParams.push(role);
-    }
-    
-    if (phone !== undefined) {
-      updateFields.push('phone = ?');
-      queryParams.push(phone);
-    }
-    
-    // Add the ID at the end of params array
-    queryParams.push(id);
-    
-    if (updateFields.length === 0) {
-      return res.status(400).json({ success: false, error: 'No fields to update' });
-    }
-    
-    const query = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`;
-    await pool.query(query, queryParams);
-    
-    res.json({ success: true, message: 'User updated successfully' });
-  } catch (error) {
-    console.error('Error updating user:', error);
-    res.status(500).json({ success: false, error: 'Failed to update user' });
-  }
-});
-
-// Delete a user (admin only)
-app.delete('/api/users/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // Prevent deleting the current user
-    if (req.session.user.id === parseInt(id)) {
-      return res.status(400).json({ success: false, error: 'Cannot delete yourself' });
-    }
-    
-    // Check if user exists
-    const [existingUser] = await pool.query('SELECT id FROM users WHERE id = ?', [id]);
-    if (existingUser.length === 0) {
-      return res.status(404).json({ success: false, error: 'User not found' });
-    }
-    
-    // Additional permission checks for managers
-    if (req.session.user.role === 'quản lý') {
-      // Managers can't delete admins or other managers
-      if (existingUser[0].role === 'admin' || existingUser[0].role === 'quản lý') {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Insufficient permissions to delete managers or admins' 
-        });
-      }
-    }
-
-    await pool.query('DELETE FROM users WHERE id = ?', [id]);
-    
-    res.json({ success: true, message: 'User deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting user:', error);
-    res.status(500).json({ success: false, error: 'Failed to delete user' });
-  }
-});
 
 // ===== MATERIALS API =====
 
@@ -570,12 +422,10 @@ app.get('/api/materials', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
-// Update these API endpoints in app.js
-
 // Create new material with packet_no uniqueness validation
 app.post('/api/materials', isAuthenticatedAPI, async (req, res) => {
   try {
-    const { packetNo, partName,materialCode, length, width, materialType, quantity, supplier } = req.body;
+    const { packetNo, partName, materialCode, length, width, materialType, quantity, supplier } = req.body;
     const currentDate = new Date().toLocaleDateString('en-GB');
     
     // Check if a material with the same packet_no already exists
@@ -593,9 +443,9 @@ app.post('/api/materials', isAuthenticatedAPI, async (req, res) => {
     
     const [result] = await pool.query(
       `INSERT INTO materials 
-       (packet_no, part_name,material_code, length, width, material_type, quantity, supplier, updated_by, last_updated) 
-       VALUES (?, ?, ?,?, ?, ?, ?, ?, ?, ?)`,
-      [packetNo, partName,materialCode, length, width, materialType, quantity, supplier, req.session.user.username, currentDate]
+       (packet_no, part_name, material_code, length, width, material_type, quantity, supplier, updated_by, last_updated) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [packetNo, partName, materialCode, length, width, materialType, quantity, supplier, req.session.user.username, currentDate]
     );
     res.json({ 
       success: true, 
@@ -763,8 +613,6 @@ app.get('/api/materials/:id', isAuthenticatedAPI, async (req, res) => {
 
 // ===== MATERIAL REQUESTS API =====
 
-// Get all material requests (admin only, with proper error handling)
-
 // Get material requests for current user
 app.get('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
   try {
@@ -871,6 +719,7 @@ app.post('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
     res.status(500).json({ success: false, error: `Failed to create material request: ${error.message}` });
   }
 });
+
 // Get a single material request by ID
 app.get('/api/material-requests/:id', isAuthenticatedAPI, async (req, res) => {
   try {
@@ -917,6 +766,7 @@ app.get('/api/material-requests/:id', isAuthenticatedAPI, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch material request' });
   }
 });
+
 app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
   try {
     const { id } = req.params;
@@ -942,14 +792,6 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
     if (request.status !== 'pending') {
       return res.status(400).json({ success: false, error: 'Request already processed' });
     }
-
-    let requestData = {};
-    try {
-      requestData = safelyParseJSON(request.request_data);
-    } catch (error) {
-      console.error('Error parsing request data:', error);
-      return res.status(400).json({ success: false, error: 'Invalid request data format' });
-    }
     
     // Start a transaction
     const connection = await pool.getConnection();
@@ -968,18 +810,38 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
       
       // If approved, process the request
       if (status === 'approved') {
+        // Parse and log request data
         let requestData = {};
-    try {
-      requestData = safelyParseJSON(request.request_data);
-    } catch (error) {
-      console.error('Error parsing request data:', error);
-      return res.status(400).json({ success: false, error: 'Invalid request data format' });
-    }
-    
+        try {
+          requestData = safelyParseJSON(request.request_data);
+          console.log("Parsed request data:", JSON.stringify(requestData, null, 2)); // Detailed logging
+        } catch (error) {
+          console.error('Error parsing request data:', error);
+          await connection.rollback();
+          return res.status(400).json({ success: false, error: 'Invalid request data format' });
+        }
+        
         if (request.request_type === 'add') {
-          // Add new material
-          const { packetNo, partName,materialCode, length, width, materialType, quantity, supplier } = requestData;
+          // Add new material - Handle both camelCase and snake_case properties
+          const packetNo = requestData.packetNo || requestData.packet_no;
+          const partName = requestData.partName || requestData.part_name;
+          const materialCode = requestData.materialCode || requestData.material_code;
+          const length = requestData.length;
+          const width = requestData.width;
+          const materialType = requestData.materialType || requestData.material_type;
+          const quantity = requestData.quantity;
+          const supplier = requestData.supplier;
           const currentDate = new Date().toLocaleDateString('en-GB');
+
+          // Validate all required fields
+          if (!packetNo || !partName || !materialCode || !length || !width || !materialType || !quantity || !supplier) {
+            console.error('Missing required fields in request data:', requestData);
+            await connection.rollback();
+            return res.status(400).json({ 
+              success: false, 
+              error: 'Missing required fields in request data' 
+            });
+          }
 
           // Check if a material with the same packet_no already exists
           const [existingMaterials] = await connection.query(
@@ -995,18 +857,48 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
             });
           }
           
-          const [addResult] = await connection.query(
-            `INSERT INTO materials 
-             (packet_no, part_name,material_code, length, width, material_type, quantity, supplier, updated_by, last_updated) 
-             VALUES (?, ?, ?,?, ?, ?, ?, ?, ?, ?)`,
-            [packetNo, partName,materialCode, length, width, materialType, quantity, supplier, (await connection.query('SELECT username FROM users WHERE id = ?', [request.user_id]))[0][0].username, currentDate]
-          );
-          
-          console.log(`Added new material with ID ${addResult.insertId}`);
+          try {
+            // Get username for the requester
+            const [userResult] = await connection.query('SELECT username FROM users WHERE id = ?', [request.user_id]);
+            const username = userResult[0]?.username || 'system';
+            
+            const [addResult] = await connection.query(
+              `INSERT INTO materials 
+               (packet_no, part_name, material_code, length, width, material_type, quantity, supplier, updated_by, last_updated) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [packetNo, partName, materialCode, length, width, materialType, quantity, supplier, username, currentDate]
+            );
+            
+            console.log(`Added new material with ID ${addResult.insertId}`);
+          } catch (dbError) {
+            console.error('Database error when adding material:', dbError);
+            await connection.rollback();
+            return res.status(500).json({ 
+              success: false, 
+              error: 'Database error when adding material' 
+            });
+          }
         } else if (request.request_type === 'edit') {
-          // Edit existing material
-          const { packetNo, partName,materialCode, length, width, materialType, quantity, supplier } = requestData;
+          // Edit existing material - Handle both camelCase and snake_case properties
+          const packetNo = requestData.packetNo || requestData.packet_no;
+          const partName = requestData.partName || requestData.part_name;
+          const materialCode = requestData.materialCode || requestData.material_code;
+          const length = requestData.length;
+          const width = requestData.width;
+          const materialType = requestData.materialType || requestData.material_type;
+          const quantity = requestData.quantity;
+          const supplier = requestData.supplier;
           const currentDate = new Date().toLocaleDateString('en-GB');
+
+          // Validate all required fields
+          if (!packetNo || !partName || !materialCode || !length || !width || !materialType || !quantity || !supplier) {
+            console.error('Missing required fields in edit request data:', requestData);
+            await connection.rollback();
+            return res.status(400).json({ 
+              success: false, 
+              error: 'Missing required fields in edit request data' 
+            });
+          }
 
           // Check if any other material has the same packet_no (excluding the current material)
           const [existingMaterials] = await connection.query(
@@ -1022,20 +914,41 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
             });
           }
           
-          await connection.query(
-            `UPDATE materials 
-             SET packet_no = ?, part_name = ?,material_code=?, length = ?, width = ?, material_type = ?, 
-                 quantity = ?, supplier = ?, updated_by = ?, last_updated = ? 
-             WHERE id = ?`,
-            [packetNo, partName,materialCode, length, width, materialType, quantity, supplier, 
-              (await connection.query('SELECT username FROM users WHERE id = ?', [request.user_id]))[0][0].username, currentDate, request.material_id]
-          );
-          
-          console.log(`Updated material ${request.material_id}`);
+          try {
+            // Get username for the requester
+            const [userResult] = await connection.query('SELECT username FROM users WHERE id = ?', [request.user_id]);
+            const username = userResult[0]?.username || 'system';
+            
+            await connection.query(
+              `UPDATE materials 
+               SET packet_no = ?, part_name = ?, material_code = ?, length = ?, width = ?, material_type = ?, 
+                   quantity = ?, supplier = ?, updated_by = ?, last_updated = ? 
+               WHERE id = ?`,
+              [packetNo, partName, materialCode, length, width, materialType, quantity, supplier, username, currentDate, request.material_id]
+            );
+            
+            console.log(`Updated material ${request.material_id}`);
+          } catch (dbError) {
+            console.error('Database error when updating material:', dbError);
+            await connection.rollback();
+            return res.status(500).json({ 
+              success: false, 
+              error: 'Database error when updating material' 
+            });
+          }
         } else if (request.request_type === 'delete') {
           // Delete material
-          await connection.query('DELETE FROM materials WHERE id = ?', [request.material_id]);
-          console.log(`Deleted material ${request.material_id}`);
+          try {
+            await connection.query('DELETE FROM materials WHERE id = ?', [request.material_id]);
+            console.log(`Deleted material ${request.material_id}`);
+          } catch (dbError) {
+            console.error('Database error when deleting material:', dbError);
+            await connection.rollback();
+            return res.status(500).json({ 
+              success: false, 
+              error: 'Database error when deleting material' 
+            });
+          }
         }
       }
       
@@ -1043,10 +956,6 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
       await connection.commit();
       
       // Create notification for the requester
-      // Cập nhật phần xử lý yêu cầu trong app.js
-
-      // Thay thế đoạn code tạo thông báo trong hàm xử lý yêu cầu:
-
       // Tạo thông báo chi tiết hơn cho người yêu cầu dựa trên loại yêu cầu và trạng thái
       let notificationMessage = '';
       const requestTypeMap = {
@@ -1153,8 +1062,7 @@ app.delete('/api/notifications', isAuthenticatedAPI, async (req, res) => {
     console.error('Error clearing notifications:', error);
     res.status(500).json({ success: false, error: 'Failed to clear notifications' });
   }
-});({ success: false, error: 'Failed to fetch notifications' });
-;
+});
 
 // Lấy số lượng thông báo chưa đọc
 app.get('/api/notifications/unread-count', isAuthenticatedAPI, async (req, res) => {
@@ -1220,10 +1128,9 @@ app.delete('/api/notifications/:id', isAuthenticatedAPI, async (req, res) => {
     res.json({ success: true, message: 'Notification deleted' });
   } catch (error) {
     console.error('Error deleting notification:', error);
-    res.status(500).json
+    res.status(500).json({ success: false, error: 'Failed to delete notification' });
   }
 });
-// Add these routes to app.js
 
 // ===== BATCHES API =====
 
@@ -1404,7 +1311,6 @@ app.put('/api/batches/:id/status', isAuthenticatedAPI, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to update batch status' });
   }
 });
-// ===== SERVE REACT APP =====
 
 // Start the server
 app.listen(PORT, '0.0.0.0', () => {

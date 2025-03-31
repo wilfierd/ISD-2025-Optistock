@@ -136,26 +136,36 @@ function WarehouseStockCheck({ user }) {
     }
   };
   
-  // Extract material ID from scan value (URL)
-  const extractMaterialIdFromScan = (scanValue) => {
-    try {
-      // If the scanner captures a URL like http://localhost:3000/material/5
-      if (scanValue.includes('/material/')) {
-        const parts = scanValue.split('/material/');
-        return parts[parts.length - 1].trim();
-      }
-      
-      // If the scanner just captures the ID directly
-      if (/^\d+$/.test(scanValue.trim())) {
-        return scanValue.trim();
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Error extracting material ID from scan:', error);
-      return null;
+ 
+ const extractMaterialIdFromScan = (scanValue) => {
+  try {
+    // Log the raw value for debugging
+    console.log('Raw QR scan value:', scanValue);
+    
+    // If the scanner captures a URL like http://localhost:3000/material/5
+    if (scanValue.includes('/material/')) {
+      const parts = scanValue.split('/material/');
+      return parts[parts.length - 1].trim().split(/[^0-9]/)[0]; // Get just the numeric part
     }
-  };
+    
+    // If the scanner just captures the ID directly
+    if (/^\d+$/.test(scanValue.trim())) {
+      return scanValue.trim();
+    }
+    
+    // Try a more general pattern to extract digits from anywhere in the string
+    const matches = scanValue.match(/\d+/);
+    if (matches && matches.length > 0) {
+      return matches[0];
+    }
+    
+    console.error('Failed to extract material ID from scan:', scanValue);
+    return null;
+  } catch (error) {
+    console.error('Error extracting material ID from scan:', error, 'Value:', scanValue);
+    return null;
+  }
+};
   
   // Handle start check mode
   const handleStartCheck = () => {
