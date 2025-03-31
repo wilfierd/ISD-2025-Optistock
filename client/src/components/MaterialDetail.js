@@ -23,9 +23,10 @@ function MaterialDetail({ user }) {
           id: material.id,
           packetNo: parseInt(material.packet_no),
           partName: material.part_name,
+          materialCode: material.material_code,
           length: parseInt(material.length),
           width: parseInt(material.width),
-          height: parseInt(material.height),
+          materialType: material.materialType,
           quantity: parseInt(material.quantity),
           supplier: material.supplier,
           updatedBy: material.updated_by,
@@ -91,8 +92,17 @@ function MaterialDetail({ user }) {
                       <td>{data.packetNo}</td>
                     </tr>
                     <tr>
+                      <th style={{ width: '30%' }}>Material Code</th>
+                      <td>{data.materialCode}</td>
+                    </tr>
+
+                    <tr>
                       <th>Dimensions</th>
-                      <td>{data.length} x {data.width} x {data.height}</td>
+                      <td>{data.length} x {data.width}</td>
+                    </tr>
+                    <tr>
+                      <th>Material Type</th>
+                      <td>{data.materialType}</td>
                     </tr>
                     <tr>
                       <th>Quantity</th>

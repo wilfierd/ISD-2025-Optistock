@@ -29,14 +29,16 @@ export const useMaterials = () => {
         id: item.id,
         packetNo: parseInt(item.packet_no),
         partName: item.part_name,
+        materialCode: item.material_code,
         length: parseInt(item.length),
         width: parseInt(item.width),
-        height: parseInt(item.height),
+        materialType: item.material_type,
         quantity: parseInt(item.quantity),
         supplier: item.supplier,
         updatedBy: item.updated_by,
         lastUpdated: item.last_updated
       }));
+      
       
       return transformedData;
     },

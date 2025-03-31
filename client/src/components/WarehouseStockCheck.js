@@ -610,9 +610,10 @@ function WarehouseStockCheck({ user }) {
                     <th>{t("Trạng thái")}</th>
                     <th>{t("partName")}</th>
                     <th>{t("packetNo")}</th>
+                    <th>{t("materialCode")}</th>
                     <th>{t("length")}(mm)</th>
                     <th>{t("width")}(mm)</th>
-                    <th>{t("height")}(mm)</th>
+                    <th>{t("materialType")}</th>
                     <th>{t("quantity")}</th>
                     <th>{t("supplier")}</th>
                     <th>{t("updatedBy")}</th>
@@ -631,9 +632,10 @@ function WarehouseStockCheck({ user }) {
                         </td>
                         <td>{material.partName}</td>
                         <td>{material.packetNo}</td>
+                        <td>{material.materialCode}</td>
                         <td>{material.length}</td>
                         <td>{material.width}</td>
-                        <td>{material.height}</td>
+                        <td>{material.materialType}</td>
                         <td>{material.quantity}</td>
                         <td>{material.supplier}</td>
                         <td>{material.updatedBy}</td>

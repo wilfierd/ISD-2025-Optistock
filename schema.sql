@@ -43,9 +43,10 @@ CREATE TABLE IF NOT EXISTS materials (
     id INT AUTO_INCREMENT PRIMARY KEY,
     packet_no INT NOT NULL,
     part_name VARCHAR(255) NOT NULL,
+    material_code VARCHAR(100) NOT NULL,
     length INT NOT NULL,
     width INT NOT NULL,
-    height INT NOT NULL,
+    material_type VARCHAR(50) NOT NULL,
     quantity INT NOT NULL,
     supplier VARCHAR(255) NOT NULL,
     updated_by VARCHAR(100) NOT NULL,
@@ -437,14 +438,15 @@ INSERT INTO material_tags (tag_name, color, created_by) VALUES
 ('Refrigerated', '#0dcaf0', 1),
 ('High Priority', '#fd7e14', 1);
 
+
 -- Insert sample data for materials
-INSERT INTO materials (packet_no, part_name, length, width, height, quantity, supplier, updated_by, last_updated) VALUES
-(1, 'xxxxxxxxxxxxxxxxxxxxxxxxx', 3000, 3455, 2255, 10, 'SHENZEN', 'Khai', '05/03/2025'),
-(1, '10100070001A (FIN 1)', 3000, 345, 10, 11000, 'NCCV', 'Khai', '05/03/2025'),
-(1, '10100070002A (FIN 2)', 3000, 345, 345, 11000, 'NCCV', 'Khai', '05/03/2025'),
-(1, '10100070003A (FIN 3)', 3000, 345, 35, 11000, 'NCCV', 'Khai', '05/03/2025'),
-(2, '10100070008A (BASE)', 3000, 345, 345, 98000, 'NCCV', 'Khai', '05/03/2025'),
-(3, '1010007010A (BLOCK)', 3000, 345, 345, 98000, 'NCCV', 'Khai', '05/03/2025');
+INSERT INTO materials (packet_no, part_name, material_code, length, width, material_type, quantity, supplier, updated_by, last_updated) VALUES
+(1, 'xxxxxxxxxxxxxxxxxxxxxxxxx','NVX', 3000, 3455, 'Steel', 10, 'SHENZEN', 'Khai', '05/03/2025'),
+(1, '10100070001A (FIN 1)','NVX', 3000, 345, 'Steel', 11000, 'NCCV', 'Khai', '05/03/2025'),
+(1, '10100070002A (FIN 2)','NVX', 3000, 345, 'Steel', 11000, 'NCCV', 'Khai', '05/03/2025'),
+(1, '10100070003A (FIN 3)','NVX', 3000, 345, 'Steel', 11000, 'NCCV', 'Khai', '05/03/2025'),
+(2, '10100070008A (BASE)','NVX', 3000, 345, 'Steel', 98000, 'NCCV', 'Khai', '05/03/2025'),
+(3, '1010007010A (BLOCK)','NVX', 3000, 345, 'Steel', 98000, 'NCCV', 'Khai', '05/03/2025');
 
 -- Add some sample category mappings
 INSERT INTO material_category_mapping (material_id, category_id) VALUES

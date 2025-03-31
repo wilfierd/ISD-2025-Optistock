@@ -39,9 +39,10 @@ function Materials({ user }) {
     materialId: '',
     packetNo: '',
     partName: '',
+    materialCode: '',
     length: '',
     width: '',
-    height: '',
+    materialType: '',
     quantity: '',
     supplier: ''
   });
@@ -107,7 +108,9 @@ function Materials({ user }) {
     if (!formData.partName) {
       errors.partName = t('partName') + ' ' + t('is required');
     }
-    
+    if (!formData.materialCode) {
+      errors.materialCode = t('materialCode') + ' ' + t('is required');
+    }
     if (!formData.length) {
       errors.length = t('length') + ' ' + t('is required');
     }
@@ -116,8 +119,8 @@ function Materials({ user }) {
       errors.width = t('width') + ' ' + t('is required');
     }
     
-    if (!formData.height) {
-      errors.height = t('height') + ' ' + t('is required');
+    if (!formData.materialType) {
+      errors.materialType = t('materialType') + ' ' + t('is required');
     }
     
     if (!formData.quantity) {
@@ -172,9 +175,10 @@ function Materials({ user }) {
       materialId: material.id,
       packetNo: material.packetNo,
       partName: material.partName,
+      materialCode: material.materialCode,
       length: material.length,
       width: material.width,
-      height: material.height,
+      materialType: material.materialType,
       quantity: material.quantity,
       supplier: material.supplier
     });
@@ -188,9 +192,10 @@ function Materials({ user }) {
       materialId: '',
       packetNo: '',
       partName: '',
+      materialCode: '',
       length: '',
       width: '',
-      height: '',
+      materialType: '',
       quantity: '',
       supplier: ''
     });
@@ -263,9 +268,10 @@ function Materials({ user }) {
     const materialData = {
       packetNo: parseInt(formData.packetNo),
       partName: formData.partName,
+      materialCode: formData.materialCode,
       length: parseInt(formData.length),
       width: parseInt(formData.width),
-      height: parseInt(formData.height),
+      materialType: formData.materialType,
       quantity: parseInt(formData.quantity),
       supplier: formData.supplier
     };
@@ -358,9 +364,10 @@ function Materials({ user }) {
     const materialData = {
       packetNo: parseInt(formData.packetNo),
       partName: formData.partName,
+      materialCode: formData.materialCode,
       length: parseInt(formData.length),
       width: parseInt(formData.width),
-      height: parseInt(formData.height),
+      materialType: formData.materialType,
       quantity: parseInt(formData.quantity),
       supplier: formData.supplier
     };
@@ -579,9 +586,10 @@ function Materials({ user }) {
                     <th width="5%"></th>
                     <th width="5%">{t('packetNo')}</th>
                     <th width="20%">{t('partName')}</th>
+                    <th width="20%">{t('materialCode')}</th>
                     <th width="10%">{t('length')}(mm)</th>
                     <th width="10%">{t('width')}(mm)</th>
-                    <th width="10%">{t('height')}(mm)</th>
+                    <th width="10%">{t('materialType')}</th>
                     <th width="5%">{t('quantity')}</th>
                     <th width="15%">{t('supplier')}</th>
                     <th width="10%">{t('updatedBy')}</th>
@@ -603,9 +611,10 @@ function Materials({ user }) {
                       </td>
                       <td>{material.packetNo}</td>
                       <td>{material.partName}</td>
+                      <td>{material.materialCode}</td>
                       <td>{material.length}</td>
                       <td>{material.width}</td>
-                      <td>{material.height}</td>
+                      <td>{material.materialType}</td>
                       <td>{material.quantity}</td>
                       <td>{material.supplier}</td>
                       <td>{material.updatedBy}</td>
@@ -687,6 +696,22 @@ function Materials({ user }) {
                           </div>
                         )}
                       </div>
+                      <div className="col-md-6">
+                        <label htmlFor="materialCode" className="form-label">{t('materialCode')}</label>
+                        <input 
+                          type="text" 
+                          className={`form-control ${validationErrors.materialCode ? 'is-invalid' : ''}`}
+                          id="materialCode" 
+                          value={formData.materialCode}
+                          onChange={handleInputChange}
+                          required 
+                        />
+                        {validationErrors.materialCode && (
+                          <div className="invalid-feedback">
+                            {validationErrors.materialCode}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-4">
@@ -722,18 +747,18 @@ function Materials({ user }) {
                         )}
                       </div>
                       <div className="col-md-4">
-                        <label htmlFor="height" className="form-label">{t('height')}</label>
+                        <label htmlFor="materialType" className="form-label">{t('materialType')}</label>
                         <input 
-                          type="number" 
-                          className={`form-control ${validationErrors.height ? 'is-invalid' : ''}`}
-                          id="height" 
-                          value={formData.height}
+                          type="text" 
+                          className={`form-control ${validationErrors.materialType ? 'is-invalid' : ''}`}
+                          id="materialType" 
+                          value={formData.materialType}
                           onChange={handleInputChange}
                           required 
                         />
-                        {validationErrors.height && (
+                        {validationErrors.materialType && (
                           <div className="invalid-feedback">
-                            {validationErrors.height}
+                            {validationErrors.materialType}
                           </div>
                         )}
                       </div>
@@ -794,10 +819,13 @@ function Materials({ user }) {
                     </div>
                     <div className="row mb-3">
                       <div className="col-md-12">
-                        <p><strong>{t('dimensions')}:</strong> {selectedMaterial.length} x {selectedMaterial.width} x {selectedMaterial.height}</p>
+                        <p><strong>{t('dimensions')}:</strong> {selectedMaterial.length} x {selectedMaterial.width} </p>
                       </div>
                     </div>
                     <div className="row mb-3">
+                      <div className="col-md-6">
+                        <p><strong>{t('materialType')}:</strong> {selectedMaterial.materialType}</p>
+                      </div>
                       <div className="col-md-6">
                         <p><strong>{t('quantity')}:</strong> {selectedMaterial.quantity}</p>
                       </div>
@@ -922,6 +950,22 @@ function Materials({ user }) {
                         </div>
                       )}
                     </div>
+                    <div className="col-md-6">
+                      <label htmlFor="materialCode" className="form-label">{t('materialCode')}</label>
+                      <input 
+                        type="text" 
+                        className={`form-control ${validationErrors.materialCode ? 'is-invalid' : ''}`}
+                        id="materialCode" 
+                        value={formData.materialCode}
+                        onChange={handleInputChange}
+                        required 
+                      />
+                      {validationErrors.materialCode && (
+                        <div className="invalid-feedback">
+                          {validationErrors.materialCode}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="row mb-3">
                     <div className="col-md-4">
@@ -957,18 +1001,18 @@ function Materials({ user }) {
                       )}
                     </div>
                     <div className="col-md-4">
-                      <label htmlFor="height" className="form-label">{t('height')}</label>
+                      <label htmlFor="materialType" className="form-label">{t('materialType')}</label>
                       <input 
-                        type="number" 
-                        className={`form-control ${validationErrors.height ? 'is-invalid' : ''}`}
-                        id="height" 
-                        value={formData.height}
+                        type="text" 
+                        className={`form-control ${validationErrors.materialType ? 'is-invalid' : ''}`}
+                        id="materialType" 
+                        value={formData.materialType}
                         onChange={handleInputChange}
                         required 
                       />
-                      {validationErrors.height && (
+                      {validationErrors.materialType && (
                         <div className="invalid-feedback">
-                          {validationErrors.height}
+                          {validationErrors.materialType}
                         </div>
                       )}
                     </div>
@@ -1142,6 +1186,22 @@ function Materials({ user }) {
                             </div>
                           )}
                         </div>
+                        <div className="col-md-6">
+                          <label htmlFor="materiaCode" className="form-label">{t('materialCode')}</label>
+                          <input 
+                            type="text" 
+                            className={`form-control ${validationErrors.materialCode ? 'is-invalid' : ''}`}
+                            id="materialCode" 
+                            value={formData.materialCode}
+                            onChange={handleInputChange}
+                            required 
+                          />
+                          {validationErrors.materialCode && (
+                            <div className="invalid-feedback">
+                              {validationErrors.materialCode}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="row mb-3">
                         <div className="col-md-3">
@@ -1177,18 +1237,18 @@ function Materials({ user }) {
                           )}
                         </div>
                         <div className="col-md-3">
-                          <label htmlFor="height" className="form-label">{t('height')}</label>
+                          <label htmlFor="materialType" className="form-label">{t('materialType')}</label>
                           <input 
-                            type="number" 
-                            className={`form-control ${validationErrors.height ? 'is-invalid' : ''}`}
-                            id="height" 
-                            value={formData.height}
+                            type="text" 
+                            className={`form-control ${validationErrors.materialType ? 'is-invalid' : ''}`}
+                            id="materialType" 
+                            value={formData.materialType}
                             onChange={handleInputChange}
                             required 
                           />
-                          {validationErrors.height && (
+                          {validationErrors.materialType && (
                             <div className="invalid-feedback">
-                              {validationErrors.height}
+                              {validationErrors.materialType}
                             </div>
                           )}
                         </div>
@@ -1320,7 +1380,7 @@ function Materials({ user }) {
                         <h2>${t('materialQRCode', { materialName: '' })}</h2>
                         <div class="material-info">
                           <h3>${selectedMaterial.partName}</h3>
-                          <p>${t('packetNo')}: ${selectedMaterial.packetNo} | ${t('dimensions')}: ${selectedMaterial.length} x ${selectedMaterial.width} x ${selectedMaterial.height}</p>
+                          <p>${t('packetNo')}: ${selectedMaterial.packetNo} | ${t('dimensions')}: ${selectedMaterial.length} x ${selectedMaterial.width} </p>
                         </div>
                         <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/material/${selectedMaterial.id}`)}" class="qr-code" />
                         <p>${window.location.origin}/material/${selectedMaterial.id}</p>

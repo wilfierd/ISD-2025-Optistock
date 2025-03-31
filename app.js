@@ -198,6 +198,7 @@ async function getDashboardData(pool) {
     const materialTypeLabels = materialTypes.map(type => type.part_name);
     const materialTypeData = materialTypes.map(type => type.count);
     
+    
     // Mock data for inventory changes
     const inventoryChanges = {
       labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
@@ -561,7 +562,7 @@ app.delete('/api/users/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) =>
 
 app.get('/api/materials', isAuthenticatedAPI, async (req, res) => {
   try {
-    const [materials] = await pool.query('SELECT * FROM materials ORDER BY id DESC');
+    const [materials] = await pool.query('SELECT id,packet_no,part_name,material_code,length,width,material_type,quantity,supplier,updated_by,last_updated FROM materials ORDER BY id DESC');
     res.json({ success: true, data: materials });
   } catch (error) {
     console.error('Error fetching materials:', error);
@@ -574,7 +575,7 @@ app.get('/api/materials', isAuthenticatedAPI, async (req, res) => {
 // Create new material with packet_no uniqueness validation
 app.post('/api/materials', isAuthenticatedAPI, async (req, res) => {
   try {
-    const { packetNo, partName, length, width, height, quantity, supplier } = req.body;
+    const { packetNo, partName,materialCode, length, width, materialType, quantity, supplier } = req.body;
     const currentDate = new Date().toLocaleDateString('en-GB');
     
     // Check if a material with the same packet_no already exists
@@ -592,11 +593,10 @@ app.post('/api/materials', isAuthenticatedAPI, async (req, res) => {
     
     const [result] = await pool.query(
       `INSERT INTO materials 
-       (packet_no, part_name, length, width, height, quantity, supplier, updated_by, last_updated) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [packetNo, partName, length, width, height, quantity, supplier, req.session.user.username, currentDate]
+       (packet_no, part_name,material_code, length, width, material_type, quantity, supplier, updated_by, last_updated) 
+       VALUES (?, ?, ?,?, ?, ?, ?, ?, ?, ?)`,
+      [packetNo, partName,materialCode, length, width, materialType, quantity, supplier, req.session.user.username, currentDate]
     );
-    
     res.json({ 
       success: true, 
       message: 'Material added successfully', 
@@ -975,10 +975,10 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
       console.error('Error parsing request data:', error);
       return res.status(400).json({ success: false, error: 'Invalid request data format' });
     }
-        
+    
         if (request.request_type === 'add') {
           // Add new material
-          const { packetNo, partName, length, width, height, quantity, supplier } = requestData;
+          const { packetNo, partName,materialCode, length, width, materialType, quantity, supplier } = requestData;
           const currentDate = new Date().toLocaleDateString('en-GB');
 
           // Check if a material with the same packet_no already exists
@@ -997,15 +997,15 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
           
           const [addResult] = await connection.query(
             `INSERT INTO materials 
-             (packet_no, part_name, length, width, height, quantity, supplier, updated_by, last_updated) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [packetNo, partName, length, width, height, quantity, supplier, (await connection.query('SELECT username FROM users WHERE id = ?', [request.user_id]))[0][0].username, currentDate]
+             (packet_no, part_name,material_code, length, width, material_type, quantity, supplier, updated_by, last_updated) 
+             VALUES (?, ?, ?,?, ?, ?, ?, ?, ?, ?)`,
+            [packetNo, partName,materialCode, length, width, materialType, quantity, supplier, (await connection.query('SELECT username FROM users WHERE id = ?', [request.user_id]))[0][0].username, currentDate]
           );
           
           console.log(`Added new material with ID ${addResult.insertId}`);
         } else if (request.request_type === 'edit') {
           // Edit existing material
-          const { packetNo, partName, length, width, height, quantity, supplier } = requestData;
+          const { packetNo, partName,materialCode, length, width, materialType, quantity, supplier } = requestData;
           const currentDate = new Date().toLocaleDateString('en-GB');
 
           // Check if any other material has the same packet_no (excluding the current material)
@@ -1024,10 +1024,10 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
           
           await connection.query(
             `UPDATE materials 
-             SET packet_no = ?, part_name = ?, length = ?, width = ?, height = ?, 
+             SET packet_no = ?, part_name = ?,material_code=?, length = ?, width = ?, material_type = ?, 
                  quantity = ?, supplier = ?, updated_by = ?, last_updated = ? 
              WHERE id = ?`,
-            [packetNo, partName, length, width, height, quantity, supplier, 
+            [packetNo, partName,materialCode, length, width, materialType, quantity, supplier, 
               (await connection.query('SELECT username FROM users WHERE id = ?', [request.user_id]))[0][0].username, currentDate, request.material_id]
           );
           
