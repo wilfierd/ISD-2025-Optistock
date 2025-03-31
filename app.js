@@ -871,7 +871,52 @@ app.post('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
     res.status(500).json({ success: false, error: `Failed to create material request: ${error.message}` });
   }
 });
-
+// Get a single material request by ID
+app.get('/api/material-requests/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.session.user.id;
+    const isAdminOrManager = req.session.user.role === 'admin' || req.session.user.role === 'quản lý';
+    
+    // Build query to get the request with user information
+    const query = `
+      SELECT mr.*, u.username as requested_by_username, u.full_name as requested_by_fullname,
+             a.username as admin_username, a.full_name as admin_fullname
+      FROM material_requests mr
+      LEFT JOIN users u ON mr.user_id = u.id
+      LEFT JOIN users a ON mr.admin_id = a.id
+      WHERE mr.id = ?
+    `;
+    
+    // Add permission check - admins see all, users only see their own
+    const permissionCheck = isAdminOrManager ? '' : ' AND mr.user_id = ?';
+    
+    const [requests] = await pool.query(
+      query + permissionCheck,
+      isAdminOrManager ? [id] : [id, userId]
+    );
+    
+    if (requests.length === 0) {
+      return res.status(404).json({ success: false, error: 'Request not found' });
+    }
+    
+    // Format the request data if it's a string
+    const request = requests[0];
+    if (typeof request.request_data === 'string') {
+      try {
+        request.request_data = JSON.parse(request.request_data);
+      } catch (error) {
+        console.error('Error parsing request data:', error);
+        // Keep the original string if parsing fails
+      }
+    }
+    
+    res.json({ success: true, data: request });
+  } catch (error) {
+    console.error('Error fetching material request:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch material request' });
+  }
+});
 app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
   try {
     const { id } = req.params;
@@ -998,10 +1043,54 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
       await connection.commit();
       
       // Create notification for the requester
+      // Cập nhật phần xử lý yêu cầu trong app.js
+
+      // Thay thế đoạn code tạo thông báo trong hàm xử lý yêu cầu:
+
+      // Tạo thông báo chi tiết hơn cho người yêu cầu dựa trên loại yêu cầu và trạng thái
+      let notificationMessage = '';
+      const requestTypeMap = {
+        'add': 'thêm',
+        'edit': 'sửa',
+        'delete': 'xóa'
+      };
+
+      const requestTypeInVietnamese = requestTypeMap[request.request_type] || request.request_type;
+
+      // Lấy thông tin về nguyên vật liệu nếu có
+      let materialInfo = '';
+      if (request.material_id) {
+        try {
+          const [materialResult] = await connection.query(
+            'SELECT part_name FROM materials WHERE id = ?',
+            [request.material_id]
+          );
+          
+          if (materialResult.length > 0) {
+            materialInfo = materialResult[0].part_name;
+          }
+        } catch (err) {
+          console.error('Error fetching material info:', err);
+        }
+      }
+
+      // Tạo thông báo chi tiết
+      if (status === 'approved') {
+        notificationMessage = `Yêu cầu ${requestTypeInVietnamese} nguyên vật liệu${materialInfo ? ` "${materialInfo}"` : ''} đã được phê duyệt`;
+      } else {
+        notificationMessage = `Yêu cầu ${requestTypeInVietnamese} nguyên vật liệu${materialInfo ? ` "${materialInfo}"` : ''} đã bị từ chối`;
+      }
+
+      // Thêm lý do từ chối nếu có
+      if (status === 'rejected' && adminNotes) {
+        notificationMessage += `. Lý do: ${adminNotes}`;
+      }
+
+      // Tạo thông báo cho người yêu cầu
       await pool.query(
-        `INSERT INTO admin_notifications (user_id, message)
-         VALUES (?, ?)`,
-        [request.user_id, `Your ${request.request_type} material request has been ${status}`]
+        `INSERT INTO admin_notifications (user_id, related_request_id, message, notification_type)
+        VALUES (?, ?, ?, 'request')`,
+        [request.user_id, request.id, notificationMessage]
       );
       
       res.json({ 
@@ -1025,8 +1114,296 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
   }
 });
 
+// ===== NOTIFICATIONS API =====
 
+// Lấy tất cả thông báo của người dùng hiện tại
+app.get('/api/notifications', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    // Lấy tất cả thông báo của người dùng
+    const [notifications] = await pool.query(
+      `SELECT * FROM admin_notifications 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 100`,  // Giới hạn 100 thông báo gần nhất
+      [userId]
+    );
+    
+    res.json({ success: true, data: notifications });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ success: false, error: 'Failed to delete notification' });
+  }
+});
 
+// Clear all notifications for a user
+app.delete('/api/notifications', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    // Delete all notifications for the current user
+    await pool.query(
+      'DELETE FROM admin_notifications WHERE user_id = ?',
+      [userId]
+    );
+    
+    res.json({ success: true, message: 'All notifications cleared' });
+  } catch (error) {
+    console.error('Error clearing notifications:', error);
+    res.status(500).json({ success: false, error: 'Failed to clear notifications' });
+  }
+});({ success: false, error: 'Failed to fetch notifications' });
+;
+
+// Lấy số lượng thông báo chưa đọc
+app.get('/api/notifications/unread-count', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const userId = req.session.user.id;
+    
+    // Đếm số lượng thông báo chưa đọc
+    const [result] = await pool.query(
+      `SELECT COUNT(*) as count FROM admin_notifications 
+       WHERE user_id = ? AND is_read = 0`,
+      [userId]
+    );
+    
+    const unreadCount = result[0].count;
+    
+    res.json({ success: true, count: unreadCount });
+  } catch (error) {
+    console.error('Error counting unread notifications:', error);
+    res.status(500).json({ success: false, error: 'Failed to count unread notifications', count: 0 });
+  }
+});
+
+// Đánh dấu thông báo là đã đọc
+app.put('/api/notifications/read', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { notificationIds } = req.body;
+    const userId = req.session.user.id;
+    
+    if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'Invalid notification IDs' });
+    }
+    
+    // Tạo placeholders cho câu truy vấn SQL
+    const placeholders = notificationIds.map(() => '?').join(',');
+    
+    // Cập nhật là đã đọc (chỉ đối với thông báo của người dùng hiện tại)
+    await pool.query(
+      `UPDATE admin_notifications 
+       SET is_read = 1 
+       WHERE id IN (${placeholders}) AND user_id = ?`,
+      [...notificationIds, userId]
+    );
+    
+    res.json({ success: true, message: 'Notifications marked as read' });
+  } catch (error) {
+    console.error('Error marking notifications as read:', error);
+    res.status(500).json({ success: false, error: 'Failed to mark notifications as read' });
+  }
+});
+
+// Xóa thông báo (tùy chọn)
+app.delete('/api/notifications/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.session.user.id;
+    
+    // Xóa thông báo (chỉ thông báo của người dùng hiện tại)
+    await pool.query(
+      'DELETE FROM admin_notifications WHERE id = ? AND user_id = ?',
+      [id, userId]
+    );
+    
+    res.json({ success: true, message: 'Notification deleted' });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json
+  }
+});
+// Add these routes to app.js
+
+// ===== BATCHES API =====
+
+// Get all batches
+app.get('/api/batches', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const [batches] = await pool.query('SELECT * FROM batches ORDER BY id DESC');
+    res.json({ success: true, data: batches });
+  } catch (error) {
+    console.error('Error fetching batches:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch batches' });
+  }
+});
+
+// Get ungrouped batches
+app.get('/api/batches/ungrouped', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const [batches] = await pool.query(
+      'SELECT * FROM batches WHERE status != "Grouped for Assembly" OR status IS NULL ORDER BY id DESC'
+    );
+    res.json({ success: true, data: batches });
+  } catch (error) {
+    console.error('Error fetching ungrouped batches:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch ungrouped batches' });
+  }
+});
+
+// Get grouped batches
+app.get('/api/batches/grouped', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const [batches] = await pool.query(
+      'SELECT b.*, bg.group_id FROM batches b ' +
+      'JOIN batch_groups bg ON b.id = bg.batch_id ' +
+      'WHERE b.status = "Grouped for Assembly" ' +
+      'ORDER BY bg.group_id, b.id'
+    );
+    res.json({ success: true, data: batches });
+  } catch (error) {
+    console.error('Error fetching grouped batches:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch grouped batches' });
+  }
+});
+
+// Get a single batch by ID
+app.get('/api/batches/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [rows] = await pool.query('SELECT * FROM batches WHERE id = ?', [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Batch not found' });
+    }
+    
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Error fetching batch:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch batch' });
+  }
+});
+
+// Group batches
+app.post('/api/batches/group', isAuthenticatedAPI, async (req, res) => {
+  // Start a transaction
+  const connection = await pool.getConnection();
+  await connection.beginTransaction();
+  
+  try {
+    const { batchIds, status } = req.body;
+    
+    if (!Array.isArray(batchIds) || batchIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'Invalid batch IDs' });
+    }
+    
+    // Check if any of the batches are already grouped
+    const placeholders = batchIds.map(() => '?').join(',');
+    const [existingGrouped] = await connection.query(
+      `SELECT id, part_name FROM batches 
+       WHERE id IN (${placeholders}) AND status = "Grouped for Assembly"`,
+      batchIds
+    );
+    
+    if (existingGrouped.length > 0) {
+      await connection.rollback();
+      return res.status(400).json({ 
+        success: false, 
+        error: `Lô ${existingGrouped[0].part_name} đã được nhóm` 
+      });
+    }
+    
+    // Create a new group
+    const [groupResult] = await connection.query(
+      'INSERT INTO batch_groups_counter (created_by) VALUES (?)',
+      [req.session.user.id]
+    );
+    
+    const groupId = groupResult.insertId;
+    
+    // Add batches to the group
+    for (const batchId of batchIds) {
+      await connection.query(
+        'INSERT INTO batch_groups (group_id, batch_id) VALUES (?, ?)',
+        [groupId, batchId]
+      );
+      
+      // Update batch status
+      await connection.query(
+        'UPDATE batches SET status = ? WHERE id = ?',
+        [status, batchId]
+      );
+    }
+    
+    // Log the grouping activity
+    await connection.query(
+      `INSERT INTO activity_logs 
+       (user_id, action_type, action_details, action_target) 
+       VALUES (?, ?, ?, ?)`,
+      [
+        req.session.user.id,
+        'BATCH_GROUP',
+        JSON.stringify({ batchIds, groupId }),
+        'batches'
+      ]
+    );
+    
+    // Commit the transaction
+    await connection.commit();
+    
+    res.json({ 
+      success: true, 
+      message: 'Batches grouped successfully',
+      groupId
+    });
+  } catch (error) {
+    // Rollback in case of error
+    await connection.rollback();
+    console.error('Error grouping batches:', error);
+    res.status(500).json({ success: false, error: 'Failed to group batches' });
+  } finally {
+    connection.release();
+  }
+});
+
+// Update batch status
+app.put('/api/batches/:id/status', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({ success: false, error: 'Status is required' });
+    }
+    
+    await pool.query(
+      'UPDATE batches SET status = ? WHERE id = ?',
+      [status, id]
+    );
+    
+    // Log the status update
+    await pool.query(
+      `INSERT INTO activity_logs 
+       (user_id, action_type, action_details, action_target) 
+       VALUES (?, ?, ?, ?)`,
+      [
+        req.session.user.id,
+        'BATCH_STATUS_UPDATE',
+        JSON.stringify({ batchId: id, newStatus: status }),
+        'batches'
+      ]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Batch status updated successfully' 
+    });
+  } catch (error) {
+    console.error('Error updating batch status:', error);
+    res.status(500).json({ success: false, error: 'Failed to update batch status' });
+  }
+});
 // ===== SERVE REACT APP =====
 
 // Start the server
