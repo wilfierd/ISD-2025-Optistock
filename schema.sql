@@ -481,3 +481,77 @@ INSERT INTO batches (part_name, machine_name, mold_code, quantity, warehouse_ent
 ('C2028', 'ZHG513-303', 'ZHG513-302-V3', 30, '19:00:10 05/03/2025', NULL, 1),
 ('C2022', 'ZHG513-304', 'ZHG513-302-V4', 40, '19:00:10 05/03/2025', NULL, 1),
 ('C2028', 'ZHG513-305', 'ZHG513-302-V4', 10, '19:00:10 05/03/2025', NULL, 1);
+
+CREATE TABLE IF NOT EXISTS machines (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ten_may_dap VARCHAR(100) NOT NULL
+);
+
+-- Create molds table
+CREATE TABLE IF NOT EXISTS molds (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ma_khuon VARCHAR(100) NOT NULL,
+    so_luong INT NOT NULL DEFAULT 0,
+    machine_id INT,
+    material_id INT,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE SET NULL,
+    FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE SET NULL
+);
+
+-- Create machine_stop_logs table
+CREATE TABLE IF NOT EXISTS machine_stop_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    machine_id INT NOT NULL,
+    reason TEXT NOT NULL,
+    stop_time VARCHAR(50),
+    stop_date VARCHAR(50),
+    user_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Create loHoangHoa table (renamed from batches)
+CREATE TABLE IF NOT EXISTS loHangHoa (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    material_id INT,
+    machine_id INT,
+    mold_id INT,
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status ENUM('running', 'stopping') DEFAULT 'running',
+    expected_output INT,
+    actual_output INT DEFAULT 0,
+    start_date DATETIME,
+    end_date DATETIME,
+    FOREIGN KEY (material_id) REFERENCES materials(id) ON DELETE SET NULL,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE SET NULL,
+    FOREIGN KEY (mold_id) REFERENCES molds(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- Insert sample data for machines
+INSERT INTO machines (ten_may_dap) VALUES
+('A7-45T'),
+('ZHG513-302'),
+('ZHG513-303'),
+('ZHG513-304'),
+('Day la may test');
+
+-- Insert sample data for molds
+INSERT INTO molds (ma_khuon, so_luong, machine_id) VALUES
+('ZHG513-302-V1', 10, 1),
+('C2021', 20, 2),
+('C2028', 30, 3),
+('C2022', 40, 4),
+('C2028', 10, 5);
+
+-- Insert sample data for loHoangHoa (production batches)
+INSERT INTO loHangHoa (material_id, machine_id, mold_id, created_by, status, expected_output, start_date) VALUES
+(1, 2, 2, 1, 'running', 500, NOW()),
+(2, 4, 4, 1, 'running', 250, NOW()),
+(3, 1, 1, 2, 'running', 1000, '2025-04-01 08:00:00'),
+(4, 3, 3, 2, 'running', 750, '2025-03-01 08:00:00'),
+(5, 5, 5, 1, 'running', 300, '2025-05-01 08:00:00');
+
+ALTER TABLE machines ADD COLUMN status ENUM('running', 'stopping') DEFAULT NULL;
