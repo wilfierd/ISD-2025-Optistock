@@ -93,6 +93,21 @@ const apiService = {
     groupBatches: (data) => api.post('/batches/group', data),
     updateStatus: (id, status) => api.put(`/batches/${id}/status`, { status }),
   },
+  production : {
+    getAll: (status = 'all') => api.get(`/production${status !== 'all' ? `?status=${status}` : ''}`),
+    getById: (id) => api.get(`/production/${id}`),
+    create: (data) => api.post('/production', data),
+    update: (id, data) => api.put(`/production/${id}`, data),
+    delete: (id) => api.delete(`/production/${id}`)
+  },
+  machines: {
+    getAll: () => api.get('/machines'),
+    saveStopReason: (machineId, data) => api.post(`/machines/${machineId}/stop`, data),
+  },
+  
+  molds: {
+    getAll: () => api.get('/molds'),
+  },
 };
 
 export default apiService;

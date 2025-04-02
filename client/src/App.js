@@ -13,6 +13,7 @@ import { hasAdminOrManagerAccess } from './utils/rolePermissions';
 import { LanguageProvider } from './contexts/LanguageContext';
 import BatchGrouping from './components/BatchGrouping';
 import Notifications from './components/Notifications'; // Import thêm component Notifications
+import Production from './components/Production'; // Import thêm component Production
 
 function App() {
   const { data: authData, isLoading } = useAuthStatus();
@@ -57,6 +58,7 @@ function App() {
           element={user ? <Notifications user={user} /> : <Navigate to="/login" />} 
         />
         <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route path="/production" element={user ? <Production user={user} /> : <Navigate to="/login" />} />
       </Routes>
     </LanguageProvider>
   );
