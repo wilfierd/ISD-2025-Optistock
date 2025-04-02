@@ -1,6 +1,6 @@
-// client/src/components/Navbar.js with updated role-based access control
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom'; 
+// client/src/components/Navbar.js
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useNotifications, useMarkNotificationsAsRead } from '../hooks/useNotifications';
 import { hasAdminOnlyAccess, hasAdminOrManagerAccess } from '../utils/rolePermissions';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -11,10 +11,10 @@ function Navbar({ user, onLogout }) {
   const isActive = (path) => location.pathname === path;
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
   
   const { data: notifications = [] } = useNotifications();
-  const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
   const markAsRead = useMarkNotificationsAsRead();
   const { language, toggleLanguage, t } = useLanguage();
   
@@ -34,7 +34,8 @@ function Navbar({ user, onLogout }) {
     setShowNotifications(false);
     navigate('/notifications');
   };
-    // Thêm function handleMarkAllAsRead để sửa lỗi
+
+  // Mark all notifications as read
   const handleMarkAllAsRead = () => {
     if (unreadCount > 0) {
       const unreadIds = notifications
@@ -45,7 +46,22 @@ function Navbar({ user, onLogout }) {
     }
   };
 
-  // Helper để xác định màu sắc cho badge dựa trên loại thông báo
+  // Get background color for avatar based on username
+  const getAvatarColor = (username) => {
+    const colors = [
+      '#4caf50', '#2196f3', '#9c27b0', '#f44336', '#ff9800',
+      '#009688', '#673ab7', '#3f51b5', '#e91e63', '#ffc107'
+    ];
+    
+    // Generate a simple hash from username to pick a consistent color
+    const hashCode = username.split('').reduce(
+      (acc, char) => acc + char.charCodeAt(0), 0
+    );
+    
+    return colors[hashCode % colors.length];
+  };
+
+  // Helper to determine badge color based on notification type
   const getNotificationBadgeColor = (notification) => {
     if (notification.notification_type === 'request') {
       return notification.message.includes('đã được phê duyệt') ? 'success' : 
@@ -54,7 +70,7 @@ function Navbar({ user, onLogout }) {
     return notification.is_important ? 'danger' : 'info';
   };
 
-  // Helper để xác định icon cho thông báo
+  // Helper to determine icon for notification
   const getNotificationIcon = (notification) => {
     if (notification.notification_type === 'request') {
       return notification.message.includes('đã được phê duyệt') ? 'fa-check-circle' : 
@@ -63,7 +79,7 @@ function Navbar({ user, onLogout }) {
     return notification.is_important ? 'fa-exclamation-circle' : 'fa-bell';
   };
 
-  // Helper để định dạng thời gian thông báo
+  // Helper to format notification time
   const formatNotificationTime = (timestamp) => {
     const now = new Date();
     const notificationTime = new Date(timestamp);
@@ -73,242 +89,404 @@ function Navbar({ user, onLogout }) {
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
 
-    if (diffSec < 60) return `${diffSec} giây trước`;
-    if (diffMin < 60) return `${diffMin} phút trước`;
-    if (diffHour < 24) return `${diffHour} giờ trước`;
-    if (diffDay < 7) return `${diffDay} ngày trước`;
+    if (diffSec < 60) return `${diffSec} ${language === 'en' ? 'seconds ago' : 'giây trước'}`;
+    if (diffMin < 60) return `${diffMin} ${language === 'en' ? 'minutes ago' : 'phút trước'}`;
+    if (diffHour < 24) return `${diffHour} ${language === 'en' ? 'hours ago' : 'giờ trước'}`;
+    if (diffDay < 7) return `${diffDay} ${language === 'en' ? 'days ago' : 'ngày trước'}`;
 
-    // Format ngày tháng nếu quá 7 ngày
+    // Format date if more than 7 days
     return notificationTime.toLocaleDateString();
   };
 
-  // Xử lý khi click vào thông báo
+  // Handle notification click
   const handleNotificationClick = (notificationId) => {
-    // Đánh dấu thông báo là đã đọc
+    // Mark notification as read
     markAsRead.mutate([notificationId]);
 
-    // Đóng dropdown
+    // Close dropdown
     setShowNotifications(false);
 
-    // Chuyển đến trang thông báo
+    // Navigate to notifications page
     navigate('/notifications');
-  }
+  };
 
-return (
-    <nav className="navbar navbar-expand-lg navbar-dark">
-        <div className="container-fluid">
-            <div className="d-flex">
-                {/* Tổng quan */}
+  // Navigation Items Dictionary
+  const navItems = {
+    dashboard: {
+      en: 'Dashboard',
+      vi: 'Tổng quan'
+    },
+    warehouse: {
+      en: 'Warehouse',
+      vi: 'Nhà kho'
+    },
+    inventoryCheck: {
+      en: 'Inventory Check',
+      vi: 'Kiểm kho'
+    },
+    employees: {
+      en: 'Employees',
+      vi: 'Nhân viên'
+    },
+    requests: {
+      en: 'Requests',
+      vi: 'Yêu cầu'
+    },
+    production: {
+      en: 'Production',
+      vi: 'Sản xuất'
+    },
+    warehouseOptions: {
+      rawMaterials: {
+        en: 'Raw Materials',
+        vi: 'Kho NVL'
+      },
+      processWarehouse: {
+        en: 'Process Warehouse',
+        vi: 'Kho công đoạn'
+      },
+      finishedProducts: {
+        en: 'Finished Products',
+        vi: 'Kho thành phẩm'
+      }
+    },
+    notifications: {
+      en: 'Notifications',
+      vi: 'Thông báo'
+    },
+    markAllAsRead: {
+      en: 'Mark all as read',
+      vi: 'Đánh dấu tất cả đã đọc'
+    },
+    noNotifications: {
+      en: 'No notifications',
+      vi: 'Không có thông báo'
+    },
+    viewAllNotifications: {
+      en: 'View all notifications',
+      vi: 'Xem tất cả thông báo'
+    },
+    logout: {
+      en: 'Logout',
+      vi: 'Đăng xuất'
+    },
+    english: {
+      en: 'English',
+      vi: 'English'
+    },
+    vietnamese: {
+      en: 'Vietnamese',
+      vi: 'Tiếng Việt'
+    }
+  };
+
+  // Function to get text based on current language
+  const getText = (item) => {
+    return language === 'en' ? item.en : item.vi;
+  };
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showWarehouseDropdown && !event.target.closest('.warehouse-dropdown-container')) {
+        setShowWarehouseDropdown(false);
+      }
+      
+      if (showLanguageDropdown && !event.target.closest('.language-dropdown-container')) {
+        setShowLanguageDropdown(false);
+      }
+      
+      if (showNotifications && !event.target.closest('.notifications-dropdown-container')) {
+        setShowNotifications(false);
+      }
+      
+      if (showUserDropdown && !event.target.closest('.user-dropdown-container')) {
+        setShowUserDropdown(false);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showWarehouseDropdown, showLanguageDropdown, showNotifications, showUserDropdown]);
+
+  return (
+    <nav className="navbar navbar-expand-lg navbar-dark" style={{ backgroundColor: '#1a4b8c' }}>
+      <div className="container-fluid">
+        <div className="d-flex">
+          <Link 
+            className={`navbar-brand ${isActive('/dashboard') ? 'fw-bold' : ''}`} 
+            to="/dashboard"
+            style={{ padding: '10px 20px', margin: '0 5px', borderRadius: '4px' }}
+          >
+            {getText(navItems.dashboard)}
+          </Link>
+          
+          {/* Warehouse dropdown */}
+          <div className="position-relative warehouse-dropdown-container">
+            <button 
+              className={`btn navbar-brand ${location.pathname.includes('/materials') || location.pathname.includes('/batch-grouping') ? 'fw-bold' : ''}`}
+              onClick={() => setShowWarehouseDropdown(!showWarehouseDropdown)}
+              style={{ 
+                padding: '10px 20px', 
+                margin: '0 5px', 
+                borderRadius: '4px',
+                backgroundColor: showWarehouseDropdown ? 'rgba(255,255,255,0.1)' : 'transparent'
+              }}
+            >
+              {getText(navItems.warehouse)} <i className="fas fa-caret-down ms-1"></i>
+            </button>
+            
+            {showWarehouseDropdown && (
+              <div 
+                className="position-absolute mt-1 dropdown-menu show" 
+                style={{ 
+                  minWidth: '200px', 
+                  zIndex: 1000, 
+                  left: '10px',
+                  borderRadius: '4px',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
+                }}
+              >
                 <Link 
-                    className={`navbar-brand ${isActive('/dashboard') ? 'fw-bold' : ''}`} 
-                    to="/dashboard"
+                  to="/materials" 
+                  className="dropdown-item"
+                  onClick={() => setShowWarehouseDropdown(false)}
                 >
-                    {t('dashboard')}
+                  {getText(navItems.warehouseOptions.rawMaterials)}
                 </Link>
-
-                {/* Nhà kho */}
-                <div className="position-relative">
-                    <button 
-                        className="btn btn-link text-white dropdown-toggle" 
-                        onClick={() => setShowWarehouseDropdown(!showWarehouseDropdown)}
-                    >
-                        {t('Nhà kho')}
-                    </button>
-                    
-                    {showWarehouseDropdown && (
-                        <div className="position-absolute top-100 mt-2 dropdown-menu show" style={{ minWidth: '200px' }}>
-                            <Link 
-                                className="dropdown-item" 
-                                to="/materials"
-                                onClick={() => setShowWarehouseDropdown(false)}
-                            >
-                                {t('Kho NVL')}
-                            </Link>
-                            <Link 
-                                className="dropdown-item" 
-                                to='/batch-grouping'
-                            >
-                                {t('Kho công đoạn')}
-                            </Link>
-                            <Link 
-                                className="dropdown-item" 
-                                onClick={() => setShowWarehouseDropdown(false)}
-                            >
-                                {t('Kho thành phẩm')}
-                            </Link>
-                        </div>
-                    )}
-                </div>
-
-                {/* Kiểm kho */}
                 <Link 
-                    className={`navbar-brand ${isActive('/warehouse-check') ? 'fw-bold' : ''}`} 
-                    to="/warehouse-check"
+                  to="/materials?type=process" 
+                  className="dropdown-item"
+                  onClick={() => setShowWarehouseDropdown(false)}
                 >
-                    {t('Kiểm kho')}
+                  {getText(navItems.warehouseOptions.processWarehouse)}
                 </Link>
-
-                {/* Nhân viên */}
-                {hasAdminOrManagerAccess(user) && (
-                    <Link 
-                        className={`navbar-brand ${isActive('/employees') ? 'fw-bold' : ''}`} 
-                        to="/employees"
-                    >
-                        {t('employees')}
-                    </Link>
-                )}
-
-                {/* Yêu cầu */}
-                {hasAdminOrManagerAccess(user) && (
-                    <Link 
-                        className={`navbar-brand ${isActive('/requests') ? 'fw-bold' : ''}`} 
-                        to="/requests"
-                    >
-                        {t('Yêu cầu')}
-                    </Link>
-                )}
-
-                {/* Sản xuất (not implemented yet) */}
-                <button 
-                    className="btn btn-link text-white" 
-                    onClick={() => alert('Sản xuất chưa được triển khai.')}
+                <Link 
+                  to="/batch-grouping" 
+                  className="dropdown-item"
+                  onClick={() => setShowWarehouseDropdown(false)}
                 >
-                    {t('Sản xuất')}
-                </button>
-            </div>
-            <div className="d-flex align-items-center">
-                {/* Language Switcher */}
-                <div className="position-relative me-3">
-                    <button 
-                        className="btn btn-link text-white" 
-                        onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                    >
-                        <i className="fas fa-globe me-1"></i>
-                        {language === 'en' ? 'EN' : 'VI'}
-                    </button>
-                    
-                    {showLanguageDropdown && (
-                        <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show" style={{ minWidth: '150px' }}>
-                            <button 
-                                className={`dropdown-item ${language === 'en' ? 'active' : ''}`} 
-                                onClick={() => {
-                                    if (language !== 'en') toggleLanguage();
-                                    setShowLanguageDropdown(false);
-                                }}
-                            >
-                                {t('english')}
-                            </button>
-                            <button 
-                                className={`dropdown-item ${language === 'vi' ? 'active' : ''}`} 
-                                onClick={() => {
-                                    if (language !== 'vi') toggleLanguage();
-                                    setShowLanguageDropdown(false);
-                                }}
-                            >
-                                {t('vietnamese')}
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Notification bell icon */}
-                <div className="position-relative me-3">
-                    <button 
-                        className="btn btn-link text-white" 
-                        onClick={() => setShowNotifications(!showNotifications)}
-                    >
-                        <i className="fas fa-bell"></i>
-                        {unreadCount > 0 && (
-                            <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                                {unreadCount}
-                            </span>
-                        )}
-                    </button>
-                    
-                    {showNotifications && (
-                        <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show notification-dropdown" style={{ width: '350px' }}>
-                            <div className="d-flex justify-content-between align-items-center px-3 py-2 dropdown-header">
-                                <h6 className="mb-0">{t('notifications')}</h6>
-                                {unreadCount > 0 && (
-                                    <button 
-                                        className="btn btn-sm btn-link text-decoration-none" 
-                                        onClick={handleMarkAllAsRead}
-                                    >
-                                        <i className="fas fa-check-double me-1"></i> {t('markAllAsRead')}
-                                    </button>
-                                )}
-                            </div>
-                            <div className="notifications-scrollable">
-                                {notifications.length === 0 ? (
-                                    <div className="notification-empty">
-                                        {t('noNotifications')}
-                                        <i className="fas fa-bell-slash"></i>
-                                        <p>{t('noNotifications')}</p>
-                                    </div>
-                                ) : (
-                                    notifications.slice(0, 5).map(notification => (
-                                        <div 
-                                            key={notification.id} 
-                                            className={`dropdown-item py-2 px-3 border-bottom notification-item ${!notification.is_read ? 'unread' : ''}`}
-                                            style={{ cursor: 'pointer' }}
-                                            onClick={() => handleNotificationClick(notification.id)}
-                                        >
-                                            <div className="d-flex align-items-start">
-                                                <div className={`notification-badge ${getNotificationBadgeColor(notification)}`}>
-                                                    <i className={`fas ${getNotificationIcon(notification)}`}></i>
-                                                </div>
-                                                <div>
-                                                    <div className="notification-message">{notification.message}</div>
-                                                    <div className="notification-time">
-                                                        {formatNotificationTime(notification.created_at)}
-                                                    </div>
-                                                </div>
-                                                {!notification.is_read && (
-                                                    <div className="ms-auto">
-                                                        <span className="badge rounded-pill bg-primary">
-                                                            <i className="fas fa-circle fa-xs"></i>
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                            <div className="dropdown-footer">
-                                <Link to="/notifications" className="text-primary" onClick={() => setShowNotifications(false)}>
-                                    <i className="fas fa-list me-1"></i> {t('viewAllNotifications')}
-                                </Link>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* User dropdown */}
-                <div className="position-relative me-3">
-                    <button 
-                        className="btn text-white d-flex align-items-center" 
-                        onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
-                    >
-                        <span className="me-2">Hi, {user.username}</span>
-                        <i className={`fas ${showLogoutDropdown ? 'fa-chevron-up' : 'fa-chevron-down'}`}></i>
-                    </button>
-                    
-                    {showLogoutDropdown && (
-                        <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show" style={{ minWidth: '150px' }}>
-                            <button 
-                                className="dropdown-item" 
-                                onClick={onLogout}
-                            >
-                                {t('logout')}
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
+                  {getText(navItems.warehouseOptions.finishedProducts)}
+                </Link>
+              </div>
+            )}
+          </div>
+          
+          <Link 
+            className={`navbar-brand ${isActive('/warehouse-check') ? 'fw-bold' : ''}`} 
+            to="/warehouse-check"
+            style={{ padding: '10px 20px', margin: '0 5px', borderRadius: '4px' }}
+          >
+            {getText(navItems.inventoryCheck)}
+          </Link>
+          
+          {/* Only show for admin or manager roles */}
+          {hasAdminOrManagerAccess(user) && (
+            <Link 
+              className={`navbar-brand ${isActive('/employees') ? 'fw-bold' : ''}`} 
+              to="/employees"
+              style={{ padding: '10px 20px', margin: '0 5px', borderRadius: '4px' }}
+            >
+              {getText(navItems.employees)}
+            </Link>
+          )}
+          
+          {/* Only show for admin or manager roles */}
+          {hasAdminOrManagerAccess(user) && (
+            <Link 
+              className={`navbar-brand ${isActive('/requests') ? 'fw-bold' : ''}`} 
+              to="/requests"
+              style={{ padding: '10px 20px', margin: '0 5px', borderRadius: '4px' }}
+            >
+              {getText(navItems.requests)}
+            </Link>
+          )}
+          
+          <Link 
+            className={`navbar-brand ${isActive('/production') ? 'fw-bold' : ''}`} 
+            to="/production"
+            style={{ 
+              padding: '10px 20px', 
+              margin: '0 5px', 
+              borderRadius: '4px',
+              backgroundColor: isActive('/production') ? 'rgba(255,255,255,0.2)' : 'transparent',
+              fontWeight: isActive('/production') ? 'bold' : 'normal'
+            }}
+          >
+            {getText(navItems.production)}
+          </Link>
         </div>
+        
+        <div className="d-flex align-items-center">
+          {/* Language Switcher */}
+          <div className="position-relative me-3 language-dropdown-container">
+            <button 
+              className="btn btn-link text-white" 
+              onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                borderRadius: '50%',
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0'
+              }}
+            >
+              <span className="d-flex align-items-center">
+                {language === 'en' ? 'EN' : 'VI'}
+              </span>
+            </button>
+            
+            {/* Language dropdown */}
+            {showLanguageDropdown && (
+              <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show" style={{ minWidth: '150px', zIndex: 1000 }}>
+                <button 
+                  className={`dropdown-item ${language === 'en' ? 'active' : ''}`} 
+                  onClick={() => {
+                    if (language !== 'en') toggleLanguage();
+                    setShowLanguageDropdown(false);
+                  }}
+                >
+                  {getText(navItems.english)}
+                </button>
+                <button 
+                  className={`dropdown-item ${language === 'vi' ? 'active' : ''}`} 
+                  onClick={() => {
+                    if (language !== 'vi') toggleLanguage();
+                    setShowLanguageDropdown(false);
+                  }}
+                >
+                  {getText(navItems.vietnamese)}
+                </button>
+              </div>
+            )}
+          </div>
+          
+          {/* Notification bell icon */}
+          <div className="position-relative me-3 notifications-dropdown-container">
+            <button 
+              className="btn btn-link text-white" 
+              onClick={() => setShowNotifications(!showNotifications)}
+            >
+              <i className="fas fa-bell"></i>
+              {unreadCount > 0 && (
+                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+            
+            {/* Enhanced Notifications dropdown */}
+            {showNotifications && (
+              <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show notification-dropdown" 
+                   style={{ width: '350px', zIndex: 1000, maxHeight: '400px', overflowY: 'auto' }}>
+                <div className="d-flex justify-content-between align-items-center px-3 py-2 dropdown-header border-bottom">
+                  <h6 className="mb-0">{getText(navItems.notifications)}</h6>
+                  {unreadCount > 0 && (
+                    <button 
+                      className="btn btn-sm btn-link text-decoration-none" 
+                      onClick={handleMarkAllAsRead}
+                    >
+                      <i className="fas fa-check-double me-1"></i> {getText(navItems.markAllAsRead)}
+                    </button>
+                  )}
+                </div>
+                
+                <div className="notifications-scrollable">
+                  {notifications.length === 0 ? (
+                    <div className="notification-empty text-center py-4">
+                      <i className="fas fa-bell-slash mb-2" style={{ fontSize: '24px', opacity: '0.5' }}></i>
+                      <p className="mb-0 text-muted">{getText(navItems.noNotifications)}</p>
+                    </div>
+                  ) : (
+                    notifications.slice(0, 5).map(notification => (
+                      <div 
+                        key={notification.id} 
+                        className={`dropdown-item py-2 px-3 border-bottom notification-item ${!notification.is_read ? 'bg-light' : ''}`}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => handleNotificationClick(notification.id)}
+                      >
+                        <div className="d-flex align-items-start">
+                          <div className={`me-2 p-2 rounded-circle text-white bg-${getNotificationBadgeColor(notification)}`}
+                               style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <i className={`fas ${getNotificationIcon(notification)}`}></i>
+                          </div>
+                          <div className="flex-grow-1">
+                            <div className="notification-message">{notification.message}</div>
+                            <div className="notification-time text-muted small">
+                              {formatNotificationTime(notification.created_at)}
+                            </div>
+                          </div>
+                          {!notification.is_read && (
+                            <div className="ms-auto">
+                              <span className="badge rounded-pill bg-primary" style={{ width: '8px', height: '8px', padding: '0' }}></span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                
+                <div className="dropdown-footer p-2 text-center border-top">
+                  <Link to="/notifications" className="btn btn-sm btn-link text-primary text-decoration-none w-100" 
+                       onClick={() => setShowNotifications(false)}>
+                    <i className="fas fa-list me-1"></i> {getText(navItems.viewAllNotifications)}
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* User dropdown with avatar */}
+          <div className="position-relative user-dropdown-container">
+            <button 
+              className="btn btn-link text-white d-flex align-items-center"
+              onClick={() => setShowUserDropdown(!showUserDropdown)}
+              style={{ textDecoration: 'none' }}
+            >
+              <div 
+                className="avatar d-flex align-items-center justify-content-center me-2"
+                style={{
+                  width: '35px',
+                  height: '35px',
+                  borderRadius: '50%',
+                  backgroundColor: getAvatarColor(user.username),
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  textTransform: 'uppercase',
+                  border: '2px solid rgba(255,255,255,0.3)'
+                }}
+              >
+                {user.username.charAt(0)}
+              </div>
+              <span className="me-1">Hi, {user.username}</span>
+              <i className={`fas ${showUserDropdown ? 'fa-caret-up' : 'fa-caret-down'}`}></i>
+            </button>
+            
+            {/* User dropdown */}
+            {showUserDropdown && (
+              <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show" 
+                   style={{ minWidth: '200px', zIndex: 1000, borderRadius: '4px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
+                <button 
+                  className="dropdown-item text-danger" 
+                  onClick={onLogout}
+                >
+                  <i className="fas fa-sign-out-alt me-2"></i> 
+                  {getText(navItems.logout)}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </nav>
-);
+  );
 }
 
 export default Navbar;
