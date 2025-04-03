@@ -138,15 +138,15 @@ function Navbar({ user, onLogout }) {
     },
     warehouseOptions: {
       rawMaterials: {
-        en: 'Raw Materials',
-        vi: 'Kho NVL'
+        en: 'Materials Warehouse',
+        vi: 'Kho Nguyên vật liệu'
       },
       processWarehouse: {
-        en: 'Process Warehouse',
+        en: 'Stage Warehouse',
         vi: 'Kho công đoạn'
       },
       finishedProducts: {
-        en: 'Finished Products',
+        en: 'Products Warehouse',
         vi: 'Kho thành phẩm'
       }
     },

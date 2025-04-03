@@ -320,7 +320,7 @@ function BatchGrouping({ user }) {
               <div className="modal-body">
                 <p>{t('Bạn có chắc chắn muốn nhóm các lô đã chọn?')}</p>
                 <p>{t('Số lô đã chọn')}: <strong>{selectedBatches.length}</strong></p>
-                <p>{t('Sau khi nhóm, trạng thái của các lô sẽ được cập nhật thành "Grouped for Assembly"')}</p>
+                <p>{t('Sau khi nhóm, trạng thái của các lô sẽ được cập nhật thành "Sẵn sàng lắp ráp"')}</p>
               </div>
               <div className="modal-footer">
                 <button 

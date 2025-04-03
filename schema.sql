@@ -442,11 +442,11 @@ INSERT INTO material_tags (tag_name, color, created_by) VALUES
 -- Insert sample data for materials
 INSERT INTO materials (packet_no, part_name, material_code, length, width, material_type, quantity, supplier, updated_by, last_updated) VALUES
 (1, 'xxxxxxxxxxxxxxxxxxxxxxxxx','NVX', 3000, 3455, 'Steel', 10, 'SHENZEN', 'Khai', '05/03/2025'),
-(1, '10100070001A (FIN 1)','NVX', 3000, 345, 'Steel', 11000, 'NCCV', 'Khai', '05/03/2025'),
-(1, '10100070002A (FIN 2)','NVX', 3000, 345, 'Steel', 11000, 'NCCV', 'Khai', '05/03/2025'),
-(1, '10100070003A (FIN 3)','NVX', 3000, 345, 'Steel', 11000, 'NCCV', 'Khai', '05/03/2025'),
-(2, '10100070008A (BASE)','NVX', 3000, 345, 'Steel', 98000, 'NCCV', 'Khai', '05/03/2025'),
-(3, '1010007010A (BLOCK)','NVX', 3000, 345, 'Steel', 98000, 'NCCV', 'Khai', '05/03/2025');
+(1, 'Fin 673675/695045','AL1100', 02, 55, 'Aluminum', 1672, 'BOYD', 'Khai', '05/03/2025'),
+(1, '690165/66','AL1100', 1, 75, 'Aluminum',  569 , 'BOYD', 'Khai', '05/03/2025'),
+(1, '10100070003A (FIN 3)','AL1100', 3000, 345, 'Steel', 11000, 'NCCV', 'Khai', '05/03/2025'),
+(2, 'GC70/71MF0234A0','C2680', 1, 19, 'Copper', 388, 'KMW', 'Khai', '05/03/2025'),
+(3, '1010007010A (BLOCK)','AL1100', 3000, 345, 'Steel', 98000, 'NCCV', 'Khai', '05/03/2025');
 
 -- Add some sample category mappings
 INSERT INTO material_category_mapping (material_id, category_id) VALUES
