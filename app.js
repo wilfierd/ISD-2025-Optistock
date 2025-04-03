@@ -1312,6 +1312,400 @@ app.put('/api/batches/:id/status', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
+// ===== PRODUCTION API ROUTES =====
+
+// Get all production data from loHangHoa
+// ===== PRODUCTION API =====
+// ===== PRODUCTION API ROUTES =====
+
+// Get all production batches
+app.get('/api/production', isAuthenticatedAPI, async (req, res) => {
+    try {
+      // Get filter from query parameter (default to all)
+      const status = req.query.status || 'all';
+      
+      // Build query based on status filter
+      let query = `
+        SELECT loHangHoa.*, 
+               materials.part_name AS material_name,
+               machines.ten_may_dap AS machine_name,
+               molds.ma_khuon AS mold_code,
+               users.username AS created_by_username
+        FROM loHangHoa
+        LEFT JOIN materials ON loHangHoa.material_id = materials.id
+        LEFT JOIN machines ON loHangHoa.machine_id = machines.id
+        LEFT JOIN molds ON loHangHoa.mold_id = molds.id
+        LEFT JOIN users ON loHangHoa.created_by = users.id
+      `;
+      
+      // Add where clause if filtering by status
+      if (status !== 'all') {
+        query += ` WHERE loHangHoa.status = ?`;
+      }
+      
+      // Order by creation date, newest first
+      query += ` ORDER BY loHangHoa.created_at DESC`;
+      
+      // Execute query
+      const [batches] = status === 'all' 
+        ? await pool.query(query)
+        : await pool.query(query, [status]);
+      
+      res.json({
+        success: true,
+        data: batches
+      });
+    } catch (error) {
+      console.error('Error fetching production batches:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch production batches'
+      });
+    }
+  });
+  
+  // Get batch by ID
+  app.get('/api/production/:id', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const [batches] = await pool.query(
+        `SELECT loHangHoa.*, 
+                materials.part_name AS material_name,
+                machines.ten_may_dap AS machine_name,
+                molds.ma_khuon AS mold_code,
+                users.username AS created_by_username
+         FROM loHangHoa
+         LEFT JOIN materials ON loHangHoa.material_id = materials.id
+         LEFT JOIN machines ON loHangHoa.machine_id = machines.id
+         LEFT JOIN molds ON loHangHoa.mold_id = molds.id
+         LEFT JOIN users ON loHangHoa.created_by = users.id
+         WHERE loHangHoa.id = ?`,
+        [id]
+      );
+      
+      if (batches.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Production batch not found'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: batches[0]
+      });
+    } catch (error) {
+      console.error('Error fetching production batch:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch production batch'
+      });
+    }
+  });
+  
+  // Create new production batch (status set to running initially)
+  app.post('/api/production', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { 
+        materialId, 
+        machineId, 
+        moldId, 
+        expectedOutput
+      } = req.body;
+      
+      // Validate required fields
+      if (!materialId || !machineId || !moldId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Material, machine, and mold are required'
+        });
+      }
+      
+      // Set current date/time for start_date
+      const currentDate = new Date();
+      
+      // Create new batch with running status
+      const [result] = await pool.query(
+        `INSERT INTO loHangHoa (
+          material_id,
+          machine_id,
+          mold_id,
+          created_by,
+          status,
+          expected_output,
+          start_date
+        ) VALUES (?, ?, ?, ?, 'running', ?, ?)`,
+        [
+          materialId,
+          machineId,
+          moldId,
+          req.session.user.id,
+          expectedOutput || 0,
+          currentDate
+        ]
+      );
+      
+      // Update machine status to running
+      await pool.query(
+        `UPDATE machines SET status = 'running' WHERE id = ?`,
+        [machineId]
+      );
+      
+      // Get the newly created batch with joined data
+      const [newBatch] = await pool.query(
+        `SELECT loHangHoa.*, 
+                materials.part_name AS material_name,
+                machines.ten_may_dap AS machine_name,
+                molds.ma_khuon AS mold_code,
+                users.username AS created_by_username
+         FROM loHangHoa
+         LEFT JOIN materials ON loHangHoa.material_id = materials.id
+         LEFT JOIN machines ON loHangHoa.machine_id = machines.id
+         LEFT JOIN molds ON loHangHoa.mold_id = molds.id
+         LEFT JOIN users ON loHangHoa.created_by = users.id
+         WHERE loHangHoa.id = ?`,
+        [result.insertId]
+      );
+      
+      res.status(201).json({
+        success: true,
+        message: 'Production batch created successfully',
+        data: newBatch[0]
+      });
+    } catch (error) {
+      console.error('Error creating production batch:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create production batch'
+      });
+    }
+  });
+  
+  // Update production batch
+  app.put('/api/production/:id', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, actualOutput } = req.body;
+      
+      // Get the current batch
+      const [currentBatch] = await pool.query(
+        'SELECT * FROM loHangHoa WHERE id = ?',
+        [id]
+      );
+      
+      if (currentBatch.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Production batch not found'
+        });
+      }
+      
+      // Handle status transitions
+      if (status) {
+        // If changing to stopping (completed), set end_date
+        if (status === 'stopping' && currentBatch[0].status !== 'stopping') {
+          await pool.query(
+            `UPDATE loHangHoa SET 
+             status = ?,
+             actual_output = ?,
+             end_date = NOW()
+             WHERE id = ?`,
+            [status, actualOutput || currentBatch[0].actual_output, id]
+          );
+          
+          // Update machine status to stopped
+          await pool.query(
+            `UPDATE machines SET status = 'stopping' WHERE id = ?`,
+            [currentBatch[0].machine_id]
+          );
+        } 
+        // If restarting a completed batch
+        else if (status === 'running' && currentBatch[0].status === 'stopping') {
+          await pool.query(
+            `UPDATE loHangHoa SET 
+             status = ?,
+             actual_output = ?,
+             end_date = NULL
+             WHERE id = ?`,
+            [status, actualOutput || currentBatch[0].actual_output, id]
+          );
+          
+          // Update machine status to running
+          await pool.query(
+            `UPDATE machines SET status = 'running' WHERE id = ?`,
+            [currentBatch[0].machine_id]
+          );
+        }
+        // For other status changes without special handling
+        else {
+          await pool.query(
+            `UPDATE loHangHoa SET 
+             status = ?,
+             actual_output = ?
+             WHERE id = ?`,
+            [status, actualOutput || currentBatch[0].actual_output, id]
+          );
+        }
+      } else {
+        // Update without changing status
+        await pool.query(
+          `UPDATE loHangHoa SET 
+           actual_output = ?
+           WHERE id = ?`,
+          [actualOutput || currentBatch[0].actual_output, id]
+        );
+      }
+      
+      // Get the updated batch with joined data
+      const [updatedBatch] = await pool.query(
+        `SELECT loHangHoa.*, 
+                materials.part_name AS material_name,
+                machines.ten_may_dap AS machine_name,
+                molds.ma_khuon AS mold_code,
+                users.username AS created_by_username
+         FROM loHangHoa
+         LEFT JOIN materials ON loHangHoa.material_id = materials.id
+         LEFT JOIN machines ON loHangHoa.machine_id = machines.id
+         LEFT JOIN molds ON loHangHoa.mold_id = molds.id
+         LEFT JOIN users ON loHangHoa.created_by = users.id
+         WHERE loHangHoa.id = ?`,
+        [id]
+      );
+      
+      res.json({
+        success: true,
+        message: 'Production batch updated successfully',
+        data: updatedBatch[0]
+      });
+    } catch (error) {
+      console.error('Error updating production batch:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to update production batch'
+      });
+    }
+  });
+  
+  // Delete production batch
+  app.delete('/api/production/:id', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get the batch to check machine status
+      const [batch] = await pool.query(
+        'SELECT machine_id, status FROM loHangHoa WHERE id = ?',
+        [id]
+      );
+      
+      if (batch.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Production batch not found'
+        });
+      }
+      
+      // Delete the batch
+      await pool.query('DELETE FROM loHangHoa WHERE id = ?', [id]);
+      
+      // If batch was running, update machine status to stopping
+      if (batch[0].status === 'running') {
+        await pool.query(
+          'UPDATE machines SET status = ? WHERE id = ?',
+          ['stopping', batch[0].machine_id]
+        );
+      }
+      
+      res.json({
+        success: true,
+        message: 'Production batch deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error deleting production batch:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to delete production batch'
+      });
+    }
+  });
+  
+  // Additional endpoints for machines
+  
+  // Get all machines
+  app.get('/api/machines', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const [machines] = await pool.query('SELECT * FROM machines ORDER BY id');
+      res.json({
+        success: true,
+        data: machines
+      });
+    } catch (error) {
+      console.error('Error fetching machines:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch machines'
+      });
+    }
+  });
+  
+  // Get all molds
+  app.get('/api/molds', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const [molds] = await pool.query('SELECT * FROM molds ORDER BY id');
+      res.json({
+        success: true,
+        data: molds
+      });
+    } catch (error) {
+      console.error('Error fetching molds:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch molds'
+      });
+    }
+  });
+  
+  // Save machine stop reason
+  app.post('/api/machines/:id/stop', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason, stopTime, stopDate } = req.body;
+      
+      // Validate input
+      if (!reason) {
+        return res.status(400).json({
+          success: false,
+          error: 'Reason is required'
+        });
+      }
+      
+      // Log the stop reason
+      await pool.query(
+        `INSERT INTO machine_stop_logs 
+         (machine_id, reason, stop_time, stop_date, user_id) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [id, reason, stopTime, stopDate, req.session.user.id]
+      );
+      
+      // Update machine status
+      await pool.query(
+        'UPDATE machines SET status = ? WHERE id = ?',
+        ['stopping', id]
+      );
+      
+      res.json({
+        success: true,
+        message: 'Machine stop reason saved successfully'
+      });
+    } catch (error) {
+      console.error('Error saving machine stop reason:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to save machine stop reason'
+      });
+    }
+  });
+
 // Start the server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
