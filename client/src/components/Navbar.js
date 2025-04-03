@@ -257,14 +257,15 @@ function Navbar({ user, onLogout }) {
                   {getText(navItems.warehouseOptions.rawMaterials)}
                 </Link>
                 <Link 
-                  to="/materials?type=process" 
+                 to="/batch-grouping" 
+            
                   className="dropdown-item"
                   onClick={() => setShowWarehouseDropdown(false)}
                 >
                   {getText(navItems.warehouseOptions.processWarehouse)}
                 </Link>
                 <Link 
-                  to="/batch-grouping" 
+                       to="/materials?type=process" 
                   className="dropdown-item"
                   onClick={() => setShowWarehouseDropdown(false)}
                 >
