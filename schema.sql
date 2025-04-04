@@ -469,9 +469,9 @@ INSERT INTO material_tag_mapping (material_id, tag_id) VALUES
 -- Sample requests
 INSERT INTO material_requests (request_type, material_id, request_data, request_reason, urgency, user_id, status)
 VALUES 
-('edit', 1, '{"packetNo": 1, "partName": "Modified Part", "length": 3000, "width": 3455, "height": 2255, "quantity": 15, "supplier": "SHENZEN"}', 
+('edit', 3, '{"packetNo": 15, "partName": "Modified Part", "length": 3000, "width": 3455, "materialCode": "ACC", "materialType": "copper", "quantity": 15, "supplier": "SHENZEN"}', 
  'Need to increase quantity for upcoming production', 'high', 4, 'pending'),
-('add', NULL, '{"packetNo": 2, "partName": "New Component", "length": 500, "width": 300, "height": 200, "quantity": 25, "supplier": "Local Supplier"}',
+('add', NULL, '{"packetNo": 2, "partName": "New Component", "length": 500, "width": 300,"materialCode": "ZYA", "materialType": "steel", "quantity": 25, "supplier": "Local Supplier"}',
  'Required for new product line', 'medium', 4, 'pending'),
 ('delete', 3, '{}', 'No longer needed in production', 'low', 4, 'pending');
 -- Insert sample data for batches
