@@ -165,6 +165,78 @@ function Production({ user }) {
     }
   }, [showAddModal, currentStep]);
   
+  // Improved function to extract material ID from scanned QR codes
+  const extractMaterialIdFromScan = (scanValue) => {
+    try {
+      // Log the raw value for debugging
+      console.log('Raw QR scan value:', scanValue);
+      
+      // 1. Check for direct material ID format
+      if (scanValue.includes('/material/')) {
+        const parts = scanValue.split('/material/');
+        const idPart = parts[parts.length - 1].trim();
+        // Extract just the numeric part until any non-digit character
+        const matches = idPart.match(/^(\d+)/);
+        if (matches && matches[1]) {
+          console.log('Extracted material ID from URL path:', matches[1]);
+          return matches[1];
+        }
+      }
+      
+      // 2. Check if the entire scan is just a valid material ID number
+      if (/^\d+$/.test(scanValue.trim())) {
+        console.log('Scan value is a direct numeric ID:', scanValue.trim());
+        return scanValue.trim();
+      }
+      
+      // 3. Try to parse as JSON (for QR codes that contain JSON data)
+      try {
+        const jsonData = JSON.parse(scanValue);
+        // Look for id, materialId, or material_id in the JSON
+        if (jsonData.id) return String(jsonData.id);
+        if (jsonData.materialId) return String(jsonData.materialId);
+        if (jsonData.material_id) return String(jsonData.material_id);
+        
+        // If we have a material object in the JSON
+        if (jsonData.material && jsonData.material.id) {
+          return String(jsonData.material.id);
+        }
+      } catch (jsonError) {
+        // Not JSON, continue with other methods
+      }
+      
+      // 4. Check for key=value pairs format (like URL parameters)
+      if (scanValue.includes('=')) {
+        const params = {};
+        scanValue.split('&').forEach(pair => {
+          const [key, value] = pair.split('=');
+          if (key && value) params[key.trim()] = value.trim();
+        });
+        
+        // Check for material ID in various key formats
+        if (params.id) return params.id;
+        if (params.materialId) return params.materialId;
+        if (params.material_id) return params.material_id;
+        if (params.materialID) return params.materialID;
+      }
+      
+      // 5. Last resort: Look for material ID pattern in the string
+      // This is more conservative than just extracting any digits
+      const materialIdMatch = scanValue.match(/material[^0-9]*(\d+)/i);
+      if (materialIdMatch && materialIdMatch[1]) {
+        console.log('Extracted material ID from pattern match:', materialIdMatch[1]);
+        return materialIdMatch[1];
+      }
+      
+      // If all methods fail, return null instead of extracting random digits
+      console.warn('Could not extract a reliable material ID from scan:', scanValue);
+      return null;
+    } catch (error) {
+      console.error('Error extracting material ID from scan:', error, 'Value:', scanValue);
+      return null;
+    }
+  };
+  
   // Handle scanner input changes and process when Enter key is pressed
   const handleScannerInput = (e) => {
     if (e.key === 'Enter') {
@@ -173,6 +245,166 @@ function Production({ user }) {
       if (scannedInput) {
         handleScannedData(scannedInput);
         setScannedInput('');
+      }
+    }
+  };
+  
+  // Handle scanned data
+  const handleScannedData = (input) => {
+    try {
+      // Try to extract identification data from the scan
+      const materialId = extractMaterialIdFromScan(input);
+      
+      if (materialId) {
+        console.log("Successfully extracted material ID:", materialId);
+        
+        // Find the matching material
+        const matchedMaterial = materials.find(m => m.id === parseInt(materialId));
+        
+        if (matchedMaterial) {
+          // Update form based on current step
+          if (currentStep === 1) {
+            // Material information
+            setFormData(prev => ({
+              ...prev,
+              materialId: matchedMaterial.id,
+              partName: matchedMaterial.partName || matchedMaterial.part_name,
+              materialCode: matchedMaterial.materialCode || matchedMaterial.material_code,
+              supplier: matchedMaterial.supplier,
+              length: matchedMaterial.length,
+              width: matchedMaterial.width
+            }));
+            
+            toast.success(language === 'vi' ? 'Đã tải thông tin vật liệu' : 'Material information loaded');
+          }
+        } else {
+          // Material ID was extracted but not found in database
+          toast.warning(language === 'vi' ? 
+            'Không tìm thấy vật liệu với mã này trong cơ sở dữ liệu' : 
+            'Material not found in database with this ID');
+        }
+        return;
+      }
+      
+      // If we couldn't extract a material ID, try parsing as structured data
+      let scannedData = {};
+      
+      // Try parsing as JSON
+      if (input.startsWith('{')) {
+        try {
+          scannedData = JSON.parse(input);
+          console.log("Parsed JSON data:", scannedData);
+        } catch (e) {
+          console.error("Failed to parse JSON from scan:", e);
+        }
+      } else {
+        // Try parsing as key=value pairs
+        input.split('&').forEach(pair => {
+          const [key, value] = pair.split('=');
+          if (key && value) {
+            scannedData[key.trim()] = value.trim();
+          }
+        });
+        console.log("Parsed key-value data:", scannedData);
+      }
+      
+      // Process the extracted data based on current step
+      updateFormFromScan(scannedData);
+      
+    } catch (error) {
+      console.error('Error processing scanned input:', error);
+      toast.error(language === 'vi' ? 'Định dạng mã vạch không hợp lệ' : 'Invalid barcode format');
+    }
+  };
+  
+  // Helper function to update form based on scanned data
+  const updateFormFromScan = (scannedData) => {
+    if (Object.keys(scannedData).length === 0) {
+      toast.error(language === 'vi' ? 'Không thể trích xuất dữ liệu từ mã vạch' : 'Could not extract data from barcode');
+      return;
+    }
+    
+    if (currentStep === 1) {
+      // Material information
+      const matchedMaterial = materials.find(m => 
+        m.materialCode === scannedData.materialCode || 
+        m.packet_no === scannedData.packetNo ||
+        m.material_code === scannedData.materialCode
+      );
+      
+      if (matchedMaterial) {
+        setFormData(prev => ({
+          ...prev,
+          materialId: matchedMaterial.id,
+          partName: matchedMaterial.partName || matchedMaterial.part_name,
+          materialCode: matchedMaterial.materialCode || matchedMaterial.material_code,
+          supplier: matchedMaterial.supplier,
+          length: matchedMaterial.length,
+          width: matchedMaterial.width
+        }));
+        
+        toast.success(language === 'vi' ? 'Đã tải thông tin vật liệu' : 'Material information loaded');
+      } else if (scannedData.materialCode || scannedData.partName) {
+        setFormData(prev => ({
+          ...prev,
+          materialCode: scannedData.materialCode || '',
+          partName: scannedData.partName || '',
+          supplier: scannedData.supplier || '',
+          length: scannedData.length || '',
+          width: scannedData.width || ''
+        }));
+        
+        toast.info(language === 'vi' ? 
+          'Không tìm thấy vật liệu trong cơ sở dữ liệu. Vui lòng chọn từ danh sách hoặc nhập thông tin.' : 
+          'Material not found in database. Please select from list or enter details.');
+      }
+    } else if (currentStep === 2) {
+      // Machine and mold information
+      let dataUpdated = false;
+      
+      if (scannedData.machineId || scannedData.machineName || scannedData.ten_may_dap) {
+        const matchedMachine = machines.find(m => 
+          m.id === Number(scannedData.machineId) || 
+          m.ten_may_dap === scannedData.machineName ||
+          m.ten_may_dap === scannedData.ten_may_dap
+        );
+        
+        if (matchedMachine) {
+          setFormData(prev => ({
+            ...prev,
+            machineId: matchedMachine.id,
+            machineName: matchedMachine.ten_may_dap
+          }));
+          
+          dataUpdated = true;
+          toast.success(language === 'vi' ? 'Đã tải thông tin máy' : 'Machine information loaded');
+        }
+      }
+      
+      if (scannedData.moldId || scannedData.moldCode || scannedData.ma_khuon) {
+        const matchedMold = molds.find(m => 
+          m.id === Number(scannedData.moldId) || 
+          m.ma_khuon === scannedData.moldCode ||
+          m.ma_khuon === scannedData.ma_khuon
+        );
+        
+        if (matchedMold) {
+          setFormData(prev => ({
+            ...prev,
+            moldId: matchedMold.id,
+            moldCode: matchedMold.ma_khuon,
+            expectedOutput: matchedMold.so_luong
+          }));
+          
+          dataUpdated = true;
+          toast.success(language === 'vi' ? 'Đã tải thông tin khuôn' : 'Mold information loaded');
+        }
+      }
+      
+      if (!dataUpdated) {
+        toast.warning(language === 'vi' ? 
+          'Không tìm thấy thông tin máy hoặc khuôn từ mã quét' : 
+          'No machine or mold information found from scan');
       }
     }
   };
@@ -189,157 +421,6 @@ function Production({ user }) {
       );
     }
   }, [showStopReasonModal]);
-  
-  // Handle scanned data
-  const handleScannedData = (input) => {
-    try {
-      // Parse scanned data - expected format: JSON or key=value pairs
-      let scannedData = {};
-      
-      if (input.startsWith('{')) {
-        // Try parsing as JSON
-        scannedData = JSON.parse(input);
-      } else {
-        // Try parsing as key=value pairs
-        input.split('&').forEach(pair => {
-          const [key, value] = pair.split('=');
-          if (key && value) {
-            scannedData[key.trim()] = value.trim();
-          }
-        });
-      }
-      
-      console.log("Scanned data:", scannedData);
-      
-      // Update form based on current step
-      if (currentStep === 1) {
-        // Material information
-        const matchedMaterial = materials.find(m => 
-          m.materialCode === scannedData.materialCode || 
-          m.packet_no === scannedData.packetNo ||
-          m.material_code === scannedData.materialCode
-        );
-        
-        if (matchedMaterial) {
-          setFormData(prev => ({
-            ...prev,
-            materialId: matchedMaterial.id,
-            partName: matchedMaterial.partName || matchedMaterial.part_name,
-            materialCode: matchedMaterial.materialCode || matchedMaterial.material_code,
-            supplier: matchedMaterial.supplier,
-            length: matchedMaterial.length,
-            width: matchedMaterial.width
-          }));
-          
-          toast.success(language === 'vi' ? 'Đã tải thông tin vật liệu' : 'Material information loaded');
-        } else {
-          // If material not found but we have material code
-          if (scannedData.materialCode || scannedData.partName) {
-            setFormData(prev => ({
-              ...prev,
-              materialCode: scannedData.materialCode || '',
-              partName: scannedData.partName || '',
-              supplier: scannedData.supplier || '',
-              length: scannedData.length || '',
-              width: scannedData.width || ''
-            }));
-            
-            toast.info(language === 'vi' ? 'Không tìm thấy vật liệu trong cơ sở dữ liệu. Vui lòng chọn từ danh sách hoặc nhập thông tin.' : 'Material not found in database. Please select from list or enter details.');
-          } else {
-            toast.error(language === 'vi' ? 'Mã vạch không hợp lệ cho vật liệu' : 'Invalid barcode for material');
-          }
-        }
-      } else if (currentStep === 2) {
-        // Machine and mold information
-        if (scannedData.machineId || scannedData.machineName || scannedData.ten_may_dap) {
-          const matchedMachine = machines.find(m => 
-            m.id === Number(scannedData.machineId) || 
-            m.ten_may_dap === scannedData.machineName ||
-            m.ten_may_dap === scannedData.ten_may_dap
-          );
-          
-          if (matchedMachine) {
-            setFormData(prev => ({
-              ...prev,
-              machineId: matchedMachine.id,
-              machineName: matchedMachine.ten_may_dap
-            }));
-            
-            toast.success(language === 'vi' ? 'Đã tải thông tin máy' : 'Machine information loaded');
-          }
-        }
-        
-        if (scannedData.moldId || scannedData.moldCode || scannedData.ma_khuon) {
-          const matchedMold = molds.find(m => 
-            m.id === Number(scannedData.moldId) || 
-            m.ma_khuon === scannedData.moldCode ||
-            m.ma_khuon === scannedData.ma_khuon
-          );
-          
-          if (matchedMold) {
-            setFormData(prev => ({
-              ...prev,
-              moldId: matchedMold.id,
-              moldCode: matchedMold.ma_khuon,
-              expectedOutput: matchedMold.so_luong
-            }));
-            
-            toast.success(language === 'vi' ? 'Đã tải thông tin khuôn' : 'Mold information loaded');
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error processing scanned input:', error);
-      toast.error(language === 'vi' ? 'Định dạng mã vạch không hợp lệ' : 'Invalid barcode format');
-    }
-  };
-  
-  // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Auto-fill expected output from mold if moldId changes
-    if (name === 'moldId') {
-      const selectedMold = molds.find(m => m.id === parseInt(value));
-      if (selectedMold) {
-        setFormData(prev => ({
-          ...prev,
-          moldCode: selectedMold.ma_khuon,
-          expectedOutput: selectedMold.so_luong
-        }));
-      }
-    }
-    
-    // Auto-fill machine name if machineId changes
-    if (name === 'machineId') {
-      const selectedMachine = machines.find(m => m.id === parseInt(value));
-      if (selectedMachine) {
-        setFormData(prev => ({
-          ...prev,
-          machineName: selectedMachine.ten_may_dap
-        }));
-      }
-    }
-    
-    // Auto-fill material details if materialId changes
-    if (name === 'materialId') {
-      const selectedMaterial = materials.find(m => m.id === parseInt(value));
-      if (selectedMaterial) {
-        setFormData(prev => ({
-          ...prev,
-          partName: selectedMaterial.partName || selectedMaterial.part_name,
-          materialCode: selectedMaterial.materialCode || selectedMaterial.material_code,
-          supplier: selectedMaterial.supplier,
-          length: selectedMaterial.length,
-          width: selectedMaterial.width
-        }));
-      }
-    }
-  };
   
   // Handle tab changes
   const handleTabChange = (tab) => {
@@ -444,11 +525,58 @@ function Production({ user }) {
     }
   };
   
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Auto-fill expected output from mold if moldId changes
+    if (name === 'moldId') {
+      const selectedMold = molds.find(m => m.id === parseInt(value));
+      if (selectedMold) {
+        setFormData(prev => ({
+          ...prev,
+          moldCode: selectedMold.ma_khuon,
+          expectedOutput: selectedMold.so_luong
+        }));
+      }
+    }
+    
+    // Auto-fill machine name if machineId changes
+    if (name === 'machineId') {
+      const selectedMachine = machines.find(m => m.id === parseInt(value));
+      if (selectedMachine) {
+        setFormData(prev => ({
+          ...prev,
+          machineName: selectedMachine.ten_may_dap
+        }));
+      }
+    }
+    
+    // Auto-fill material details if materialId changes
+    if (name === 'materialId') {
+      const selectedMaterial = materials.find(m => m.id === parseInt(value));
+      if (selectedMaterial) {
+        setFormData(prev => ({
+          ...prev,
+          partName: selectedMaterial.partName || selectedMaterial.part_name,
+          materialCode: selectedMaterial.materialCode || selectedMaterial.material_code,
+          supplier: selectedMaterial.supplier,
+          length: selectedMaterial.length,
+          width: selectedMaterial.width
+        }));
+      }
+    }
+  };
+  
   // Handle logout
   const handleLogout = () => {
     logoutMutation.mutate();
   };
-  
+
   return (
     <div className="production-container">
       <Navbar user={user} onLogout={handleLogout} />

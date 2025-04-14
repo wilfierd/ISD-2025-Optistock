@@ -137,35 +137,61 @@ function WarehouseStockCheck({ user }) {
   };
   
  
- const extractMaterialIdFromScan = (scanValue) => {
-  try {
-    // Log the raw value for debugging
-    console.log('Raw QR scan value:', scanValue);
-    
-    // If the scanner captures a URL like http://localhost:3000/material/5
-    if (scanValue.includes('/material/')) {
-      const parts = scanValue.split('/material/');
-      return parts[parts.length - 1].trim().split(/[^0-9]/)[0]; // Get just the numeric part
+  const extractMaterialIdFromScan = (scanValue) => {
+    try {
+      console.log('Raw QR scan value:', scanValue);
+      
+      // Step 1: Try to parse as URL and check for material ID in path
+      try {
+        const url = new URL(scanValue);
+        // Look for material ID in URL path segments
+        const pathSegments = url.pathname.split('/').filter(Boolean);
+        for (let i = 0; i < pathSegments.length - 1; i++) {
+          if (pathSegments[i].toLowerCase() === 'material' && /^\d+$/.test(pathSegments[i+1])) {
+            return pathSegments[i+1];
+          }
+        }
+        
+        // Check for material ID in query parameters
+        const materialParam = url.searchParams.get('material') || 
+                             url.searchParams.get('materialId') || 
+                             url.searchParams.get('id');
+        if (materialParam && /^\d+$/.test(materialParam)) {
+          return materialParam;
+        }
+      } catch (e) {
+        // Not a valid URL, continue with other extraction methods
+      }
+      
+      // Step 2: Check for exact match with a material ID pattern (e.g., M12345)
+      const materialCodeMatch = scanValue.match(/\b[Mm][0-9]{3,8}\b/);
+      if (materialCodeMatch) {
+        // Extract just the numeric part if needed
+        return materialCodeMatch[0].substring(1);
+      }
+      
+      // Step 3: Check if the entire value is just a number (direct ID)
+      if (/^\d+$/.test(scanValue.trim())) {
+        return scanValue.trim();
+      }
+      
+      // Step 4: Look for material prefixes followed by numbers
+      const prefixMatch = scanValue.match(/\b(material|item|product|part|mat)[^a-zA-Z0-9]*([0-9]+)\b/i);
+      if (prefixMatch) {
+        return prefixMatch[2];
+      }
+      
+      // Step 5: IMPORTANT - Verify any extracted ID exists in your database
+      // This would require an async function and change to the overall design
+      
+      // For now, log that no reliable material ID could be extracted
+      console.log('Could not reliably extract a material ID from scan');
+      return null;
+    } catch (error) {
+      console.error('Error extracting material ID:', error);
+      return null;
     }
-    
-    // If the scanner just captures the ID directly
-    if (/^\d+$/.test(scanValue.trim())) {
-      return scanValue.trim();
-    }
-    
-    // Try a more general pattern to extract digits from anywhere in the string
-    const matches = scanValue.match(/\d+/);
-    if (matches && matches.length > 0) {
-      return matches[0];
-    }
-    
-    console.error('Failed to extract material ID from scan:', scanValue);
-    return null;
-  } catch (error) {
-    console.error('Error extracting material ID from scan:', error, 'Value:', scanValue);
-    return null;
-  }
-};
+  };
   
   // Handle start check mode
   const handleStartCheck = () => {
