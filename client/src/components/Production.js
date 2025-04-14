@@ -598,10 +598,10 @@ function Production({ user }) {
             {language === 'vi' ? 'Danh sách lô sản xuất' : 'Production Batches'}
           </button>
           <button
-            className={`tab ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => handleTabChange('history')}
+            className={`tab ${activeTab === 'Plating List' ? 'active' : ''}`}
+            onClick={() => handleTabChange('Plating List')}
           >
-            {language === 'vi' ? 'Danh sách mạ' : 'History'}
+            {language === 'vi' ? 'Danh sách mạ' : 'Plating List'}
           </button>
         </div>
         
@@ -756,19 +756,6 @@ function Production({ user }) {
               ) : (
                 /* Machine Information Step */
                 <div className="machine-form">
-                  <div className="scanner-input-container">
-                    <label>{language === 'vi' ? 'Quét mã vạch' : 'Scan Barcode'}</label>
-                    <input
-                      type="text"
-                      ref={scanInputRef}
-                      value={scannedInput}
-                      onChange={(e) => setScannedInput(e.target.value)}
-                      onKeyDown={handleScannerInput}
-                      placeholder={language === 'vi' ? 'Quét mã vạch máy hoặc khuôn...' : 'Scan machine or mold barcode...'}
-                      className="scanner-input"
-                    />
-                  </div>
-                  
                   <div className="form-group">
                     <label>{language === 'vi' ? 'Máy' : 'Machine'}</label>
                     <select

@@ -116,7 +116,6 @@ const translations = {
     "This packet number already exists. Packet numbers must be unique.": "This packet number already exists. Packet numbers must be unique.",
     "Fill in the details for your": "Fill in the details for your",
     "add": "add",
-    "edit": "edit",
     "request": "request",
     "This request will be sent to an administrator for approval.": "This request will be sent to an administrator for approval.",
     
@@ -406,7 +405,6 @@ const translations = {
     "This packet number already exists. Packet numbers must be unique.": "Số packet này đã tồn tại. Số packet phải là duy nhất.",
     "Fill in the details for your": "Điền thông tin cho yêu cầu",
     "add": "thêm",
-    "edit": "sửa",
     "request": "của bạn",
     "This request will be sent to an administrator for approval.": "Yêu cầu này sẽ được gửi đến quản trị viên để phê duyệt.",
     
