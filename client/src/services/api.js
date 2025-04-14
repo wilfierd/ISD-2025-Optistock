@@ -108,6 +108,21 @@ const apiService = {
   molds: {
     getAll: () => api.get('/molds'),
   },
+  // New API endpoints for assembly and plating
+  assemblies: {
+    getAll: () => api.get('/assemblies'),
+    getById: (id) => api.get(`/assemblies/${id}`),
+    create: (data) => api.post('/assemblies', data),
+    update: (id, data) => api.put(`/assemblies/${id}`, data),
+    delete: (id) => api.delete(`/assemblies/${id}`),
+    proceedToPlating: (id) => api.post(`/assemblies/${id}/plating`)
+  },
+  
+  plating: {
+    getAll: () => api.get('/plating'),
+    getById: (id) => api.get(`/plating/${id}`),
+    update: (id, data) => api.put(`/plating/${id}`, data)
+  }
 };
 
 export default apiService;

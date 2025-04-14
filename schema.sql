@@ -555,3 +555,28 @@ INSERT INTO loHangHoa (material_id, machine_id, mold_id, created_by, status, exp
 (5, 5, 5, 1, 'running', 300, '2025-05-01 08:00:00');
 
 ALTER TABLE machines ADD COLUMN status ENUM('running', 'stopping') DEFAULT NULL;
+
+-- Assembly components table
+CREATE TABLE IF NOT EXISTS assembly_components (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    group_id INT NOT NULL,
+    start_time DATETIME NOT NULL,
+    completion_time DATETIME,
+    product_quantity INT NOT NULL,
+    pic_id INT NOT NULL,
+    status ENUM('pending', 'processing', 'completed', 'plating') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES batch_groups_counter(id) ON DELETE CASCADE,
+    FOREIGN KEY (pic_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Plating table
+CREATE TABLE IF NOT EXISTS plating (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    assembly_id INT NOT NULL,
+    plating_start_time DATETIME NOT NULL,
+    plating_end_time DATETIME,
+    status ENUM('pending', 'processing', 'completed') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (assembly_id) REFERENCES assembly_components(id) ON DELETE CASCADE
+);

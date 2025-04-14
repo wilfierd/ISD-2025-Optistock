@@ -1706,6 +1706,383 @@ app.get('/api/production', isAuthenticatedAPI, async (req, res) => {
     }
   });
 
+  // Add these routes to your Express app.js file
+
+// Assembly routes
+app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const [rows] = await pool.query(`
+        SELECT ac.*, u.username as pic_name 
+        FROM assembly_components ac
+        JOIN users u ON ac.pic_id = u.id
+        ORDER BY ac.created_at DESC
+      `);
+      
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      console.error('Error fetching assemblies:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch assemblies' });
+    }
+  });
+  
+  app.get('/api/assemblies/:id', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get assembly data with details
+      const [rows] = await pool.query(`
+        SELECT ac.*, u.username as pic_name, u.full_name as pic_full_name
+        FROM assembly_components ac
+        JOIN users u ON ac.pic_id = u.id
+        WHERE ac.id = ?
+      `, [id]);
+      
+      if (rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Assembly not found' });
+      }
+      
+      // Get batch information for this assembly
+      const [batchRows] = await pool.query(`
+        SELECT b.id, b.part_name, b.machine_name, b.mold_code, b.quantity
+        FROM batches b
+        JOIN batch_groups bg ON b.id = bg.batch_id
+        WHERE bg.group_id = ?
+      `, [rows[0].group_id]);
+      
+      const assemblyData = {
+        ...rows[0],
+        batches: batchRows
+      };
+      
+      res.json({ success: true, data: assemblyData });
+    } catch (error) {
+      console.error('Error fetching assembly:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch assembly' });
+    }
+  });
+  
+  app.get('/api/assemblies/group/:groupId', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { groupId } = req.params;
+      
+      const [rows] = await pool.query(`
+        SELECT ac.*, u.username as pic_name 
+        FROM assembly_components ac
+        JOIN users u ON ac.pic_id = u.id
+        WHERE ac.group_id = ?
+      `, [groupId]);
+      
+      if (rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'No assembly found for this group' });
+      }
+      
+      res.json({ success: true, data: rows[0] });
+    } catch (error) {
+      console.error('Error fetching assembly by group:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch assembly by group' });
+    }
+  });
+  
+  app.post('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { groupId, picId, startTime, completionTime, productQuantity } = req.body;
+      
+      // Validate required fields
+      if (!groupId || !picId || !productQuantity) {
+        return res.status(400).json({ success: false, error: 'Missing required fields' });
+      }
+      
+      // Parse the start time string
+      let parsedStartTime = null;
+      try {
+        if (startTime && startTime.includes(' - ')) {
+          // Format: "hh:mm:ss - dd/mm/yyyy"
+          const [time, date] = startTime.split(' - ');
+          const [hours, minutes, seconds] = time.split(':');
+          const [day, month, year] = date.split('/');
+          
+          parsedStartTime = new Date(year, month - 1, day, hours, minutes, seconds);
+        } else {
+          parsedStartTime = new Date();
+        }
+      } catch (e) {
+        parsedStartTime = new Date();
+      }
+      
+      // Parse the completion time string if provided
+      let parsedCompletionTime = null;
+      if (completionTime && completionTime.includes(' - ')) {
+        try {
+          const [time, date] = completionTime.split(' - ');
+          const [hours, minutes, seconds] = time.split(':');
+          const [day, month, year] = date.split('/');
+          
+          parsedCompletionTime = new Date(year, month - 1, day, hours, minutes, seconds);
+        } catch (e) {
+          // If parsing fails, leave as null
+        }
+      }
+      
+      // Insert the assembly
+      const [result] = await pool.query(`
+        INSERT INTO assembly_components 
+        (group_id, pic_id, start_time, completion_time, product_quantity, status)
+        VALUES (?, ?, ?, ?, ?, 'pending')
+      `, [
+        groupId,
+        picId,
+        parsedStartTime,
+        parsedCompletionTime,
+        productQuantity
+      ]);
+      
+      res.status(201).json({ 
+        success: true, 
+        message: 'Assembly created successfully', 
+        assemblyId: result.insertId 
+      });
+    } catch (error) {
+      console.error('Error creating assembly:', error);
+      res.status(500).json({ success: false, error: 'Failed to create assembly' });
+    }
+  });
+  
+  app.put('/api/assemblies/:id', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { picId, startTime, completionTime, productQuantity, status } = req.body;
+      
+      // Build the SQL update statement dynamically
+      let updateFields = [];
+      let queryParams = [];
+      
+      if (picId) {
+        updateFields.push('pic_id = ?');
+        queryParams.push(picId);
+      }
+      
+      if (startTime) {
+        updateFields.push('start_time = ?');
+        queryParams.push(new Date(startTime));
+      }
+      
+      if (completionTime) {
+        updateFields.push('completion_time = ?');
+        queryParams.push(new Date(completionTime));
+      }
+      
+      if (productQuantity) {
+        updateFields.push('product_quantity = ?');
+        queryParams.push(productQuantity);
+      }
+      
+      if (status) {
+        updateFields.push('status = ?');
+        queryParams.push(status);
+      }
+      
+      // Add the ID at the end of params array
+      queryParams.push(id);
+      
+      if (updateFields.length === 0) {
+        return res.status(400).json({ success: false, error: 'No fields to update' });
+      }
+      
+      const query = `UPDATE assembly_components SET ${updateFields.join(', ')} WHERE id = ?`;
+      
+      await pool.query(query, queryParams);
+      
+      res.json({ success: true, message: 'Assembly updated successfully' });
+    } catch (error) {
+      console.error('Error updating assembly:', error);
+      res.status(500).json({ success: false, error: 'Failed to update assembly' });
+    }
+  });
+  
+  app.put('/api/assemblies/:id/status', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      if (!status) {
+        return res.status(400).json({ success: false, error: 'Status is required' });
+      }
+      
+      await pool.query(
+        'UPDATE assembly_components SET status = ? WHERE id = ?',
+        [status, id]
+      );
+      
+      res.json({ success: true, message: 'Assembly status updated successfully' });
+    } catch (error) {
+      console.error('Error updating assembly status:', error);
+      res.status(500).json({ success: false, error: 'Failed to update assembly status' });
+    }
+  });
+  
+  app.post('/api/assemblies/:id/plating', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Start a transaction
+      const connection = await pool.getConnection();
+      await connection.beginTransaction();
+      
+      try {
+        // Update assembly status
+        await connection.query(`
+          UPDATE assembly_components
+          SET status = 'plating'
+          WHERE id = ?
+        `, [id]);
+        
+        // Create plating record
+        const now = new Date();
+        await connection.query(`
+          INSERT INTO plating
+          (assembly_id, plating_start_time, status)
+          VALUES (?, ?, 'pending')
+        `, [id, now]);
+        
+        // Commit transaction
+        await connection.commit();
+        
+        res.json({ 
+          success: true, 
+          message: 'Successfully proceeded to plating'
+        });
+      } catch (error) {
+        // Rollback on error
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    } catch (error) {
+      console.error('Error proceeding to plating:', error);
+      res.status(500).json({ success: false, error: 'Failed to proceed to plating' });
+    }
+  });
+  
+  // Plating routes
+  app.get('/api/plating', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const [rows] = await pool.query(`
+        SELECT p.*, ac.group_id, ac.product_quantity, ac.pic_id, u.username as pic_name
+        FROM plating p
+        JOIN assembly_components ac ON p.assembly_id = ac.id
+        JOIN users u ON ac.pic_id = u.id
+        ORDER BY p.created_at DESC
+      `);
+      
+      res.json({ success: true, data: rows });
+    } catch (error) {
+      console.error('Error fetching plating records:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch plating records' });
+    }
+  });
+  
+  app.get('/api/plating/:id', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const [rows] = await pool.query(`
+        SELECT p.*, ac.group_id, ac.product_quantity, ac.pic_id, u.username as pic_name
+        FROM plating p
+        JOIN assembly_components ac ON p.assembly_id = ac.id
+        JOIN users u ON ac.pic_id = u.id
+        WHERE p.id = ?
+      `, [id]);
+      
+      if (rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Plating record not found' });
+      }
+      
+      res.json({ success: true, data: rows[0] });
+    } catch (error) {
+      console.error('Error fetching plating record:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch plating record' });
+    }
+  });
+  
+  app.get('/api/plating/assembly/:assemblyId', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { assemblyId } = req.params;
+      
+      const [rows] = await pool.query(`
+        SELECT p.*, ac.group_id, ac.product_quantity, ac.pic_id, u.username as pic_name
+        FROM plating p
+        JOIN assembly_components ac ON p.assembly_id = ac.id
+        JOIN users u ON ac.pic_id = u.id
+        WHERE p.assembly_id = ?
+      `, [assemblyId]);
+      
+      if (rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'No plating record found for this assembly' });
+      }
+      
+      res.json({ success: true, data: rows[0] });
+    } catch (error) {
+      console.error('Error fetching plating by assembly:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch plating by assembly' });
+    }
+  });
+  
+  app.put('/api/plating/:id', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, platingEndTime } = req.body;
+      
+      // Build the SQL update statement dynamically
+      let updateFields = [];
+      let queryParams = [];
+      
+      if (status) {
+        updateFields.push('status = ?');
+        queryParams.push(status);
+      }
+      
+      if (platingEndTime) {
+        updateFields.push('plating_end_time = ?');
+        queryParams.push(new Date(platingEndTime));
+      }
+      
+      // Add the ID at the end of params array
+      queryParams.push(id);
+      
+      if (updateFields.length === 0) {
+        return res.status(400).json({ success: false, error: 'No fields to update' });
+      }
+      
+      const query = `UPDATE plating SET ${updateFields.join(', ')} WHERE id = ?`;
+      
+      await pool.query(query, queryParams);
+      
+      res.json({ success: true, message: 'Plating record updated successfully' });
+    } catch (error) {
+      console.error('Error updating plating record:', error);
+      res.status(500).json({ success: false, error: 'Failed to update plating record' });
+    }
+  });
+  
+  app.put('/api/plating/:id/complete', isAuthenticatedAPI, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Update plating record to completed
+      await pool.query(`
+        UPDATE plating
+        SET status = 'completed', plating_end_time = NOW()
+        WHERE id = ?
+      `, [id]);
+      
+      res.json({ success: true, message: 'Plating process completed' });
+    } catch (error) {
+      console.error('Error completing plating process:', error);
+      res.status(500).json({ success: false, error: 'Failed to complete plating process' });
+    }
+  });
+
 // Start the server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
