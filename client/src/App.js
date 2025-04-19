@@ -1,6 +1,6 @@
-
+// Update your App.js file with these router fixes
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Dashboard from './components/Dashboard';
 import Materials from './components/Materials';
 import MaterialDetail from './components/MaterialDetail';
@@ -12,8 +12,8 @@ import { useAuthStatus } from './hooks/useAuth';
 import { hasAdminOrManagerAccess } from './utils/rolePermissions';
 import { LanguageProvider } from './contexts/LanguageContext';
 import BatchGrouping from './components/BatchGrouping';
-import Notifications from './components/Notifications'; // Import thêm component Notifications
-import Production from './components/Production'; // Import thêm component Production
+import Notifications from './components/Notifications';
+import Production from './components/Production';
 
 function App() {
   const { data: authData, isLoading } = useAuthStatus();
@@ -26,39 +26,49 @@ function App() {
   return (
     <LanguageProvider>
       <Routes>
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
-        <Route path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
-        <Route path="/materials" element={user ? <Materials user={user} /> : <Navigate to="/login" />} />
-        <Route path="/material/:id" element={user ? <MaterialDetail user={user} /> : <Navigate to="/login" />} />
-        <Route path="/warehouse-check" element={user ? <WarehouseStockCheck user={user} /> : <Navigate to="/login" />} />
+        {/* Add key prop to force re-render when routes change */}
+        <Route key="login" path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+        <Route key="dashboard" path="/dashboard" element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} />
+        <Route key="materials" path="/materials" element={user ? <Materials user={user} /> : <Navigate to="/login" />} />
+        <Route key="material-detail" path="/material/:id" element={user ? <MaterialDetail user={user} /> : <Navigate to="/login" />} />
+        <Route key="warehouse" path="/warehouse-check" element={user ? <WarehouseStockCheck user={user} /> : <Navigate to="/login" />} />
         
         {/* Allow both admin and manager access to employees route */}
         <Route 
+          key="employees"
           path="/employees" 
           element={user && hasAdminOrManagerAccess(user) ? <Users user={user} /> : <Navigate to="/dashboard" />} 
         />
         
         {/* Allow both admin and manager access to requests route */}
         <Route 
+          key="requests"
           path="/requests" 
           element={user && hasAdminOrManagerAccess(user) ? <MaterialRequests user={user} /> : <Navigate to="/dashboard" />} 
         />
 
         {/* Allow only admin and manager access to warehouse check route */}
         <Route 
+          key="warehouse-check"
           path="/warehouse-check" 
           element={user ? <WarehouseStockCheck user={user} /> : <Navigate to="/dashboard" />}         
-          />
+        />
         <Route 
+          key="batch-grouping"
           path="/batch-grouping" 
           element={user ? <BatchGrouping user={user} /> : <Navigate to="/login" />} 
         />
-                <Route 
+        <Route 
+          key="notifications"
           path="/notifications" 
           element={user ? <Notifications user={user} /> : <Navigate to="/login" />} 
         />
-        <Route path="/" element={<Navigate to="/dashboard" />} />
-        <Route path="/production" element={user ? <Production user={user} /> : <Navigate to="/login" />} />
+        <Route 
+          key="production"
+          path="/production" 
+          element={user ? <Production user={user} /> : <Navigate to="/login" />} 
+        />
+        <Route key="default" path="/" element={<Navigate to="/dashboard" />} />
       </Routes>
     </LanguageProvider>
   );

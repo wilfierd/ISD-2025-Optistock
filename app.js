@@ -1312,6 +1312,48 @@ app.put('/api/batches/:id/status', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
+// Add these server-side routes to your app.js file
+
+// Create a new batch
+app.post('/api/batches', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { part_name, machine_name, mold_code, quantity, warehouse_entry_time, status, created_by } = req.body;
+    
+    // Validate required fields
+    if (!part_name || !machine_name || !mold_code || !quantity || !warehouse_entry_time) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    
+    // Insert the batch into database
+    const [result] = await pool.query(
+      `INSERT INTO batches 
+       (part_name, machine_name, mold_code, quantity, warehouse_entry_time, status, created_by) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [part_name, machine_name, mold_code, quantity, warehouse_entry_time, status, created_by]
+    );
+    
+    // Create notification for admins
+    const [admins] = await pool.query('SELECT id FROM users WHERE role = "admin" OR role = "quản lý"');
+    
+    for (const admin of admins) {
+      await pool.query(
+        `INSERT INTO admin_notifications (user_id, message, notification_type)
+         VALUES (?, ?, ?)`,
+        [admin.id, `New batch created: ${part_name} (${quantity} units)`, 'system']
+      );
+    }
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Batch created successfully',
+      batchId: result.insertId
+    });
+  } catch (error) {
+    console.error('Error creating batch:', error);
+    res.status(500).json({ success: false, error: 'Failed to create batch' });
+  }
+});
+
 // ===== PRODUCTION API ROUTES =====
 
 // Get all production data from loHangHoa

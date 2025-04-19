@@ -8,6 +8,7 @@ import apiService from '../services/api';
 import { toast } from 'react-toastify';
 import './Production.css';
 import { useLanguage } from '../contexts/LanguageContext';
+import BatchTimer from './BatchTimer.js';
 
 // Custom hook for production data
 const useProduction = (status = 'all') => {
@@ -65,6 +66,17 @@ function Production({ user }) {
     platingTime: '',
     selectedItems: []
   });
+  
+  // State for recent batch completions and notifications
+  const [recentCompletions, setRecentCompletions] = useState([]);
+  const [showCompletionAlert, setShowCompletionAlert] = useState(false);
+  
+  // State for batch completion popup
+  const [showCompletionPopup, setShowCompletionPopup] = useState(false);
+  const [completedBatchInfo, setCompletedBatchInfo] = useState(null);
+  
+  // State for next completion
+  const [nextCompletion, setNextCompletion] = useState(null);
   
   // Form data state
   const [formData, setFormData] = useState({
@@ -196,7 +208,80 @@ function Production({ user }) {
     }
   });
   
-  // Initialize production progress
+  // Helper function to format date time string
+  const formatDateTime = (date) => {
+    const pad = (num) => String(num).padStart(2, '0');
+    
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    const seconds = pad(date.getSeconds());
+    const day = pad(date.getDate());
+    const month = pad(date.getMonth() + 1);
+    const year = date.getFullYear();
+    
+    return `${hours}:${minutes}:${seconds} - ${day}/${month}/${year}`;
+  };
+  
+  // Function to create batches in the warehouse
+  const createCompletedBatches = async (production, count) => {
+    try {
+      // Prepare the batch data
+      const batchData = {
+        part_name: production.material_name,
+        machine_name: production.machine_name,
+        mold_code: production.mold_code,
+        quantity: count,
+        warehouse_entry_time: formatDateTime(new Date()),
+        status: null, // Initially ungrouped
+        created_by: user.id
+      };
+      
+      // Call the API to create batches
+      const response = await apiService.batches.create(batchData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating batches:', error);
+      throw error;
+    }
+  };
+  
+  // Calculate which production will complete a batch next
+  const getNextBatchCompletion = () => {
+    let nextCompletion = null;
+    let minTimeLeft = Infinity;
+    
+    // Check all running productions
+    productions.forEach(prod => {
+      if (prod.status === 'running') {
+        const startTime = new Date(prod.start_date).getTime();
+        const now = new Date().getTime();
+        const elapsedMinutes = (now - startTime) / (1000 * 60);
+        
+        // Calculate which batch is in progress and when it will complete
+        const completedBatches = Math.floor(elapsedMinutes / 5);
+        const nextBatchCompleteTime = startTime + ((completedBatches + 1) * 5 * 60 * 1000);
+        
+        // Time left until next batch completion
+        const timeLeft = nextBatchCompleteTime - now;
+        
+        // If this is sooner than our current minimum, update
+        if (timeLeft > 0 && timeLeft < minTimeLeft) {
+          minTimeLeft = timeLeft;
+          nextCompletion = {
+            productionId: prod.id,
+            materialName: prod.material_name,
+            machineName: prod.machine_name,
+            timeLeft: timeLeft,
+            completionTime: new Date(nextBatchCompleteTime)
+          };
+        }
+      }
+    });
+    
+    return nextCompletion;
+  };
+  
+  // Initialize production progress and set up batch completion tracking
   useEffect(() => {
     if (productions.length > 0) {
       const progress = {};
@@ -224,12 +309,6 @@ function Production({ user }) {
             // Estimated completion time
             estimatedCompletion: new Date(startTime + (totalExpected * 5 * 60 * 1000))
           };
-          
-          // If batches are done, update stage warehouse
-          if (batchesDone > 0 && batchesDone !== progress[prod.id]?.batchesDone) {
-            // This would normally call an API to update the warehouse
-            console.log(`Updating stage warehouse: ${batchesDone} units from production ${prod.id}`);
-          }
         } else {
           // For stopped productions, use actual output
           const actualOutput = prod.actual_output || 0;
@@ -247,7 +326,44 @@ function Production({ user }) {
       });
       
       setProductionProgress(progress);
+      
+      // Initial calculation of next batch completion
+      setNextCompletion(getNextBatchCompletion());
     }
+    
+    // Check for batch completions
+    const checkBatchCompletions = () => {
+      productions.forEach(prod => {
+        if (prod.status === 'running') {
+          const startTime = new Date(prod.start_date).getTime();
+          const now = new Date().getTime();
+          const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+          
+          // Assuming 5 min per batch
+          const batchesDone = Math.floor(elapsedMinutes / 5);
+          const previousBatchesDone = productionProgress[prod.id]?.batchesDone || 0;
+          
+          // A new batch just completed
+          if (batchesDone > previousBatchesDone) {
+            // Show completion popup
+            setCompletedBatchInfo({
+              productionId: prod.id,
+              materialName: prod.material_name,
+              machineName: prod.machine_name,
+              moldCode: prod.mold_code,
+              batchNumber: batchesDone,
+              completionTime: new Date(),
+            });
+            setShowCompletionPopup(true);
+            
+            // Automatically hide after 10 seconds
+            setTimeout(() => {
+              setShowCompletionPopup(false);
+            }, 10000);
+          }
+        }
+      });
+    };
     
     // Update progress every minute
     const interval = setInterval(() => {
@@ -276,18 +392,93 @@ function Production({ user }) {
             
             // If batches are done, update stage warehouse
             if (batchesDone > 0 && batchesDone !== prev[prod.id]?.batchesDone) {
-              // This would normally call an API to update the warehouse
-              console.log(`Updating stage warehouse: ${batchesDone} units from production ${prod.id}`);
+              // Calculate the new batches completed since last update
+              const newlyCompletedCount = batchesDone - (prev[prod.id]?.batchesDone || 0);
+              
+              if (newlyCompletedCount > 0) {
+                // Create actual batches in warehouse through API call
+                createCompletedBatches(prod, newlyCompletedCount)
+                  .then(() => {
+                    // Add to recent completions
+                    setRecentCompletions(prevCompletions => {
+                      const newCompletions = [...prevCompletions];
+                      newCompletions.unshift({
+                        id: Date.now(), // unique id for the notification
+                        productionId: prod.id,
+                        count: newlyCompletedCount,
+                        materialName: prod.material_name,
+                        timestamp: new Date()
+                      });
+                      
+                      // Keep only the last 5 completions
+                      return newCompletions.slice(0, 5);
+                    });
+                    
+                    // Show the alert
+                    setShowCompletionAlert(true);
+                    
+                    // Auto-hide the alert after 10 seconds
+                    setTimeout(() => {
+                      setShowCompletionAlert(false);
+                    }, 10000);
+                    
+                    // Show toast notification when batch is completed
+                    toast.success(
+                      language === 'vi' 
+                        ? `${newlyCompletedCount} lô đã hoàn thành từ sản xuất ID: ${prod.id}` 
+                        : `${newlyCompletedCount} batches completed from production ID: ${prod.id}`
+                    );
+                    
+                    // Update production with actual output
+                    updateProduction.mutate({
+                      id: prod.id,
+                      data: {
+                        actual_output: batchesDone
+                      }
+                    });
+                    
+                    // Refresh batch data to show new batches in warehouse
+                    queryClient.invalidateQueries({ queryKey: ['batches'] });
+                  })
+                  .catch(error => {
+                    console.error('Error creating batches:', error);
+                    toast.error(
+                      language === 'vi' 
+                        ? 'Lỗi khi cập nhật kho công đoạn' 
+                        : 'Error updating stage warehouse'
+                    );
+                  });
+              }
             }
           }
         });
         
         return updated;
       });
+      
+      // Update next batch completion
+      setNextCompletion(getNextBatchCompletion());
+      
+      // Check for batch completions
+      checkBatchCompletions();
     }, 60000); // Update every minute
     
-    return () => clearInterval(interval);
-  }, [productions]);
+    // Set up separate interval to check for completions more frequently
+    const checkInterval = setInterval(checkBatchCompletions, 15000);
+    
+    return () => {
+      clearInterval(interval);
+      clearInterval(checkInterval);
+    };
+  }, [productions, productionProgress, updateProduction, queryClient, user.id, language]);
+  
+  // Set up scanner input listener
+  useEffect(() => {
+    // Focus the input field when modal is opened
+    if (showAddModal && scanInputRef.current) {
+      scanInputRef.current.focus();
+    }
+  }, [showAddModal, currentStep]);
   
   // Set current date/time for plating form fields and stop form fields
   useEffect(() => {
@@ -310,14 +501,6 @@ function Production({ user }) {
       }));
     }
   }, [showStopReasonModal, showPlatingModal]);
-  
-  // Set up scanner input listener
-  useEffect(() => {
-    // Focus the input field when modal is opened
-    if (showAddModal && scanInputRef.current) {
-      scanInputRef.current.focus();
-    }
-  }, [showAddModal, currentStep]);
   
   // Improved function to extract material ID from scanned QR codes
   const extractMaterialIdFromScan = (scanValue) => {
@@ -845,6 +1028,36 @@ function Production({ user }) {
         {/* Production Tab Content */}
         {activeTab === 'production' && (
           <div className="table-container">
+            {/* Next batch completion indicator */}
+            {nextCompletion && (
+              <div className="next-batch-alert">
+                <div className="pulsing-icon">
+                  <i className="fas fa-hourglass-half"></i>
+                </div>
+                <div className="next-batch-info">
+                  <div className="next-batch-label">
+                    {language === 'vi' ? 'Lô tiếp theo sẽ hoàn thành:' : 'Next batch completing:'}
+                  </div>
+                  <div className="next-batch-details">
+                    <span className="material-name">{nextCompletion.materialName}</span>
+                    <span className="separator">|</span>
+                    <span className="machine-name">{nextCompletion.machineName}</span>
+                    <span className="separator">|</span>
+                    <span className="completion-time">{nextCompletion.completionTime.toLocaleTimeString()}</span>
+                  </div>
+                </div>
+                <div className="time-remaining">
+                  <span className="time-value">
+                    {Math.floor(nextCompletion.timeLeft / (1000 * 60))}:
+                    {String(Math.floor((nextCompletion.timeLeft / 1000) % 60)).padStart(2, '0')}
+                  </span>
+                  <span className="time-label">
+                    {language === 'vi' ? 'phút còn lại' : 'minutes left'}
+                  </span>
+                </div>
+              </div>
+            )}
+          
             {isLoadingProductions ? (
               <div className="loading-spinner">
                 <div className="spinner"></div>
@@ -892,10 +1105,23 @@ function Production({ user }) {
                               : `Completed: ${productionProgress[production.id]?.batchesDone || 0} / 
                                  Remaining: ${productionProgress[production.id]?.batchesRemaining || 0}`}
                           </div>
-                          {production.status === 'running' && productionProgress[production.id]?.estimatedCompletion && (
-                            <div className="small text-muted">
-                              {language === 'vi' ? 'Dự kiến hoàn thành: ' : 'Est. completion: '}
-                              {productionProgress[production.id].estimatedCompletion.toLocaleString()}
+                          
+                          {/* Add batch completion timer for running productions */}
+                          {production.status === 'running' && (
+                            <div className="batch-info-row">
+                              <div className="completion-estimate">
+                                <span className="completion-badge in-progress">
+                                  {language === 'vi' ? 'Đang chạy' : 'In Progress'}
+                                </span>
+                                <BatchTimer startTime={production.start_date} batchDuration={5} />
+                              </div>
+                              <div className="total-estimate">
+                                {language === 'vi' ? 'Hoàn thành dự kiến:' : 'Est. completion:'} 
+                                {' '}
+                                {productionProgress[production.id]?.estimatedCompletion 
+                                  ? productionProgress[production.id].estimatedCompletion.toLocaleString() 
+                                  : 'N/A'}
+                              </div>
                             </div>
                           )}
                         </td>
@@ -1468,6 +1694,121 @@ function Production({ user }) {
                   {language === 'vi' ? 'Hoàn thành mạ' : 'Complete Plating'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Batch Completion Alert */}
+      {showCompletionAlert && recentCompletions.length > 0 && (
+        <div className="batch-completion-alert">
+          <div className="alert-header">
+            <h6>
+              <i className="fas fa-bell me-2"></i>
+              {language === 'vi' ? 'Thông báo hoàn thành lô' : 'Batch Completion Alert'}
+            </h6>
+            <button 
+              className="btn-close" 
+              onClick={() => setShowCompletionAlert(false)}
+            ></button>
+          </div>
+          <div className="alert-body">
+            {recentCompletions.slice(0, 3).map(completion => (
+              <div key={completion.id} className="completion-item">
+                <div className="completion-icon">
+                  <i className="fas fa-check-circle"></i>
+                </div>
+                <div className="completion-content">
+                  <div className="completion-title">
+                    {language === 'vi' 
+                      ? `${completion.count} lô đã hoàn thành` 
+                      : `${completion.count} batch(es) completed`}
+                  </div>
+                  <div className="completion-detail">
+                    {completion.materialName} (ID: {completion.productionId})
+                  </div>
+                  <div className="completion-time">
+                    {completion.timestamp.toLocaleTimeString()}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {recentCompletions.length > 3 && (
+              <div className="more-completions">
+                {language === 'vi' 
+                  ? `+ ${recentCompletions.length - 3} thông báo khác` 
+                  : `+ ${recentCompletions.length - 3} more notifications`}
+              </div>
+            )}
+          </div>
+          <div className="alert-footer">
+            <button 
+              className="btn btn-sm btn-light"
+              onClick={() => {
+                // Navigate to batches view
+                // You can implement this based on your routing setup
+                setShowCompletionAlert(false);
+              }}
+            >
+              {language === 'vi' ? 'Xem lô trong kho' : 'View batches in warehouse'}
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Batch Completion Popup */}
+      {showCompletionPopup && completedBatchInfo && (
+        <div className="batch-completion-popup">
+          <div className="popup-content">
+            <div className="completion-header">
+              <div className="completion-icon">
+                <i className="fas fa-check-circle"></i>
+              </div>
+              <div className="completion-title">
+                <h5>{language === 'vi' ? 'Lô đã hoàn thành!' : 'Batch Completed!'}</h5>
+                <p className="completion-subtitle">
+                  {language === 'vi' 
+                    ? `Lô #${completedBatchInfo.batchNumber} đã hoàn thành sản xuất` 
+                    : `Batch #${completedBatchInfo.batchNumber} has completed production`}
+                </p>
+              </div>
+              <button 
+                className="popup-close-btn"
+                onClick={() => setShowCompletionPopup(false)}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            
+            <div className="completion-details">
+              <div className="detail-item">
+                <span className="detail-label">{language === 'vi' ? 'Tên vật liệu:' : 'Material Name:'}</span>
+                <span className="detail-value">{completedBatchInfo.materialName}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">{language === 'vi' ? 'Tên máy:' : 'Machine Name:'}</span>
+                <span className="detail-value">{completedBatchInfo.machineName}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">{language === 'vi' ? 'Mã khuôn:' : 'Mold Code:'}</span>
+                <span className="detail-value">{completedBatchInfo.moldCode}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">{language === 'vi' ? 'Thời gian hoàn thành:' : 'Completion Time:'}</span>
+                <span className="detail-value">{completedBatchInfo.completionTime.toLocaleString()}</span>
+              </div>
+            </div>
+            
+            <div className="completion-actions">
+              <button 
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowCompletionPopup(false);
+                  // Here you can add logic to navigate to the stage warehouse view
+                }}
+              >
+                {language === 'vi' ? 'Xem trong kho công đoạn' : 'View in Stage Warehouse'}
+              </button>
             </div>
           </div>
         </div>

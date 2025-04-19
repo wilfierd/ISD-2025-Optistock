@@ -92,6 +92,7 @@ const apiService = {
     getGrouped: () => api.get('/batches/grouped'),
     groupBatches: (data) => api.post('/batches/group', data),
     updateStatus: (id, status) => api.put(`/batches/${id}/status`, { status }),
+    create: (data) => api.post('/batches', data), // New endpoint to create batches
   },
   production : {
     getAll: (status = 'all') => api.get(`/production${status !== 'all' ? `?status=${status}` : ''}`),
