@@ -21,6 +21,18 @@ const useProduction = (status = 'all') => {
   });
 };
 
+// Custom hook for plating data
+const usePlating = () => {
+  return useQuery({
+    queryKey: ['plating'],
+    queryFn: async () => {
+      const response = await apiService.plating.getAll();
+      return response.data.data || [];
+    },
+    retry: 1,
+  });
+};
+
 function Production({ user }) {
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
@@ -33,7 +45,9 @@ function Production({ user }) {
   // State for modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStopReasonModal, setShowStopReasonModal] = useState(false);
+  const [showPlatingModal, setShowPlatingModal] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState(null);
+  const [selectedPlating, setSelectedPlating] = useState(null);
   const [stopReason, setStopReason] = useState('');
   const [stopTime, setStopTime] = useState('');
   const [stopDate, setStopDate] = useState('');
@@ -41,6 +55,16 @@ function Production({ user }) {
   
   // State for current step in add wizard
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // State for batch production progress
+  const [productionProgress, setProductionProgress] = useState({});
+  
+  // State for plating date/time
+  const [platingData, setPlatingData] = useState({
+    platingDate: '',
+    platingTime: '',
+    selectedItems: []
+  });
   
   // Form data state
   const [formData, setFormData] = useState({
@@ -60,6 +84,7 @@ function Production({ user }) {
   // Queries for data
   const { data: materials = [], isLoading: isLoadingMaterials } = useMaterials();
   const { data: productions = [], isLoading: isLoadingProductions } = useProduction(productionFilter);
+  const { data: platingItems = [], isLoading: isLoadingPlating, refetch: refetchPlating } = usePlating();
   const { data: machines = [], isLoading: isLoadingMachines } = useQuery({
     queryKey: ['machines'],
     queryFn: async () => {
@@ -156,6 +181,135 @@ function Production({ user }) {
       toast.error(error.response?.data?.error || (language === 'vi' ? 'Không thể lưu lý do dừng máy' : 'Failed to save machine stop reason'));
     }
   });
+  
+  // Mutation for updating plating information
+  const updatePlating = useMutation({
+    mutationFn: ({ id, data }) => apiService.plating.update(id, data),
+    onSuccess: () => {
+      toast.success(language === 'vi' ? 'Đã cập nhật thông tin mạ thành công' : 'Plating information updated successfully');
+      refetchPlating();
+      setShowPlatingModal(false);
+      setSelectedPlating(null);
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || (language === 'vi' ? 'Không thể cập nhật thông tin mạ' : 'Failed to update plating information'));
+    }
+  });
+  
+  // Initialize production progress
+  useEffect(() => {
+    if (productions.length > 0) {
+      const progress = {};
+      
+      productions.forEach(prod => {
+        if (prod.status === 'running') {
+          // For running productions, calculate progress based on time
+          const startTime = new Date(prod.start_date).getTime();
+          const now = new Date().getTime();
+          const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+          
+          // Assuming 5 min per batch as requested
+          const batchesDone = Math.floor(elapsedMinutes / 5);
+          const totalExpected = prod.expected_output || 100;
+          
+          // Calculate percentage with constraints
+          const percentage = Math.min(Math.round((batchesDone / totalExpected) * 100), 100);
+          const remaining = Math.max(totalExpected - batchesDone, 0);
+          
+          progress[prod.id] = {
+            batchesDone,
+            batchesRemaining: remaining,
+            totalExpected,
+            percentage,
+            // Estimated completion time
+            estimatedCompletion: new Date(startTime + (totalExpected * 5 * 60 * 1000))
+          };
+          
+          // If batches are done, update stage warehouse
+          if (batchesDone > 0 && batchesDone !== progress[prod.id]?.batchesDone) {
+            // This would normally call an API to update the warehouse
+            console.log(`Updating stage warehouse: ${batchesDone} units from production ${prod.id}`);
+          }
+        } else {
+          // For stopped productions, use actual output
+          const actualOutput = prod.actual_output || 0;
+          const totalExpected = prod.expected_output || 100;
+          const percentage = Math.min(Math.round((actualOutput / totalExpected) * 100), 100);
+          
+          progress[prod.id] = {
+            batchesDone: actualOutput,
+            batchesRemaining: Math.max(totalExpected - actualOutput, 0),
+            totalExpected,
+            percentage,
+            stopped: true
+          };
+        }
+      });
+      
+      setProductionProgress(progress);
+    }
+    
+    // Update progress every minute
+    const interval = setInterval(() => {
+      setProductionProgress(prev => {
+        const updated = {...prev};
+        
+        productions.forEach(prod => {
+          if (prod.status === 'running' && updated[prod.id]) {
+            const startTime = new Date(prod.start_date).getTime();
+            const now = new Date().getTime();
+            const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+            
+            // Assuming 5 min per batch
+            const batchesDone = Math.floor(elapsedMinutes / 5);
+            const totalExpected = prod.expected_output || 100;
+            const percentage = Math.min(Math.round((batchesDone / totalExpected) * 100), 100);
+            const remaining = Math.max(totalExpected - batchesDone, 0);
+            
+            updated[prod.id] = {
+              batchesDone,
+              batchesRemaining: remaining,
+              totalExpected,
+              percentage,
+              estimatedCompletion: new Date(startTime + (totalExpected * 5 * 60 * 1000))
+            };
+            
+            // If batches are done, update stage warehouse
+            if (batchesDone > 0 && batchesDone !== prev[prod.id]?.batchesDone) {
+              // This would normally call an API to update the warehouse
+              console.log(`Updating stage warehouse: ${batchesDone} units from production ${prod.id}`);
+            }
+          }
+        });
+        
+        return updated;
+      });
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, [productions]);
+  
+  // Set current date/time for plating form fields and stop form fields
+  useEffect(() => {
+    if (showStopReasonModal) {
+      const now = new Date();
+      setStopTime(
+        `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+      );
+      setStopDate(
+        `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+      );
+    }
+    
+    if (showPlatingModal) {
+      const now = new Date();
+      setPlatingData(prev => ({
+        ...prev,
+        platingTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`,
+        platingDate: `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+      }));
+    }
+  }, [showStopReasonModal, showPlatingModal]);
   
   // Set up scanner input listener
   useEffect(() => {
@@ -409,22 +563,13 @@ function Production({ user }) {
     }
   };
   
-  // Set current date/time for stop form fields
-  useEffect(() => {
-    if (showStopReasonModal) {
-      const now = new Date();
-      setStopTime(
-        `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
-      );
-      setStopDate(
-        `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
-      );
-    }
-  }, [showStopReasonModal]);
-  
   // Handle tab changes
   const handleTabChange = (tab) => {
     setActiveTab(tab);
+    // If switching to plating list, refetch plating data
+    if (tab === 'platingList') {
+      refetchPlating();
+    }
   };
   
   // Handle add new batch
@@ -444,6 +589,69 @@ function Production({ user }) {
       expectedOutput: '',
     });
     setShowAddModal(true);
+  };
+  
+  // Handle plating item selection
+  const handlePlatingItemSelect = (itemId) => {
+    setPlatingData(prev => {
+      const selectedItems = [...prev.selectedItems];
+      
+      if (selectedItems.includes(itemId)) {
+        return {
+          ...prev,
+          selectedItems: selectedItems.filter(id => id !== itemId)
+        };
+      } else {
+        return {
+          ...prev,
+          selectedItems: [...selectedItems, itemId]
+        };
+      }
+    });
+  };
+  
+  // Handle set plating data
+  const handleSetPlatingTime = () => {
+    // Validate
+    if (!platingData.platingDate || !platingData.platingTime) {
+      toast.error(language === 'vi' ? 'Vui lòng chọn ngày và giờ mạ' : 'Please select plating date and time');
+      return;
+    }
+    
+    if (platingData.selectedItems.length === 0) {
+      toast.error(language === 'vi' ? 'Vui lòng chọn ít nhất một lô để mạ' : 'Please select at least one batch for plating');
+      return;
+    }
+    
+    // For each selected item, update its plating information
+    platingData.selectedItems.forEach(itemId => {
+      const item = platingItems.find(p => p.id === itemId);
+      if (item) {
+        updatePlating.mutate({
+          id: itemId,
+          data: {
+            platingDate: platingData.platingDate,
+            platingTime: platingData.platingTime,
+            status: 'inProcess'
+          }
+        });
+      }
+    });
+  };
+  
+  // Handle show plating detail
+  const handleShowPlatingDetail = (plating) => {
+    setSelectedPlating(plating);
+    setShowPlatingModal(true);
+  };
+  
+  // Handle plating data input change
+  const handlePlatingInputChange = (e) => {
+    const { name, value } = e.target;
+    setPlatingData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
   
   // Handle next step in wizard
@@ -504,6 +712,19 @@ function Production({ user }) {
         reason: stopReason,
         stopTime,
         stopDate
+      }
+    });
+  };
+  
+  // Handle plating completion
+  const handleCompletePlating = () => {
+    if (!selectedPlating) return;
+    
+    updatePlating.mutate({
+      id: selectedPlating.id,
+      data: {
+        status: 'completed',
+        platingEndTime: new Date().toISOString()
       }
     });
   };
@@ -572,6 +793,18 @@ function Production({ user }) {
     }
   };
   
+  // Helper function to format time
+  const formatTime = (date) => {
+    if (!date) return '';
+    
+    try {
+      const d = new Date(date);
+      return d.toLocaleString();
+    } catch (e) {
+      return date;
+    }
+  };
+  
   // Handle logout
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -583,10 +816,14 @@ function Production({ user }) {
       
       <div className="content-wrapper">
         <div className="header-section">
-          <h1>{language === 'vi' ? 'Danh sách lô sản xuất' : 'Production Management'}</h1>
-          <button className="add-button" onClick={handleAddBatch}>
-            {language === 'vi' ? 'Tạo lô mới' : 'New Production Batch'}
-          </button>
+          <h1>{language === 'vi' ? activeTab === 'production' ? 'Danh sách lô sản xuất' : 'Danh sách mạ' : 
+                            activeTab === 'production' ? 'Production Management' : 'Plating List'}</h1>
+          
+          {activeTab === 'production' && (
+            <button className="add-button" onClick={handleAddBatch}>
+              {language === 'vi' ? 'Tạo lô mới' : 'New Production Batch'}
+            </button>
+          )}
         </div>
         
         {/* Tabs */}
@@ -598,84 +835,335 @@ function Production({ user }) {
             {language === 'vi' ? 'Danh sách lô sản xuất' : 'Production Batches'}
           </button>
           <button
-            className={`tab ${activeTab === 'Plating List' ? 'active' : ''}`}
-            onClick={() => handleTabChange('Plating List')}
+            className={`tab ${activeTab === 'platingList' ? 'active' : ''}`}
+            onClick={() => handleTabChange('platingList')}
           >
             {language === 'vi' ? 'Danh sách mạ' : 'Plating List'}
           </button>
         </div>
         
-        {/* Production Table */}
-        <div className="table-container">
-          {isLoadingProductions ? (
-            <div className="loading-spinner">
-              <div className="spinner"></div>
-            </div>
-          ) : (
-            <table className="production-table">
-              <thead>
-                <tr>
-                  <th>{language === 'vi' ? 'Trạng thái' : 'Status'}</th>
-                  <th>{language === 'vi' ? 'Tên máy dập' : 'Machine'}</th>
-                  <th>{language === 'vi' ? 'Mã khuôn' : 'Mold'}</th>
-                  <th>{language === 'vi' ? 'Số lượng' : 'Quantity'}</th>
-                  <th>{language === 'vi' ? 'Ngày, giờ bắt đầu' : 'Start Time'}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {productions.length > 0 ? (
-                  productions.map(production => (
-                    <tr key={production.id}>
-                      <td>
-                        <span className={`status-indicator ${production.status === 'running' ? 'active' : 'inactive'}`}></span>
-                      </td>
-                      <td>{production.machine_name}</td>
-                      <td>{production.mold_code}</td>
-                      <td>{production.expected_output}</td>
-                      <td>
-                        {production.start_date ? new Date(production.start_date).toLocaleString() : '-'}
-                      </td>
-                      <td className="actions-cell">
-                        {/* Start button - Blue when machine is stopped */}
-                        <button
-                          className={`action-button start-button ${production.status !== 'running' ? 'active' : 'inactive'}`}
-                          onClick={() => handleStartProduction(production)}
-                          disabled={production.status === 'running'}
-                        >
-                          {language === 'vi' ? 'Tiếp tục' : 'Start'}
-                        </button>
-                        
-                        {/* Stop button - Red when machine is running */}
-                        <button
-                          className={`action-button stop-button ${production.status === 'running' ? 'active' : 'inactive'}`}
-                          onClick={() => handleStopMachine(production)}
-                          disabled={production.status !== 'running'}
-                        >
-                          {language === 'vi' ? 'Dừng' : 'Stop'}
-                        </button>
-                        
-                        {/* Delete button - Always visible */}
-                        <button
-                          className="action-button delete-button"
-                          onClick={() => handleDeleteProduction(production.id)}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
+        {/* Production Tab Content */}
+        {activeTab === 'production' && (
+          <div className="table-container">
+            {isLoadingProductions ? (
+              <div className="loading-spinner">
+                <div className="spinner"></div>
+              </div>
+            ) : (
+              <table className="production-table">
+                <thead>
+                  <tr>
+                    <th>{language === 'vi' ? 'Trạng thái' : 'Status'}</th>
+                    <th>{language === 'vi' ? 'Tên máy dập' : 'Machine'}</th>
+                    <th>{language === 'vi' ? 'Mã khuôn' : 'Mold'}</th>
+                    <th>{language === 'vi' ? 'Tiến độ' : 'Progress'}</th>
+                    <th>{language === 'vi' ? 'Số lượng' : 'Quantity'}</th>
+                    <th>{language === 'vi' ? 'Ngày, giờ bắt đầu' : 'Start Time'}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productions.length > 0 ? (
+                    productions.map(production => (
+                      <tr key={production.id}>
+                        <td>
+                          <span className={`status-indicator ${production.status === 'running' ? 'active' : 'inactive'}`}></span>
+                        </td>
+                        <td>{production.machine_name}</td>
+                        <td>{production.mold_code}</td>
+                        <td>
+                          {/* Progress bar showing batch completion based on time */}
+                          <div className="progress" style={{ height: '20px' }}>
+                            <div 
+                              className={`progress-bar ${production.status === 'running' ? 'bg-success' : 'bg-secondary'}`} 
+                              role="progressbar" 
+                              style={{ width: `${productionProgress[production.id]?.percentage || 0}%` }}
+                              aria-valuenow={productionProgress[production.id]?.percentage || 0} 
+                              aria-valuemin="0" 
+                              aria-valuemax="100"
+                            >
+                              {productionProgress[production.id]?.percentage || 0}%
+                            </div>
+                          </div>
+                          <div className="small text-muted mt-1">
+                            {language === 'vi' 
+                              ? `Hoàn thành: ${productionProgress[production.id]?.batchesDone || 0} / 
+                                  Còn lại: ${productionProgress[production.id]?.batchesRemaining || 0}` 
+                              : `Completed: ${productionProgress[production.id]?.batchesDone || 0} / 
+                                 Remaining: ${productionProgress[production.id]?.batchesRemaining || 0}`}
+                          </div>
+                          {production.status === 'running' && productionProgress[production.id]?.estimatedCompletion && (
+                            <div className="small text-muted">
+                              {language === 'vi' ? 'Dự kiến hoàn thành: ' : 'Est. completion: '}
+                              {productionProgress[production.id].estimatedCompletion.toLocaleString()}
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          {production.expected_output} 
+                          {production.actual_output > 0 && ` / ${production.actual_output}`}
+                        </td>
+                        <td>
+                          {production.start_date ? new Date(production.start_date).toLocaleString() : '-'}
+                        </td>
+                        <td className="actions-cell">
+                          {/* Start button - Blue when machine is stopped */}
+                          <button
+                            className={`action-button start-button ${production.status !== 'running' ? 'active' : 'inactive'}`}
+                            onClick={() => handleStartProduction(production)}
+                            disabled={production.status === 'running'}
+                          >
+                            {language === 'vi' ? 'Tiếp tục' : 'Start'}
+                          </button>
+                          
+                          {/* Stop button - Red when machine is running */}
+                          <button
+                            className={`action-button stop-button ${production.status === 'running' ? 'active' : 'inactive'}`}
+                            onClick={() => handleStopMachine(production)}
+                            disabled={production.status !== 'running'}
+                          >
+                            {language === 'vi' ? 'Dừng' : 'Stop'}
+                          </button>
+                          
+                          {/* Delete button - Always visible */}
+                          <button
+                            className="action-button delete-button"
+                            onClick={() => handleDeleteProduction(production.id)}
+                          >
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="7" className="no-data">
+                        {language === 'vi' ? 'Không tìm thấy lô sản xuất nào' : 'No production batches found'}
                       </td>
                     </tr>
-                  ))
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+        
+        {/* Plating List Tab Content */}
+        {activeTab === 'platingList' && (
+          <div className="plating-section">
+            {/* Plating settings for ready items */}
+            <div className="card mb-4">
+              <div className="card-header bg-primary text-white">
+                <h5 className="mb-0">{language === 'vi' ? 'Lô chờ mạ' : 'Batches Ready for Plating'}</h5>
+              </div>
+              <div className="card-body">
+                {isLoadingPlating ? (
+                  <div className="text-center my-3">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">{language === 'vi' ? 'Đang tải...' : 'Loading...'}</span>
+                    </div>
+                  </div>
                 ) : (
-                  <tr>
-                    <td colSpan="6" className="no-data">
-                      {language === 'vi' ? 'Không tìm thấy lô sản xuất nào' : 'No production batches found'}
-                    </td>
-                  </tr>
+                  <>
+                    <div className="row mb-3">
+                      <div className="col-md-5">
+                        <input 
+                          type="date" 
+                          className="form-control" 
+                          name="platingDate"
+                          value={platingData.platingDate}
+                          onChange={handlePlatingInputChange}
+                          placeholder={language === 'vi' ? 'Ngày mạ' : 'Plating Date'}
+                        />
+                      </div>
+                      <div className="col-md-5">
+                        <input 
+                          type="time" 
+                          className="form-control" 
+                          name="platingTime"
+                          value={platingData.platingTime}
+                          onChange={handlePlatingInputChange}
+                          placeholder={language === 'vi' ? 'Giờ mạ' : 'Plating Time'}
+                        />
+                      </div>
+                      <div className="col-md-2">
+                        <button
+                          className="btn btn-primary w-100"
+                          onClick={handleSetPlatingTime}
+                          disabled={!platingData.platingDate || !platingData.platingTime || platingData.selectedItems.length === 0}
+                        >
+                          {language === 'vi' ? 'Đặt lịch mạ' : 'Set Plating'}
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="table-responsive">
+                      <table className="table table-hover">
+                        <thead>
+                          <tr>
+                            <th width="5%">
+                              <input 
+                                type="checkbox" 
+                                className="form-check-input" 
+                                checked={platingItems.filter(p => p.status === 'pending').length > 0 && 
+                                         platingItems.filter(p => p.status === 'pending').every(p => platingData.selectedItems.includes(p.id))}
+                                onChange={() => {
+                                  const pendingItems = platingItems.filter(p => p.status === 'pending');
+                                  if (pendingItems.length === 0) return;
+                                  
+                                  const areAllSelected = pendingItems.every(p => platingData.selectedItems.includes(p.id));
+                                  
+                                  if (areAllSelected) {
+                                    // Deselect all
+                                    setPlatingData(prev => ({
+                                      ...prev,
+                                      selectedItems: prev.selectedItems.filter(id => !pendingItems.some(p => p.id === id))
+                                    }));
+                                  } else {
+                                    // Select all
+                                    setPlatingData(prev => ({
+                                      ...prev,
+                                      selectedItems: [...new Set([...prev.selectedItems, ...pendingItems.map(p => p.id)])]
+                                    }));
+                                  }
+                                }}
+                              />
+                            </th>
+                            <th>{language === 'vi' ? 'Nhóm ID' : 'Group ID'}</th>
+                            <th>{language === 'vi' ? 'Số lượng' : 'Quantity'}</th>
+                            <th>{language === 'vi' ? 'Người phụ trách' : 'PIC'}</th>
+                            <th>{language === 'vi' ? 'Trạng thái' : 'Status'}</th>
+                            <th>{language === 'vi' ? 'Ngày bắt đầu' : 'Start Date'}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {platingItems.filter(p => p.status === 'pending').length > 0 ? (
+                            platingItems.filter(p => p.status === 'pending').map(item => (
+                              <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => handlePlatingItemSelect(item.id)}>
+                                <td>
+                                  <input 
+                                    type="checkbox" 
+                                    className="form-check-input" 
+                                    checked={platingData.selectedItems.includes(item.id)}
+                                    onChange={() => handlePlatingItemSelect(item.id)}
+                                    onClick={e => e.stopPropagation()}
+                                  />
+                                </td>
+                                <td>{item.group_id}</td>
+                                <td>{item.product_quantity}</td>
+                                <td>{item.pic_name}</td>
+                                <td>
+                                  <span className="badge bg-warning">
+                                    {language === 'vi' ? 'Chờ mạ' : 'Pending'}
+                                  </span>
+                                </td>
+                                <td>{formatTime(item.created_at)}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan="6" className="text-center py-3">
+                                {language === 'vi' ? 'Không có lô nào đang chờ mạ' : 'No batches waiting for plating'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 )}
-              </tbody>
-            </table>
-          )}
-        </div>
+              </div>
+            </div>
+            
+            {/* Plating in progress items */}
+            <div className="card">
+              <div className="card-header bg-info text-white">
+                <h5 className="mb-0">{language === 'vi' ? 'Lô đang mạ' : 'Batches in Plating Process'}</h5>
+              </div>
+              <div className="card-body">
+                {isLoadingPlating ? (
+                  <div className="text-center my-3">
+                    <div className="spinner-border text-primary" role="status">
+                      <span className="visually-hidden">{language === 'vi' ? 'Đang tải...' : 'Loading...'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table table-hover">
+                      <thead>
+                        <tr>
+                          <th>{language === 'vi' ? 'Nhóm ID' : 'Group ID'}</th>
+                          <th>{language === 'vi' ? 'Số lượng' : 'Quantity'}</th>
+                          <th>{language === 'vi' ? 'Người phụ trách' : 'PIC'}</th>
+                          <th>{language === 'vi' ? 'Trạng thái' : 'Status'}</th>
+                          <th>{language === 'vi' ? 'Ngày mạ' : 'Plating Date'}</th>
+                          <th>{language === 'vi' ? 'Thao tác' : 'Actions'}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {platingItems.filter(p => p.status !== 'pending').length > 0 ? (
+                          platingItems.filter(p => p.status !== 'pending').map(item => (
+                            <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => handleShowPlatingDetail(item)}>
+                              <td>{item.group_id}</td>
+                              <td>{item.product_quantity}</td>
+                              <td>{item.pic_name}</td>
+                              <td>
+                                {item.status === 'inProcess' ? (
+                                  <span className="badge bg-primary">
+                                    {language === 'vi' ? 'Đang mạ' : 'In Progress'}
+                                  </span>
+                                ) : item.status === 'completed' ? (
+                                  <span className="badge bg-success">
+                                    {language === 'vi' ? 'Hoàn thành' : 'Completed'}
+                                  </span>
+                                ) : (
+                                  <span className="badge bg-secondary">
+                                    {item.status}
+                                  </span>
+                                )}
+                              </td>
+                              <td>{item.platingDate} {item.platingTime}</td>
+                              <td>
+                                {item.status === 'inProcess' && (
+                                  <button
+                                    className="btn btn-sm btn-success"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedPlating(item);
+                                      handleCompletePlating();
+                                    }}
+                                  >
+                                    {language === 'vi' ? 'Hoàn thành' : 'Complete'}
+                                  </button>
+                                )}
+                                
+                                <button
+                                  className="btn btn-sm btn-info ms-2"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleShowPlatingDetail(item);
+                                  }}
+                                >
+                                  {language === 'vi' ? 'Chi tiết' : 'Details'}
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="6" className="text-center py-3">
+                              {language === 'vi' ? 'Không có lô nào đang trong quá trình mạ' : 'No batches in plating process'}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Add Production Modal */}
@@ -912,6 +1400,74 @@ function Production({ user }) {
                   (language === 'vi' ? 'Đang lưu...' : 'Saving...') : 
                   (language === 'vi' ? 'Xác nhận' : 'Confirm')}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Plating Detail Modal */}
+      {showPlatingModal && selectedPlating && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>{language === 'vi' ? 'Chi tiết mạ' : 'Plating Details'}</h3>
+              <button className="close-button" onClick={() => {
+                setShowPlatingModal(false);
+                setSelectedPlating(null);
+              }}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="detail-row">
+                <span className="detail-label">{language === 'vi' ? 'Nhóm ID' : 'Group ID'}:</span>
+                <span className="detail-value">{selectedPlating.group_id}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">{language === 'vi' ? 'Số lượng' : 'Quantity'}:</span>
+                <span className="detail-value">{selectedPlating.product_quantity}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">{language === 'vi' ? 'Người phụ trách' : 'PIC'}:</span>
+                <span className="detail-value">{selectedPlating.pic_name}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">{language === 'vi' ? 'Trạng thái' : 'Status'}:</span>
+                <span className="detail-value">
+                  {selectedPlating.status === 'pending' 
+                    ? (language === 'vi' ? 'Chờ mạ' : 'Pending') 
+                    : selectedPlating.status === 'inProcess' 
+                      ? (language === 'vi' ? 'Đang mạ' : 'In Progress')
+                      : (language === 'vi' ? 'Hoàn thành' : 'Completed')}
+                </span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">{language === 'vi' ? 'Ngày mạ' : 'Plating Date'}:</span>
+                <span className="detail-value">{selectedPlating.platingDate} {selectedPlating.platingTime}</span>
+              </div>
+              {selectedPlating.platingEndTime && (
+                <div className="detail-row">
+                  <span className="detail-label">{language === 'vi' ? 'Ngày hoàn thành' : 'Completion Date'}:</span>
+                  <span className="detail-value">{formatTime(selectedPlating.platingEndTime)}</span>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="cancel-button"
+                onClick={() => {
+                  setShowPlatingModal(false);
+                  setSelectedPlating(null);
+                }}
+              >
+                {language === 'vi' ? 'Đóng' : 'Close'}
+              </button>
+              {selectedPlating.status === 'inProcess' && (
+                <button 
+                  className="confirm-button"
+                  onClick={handleCompletePlating}
+                >
+                  {language === 'vi' ? 'Hoàn thành mạ' : 'Complete Plating'}
+                </button>
+              )}
             </div>
           </div>
         </div>
