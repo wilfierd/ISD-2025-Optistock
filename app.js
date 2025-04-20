@@ -1827,7 +1827,7 @@ app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
   
   app.post('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
     try {
-      const { groupId, picId, startTime, completionTime, productQuantity } = req.body;
+      const { groupId, picId, startTime, completionTime, productQuantity, productName, productCode, notes } = req.body;
       
       // Validate required fields
       if (!groupId || !picId || !productQuantity) {
@@ -1868,14 +1868,17 @@ app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
       // Insert the assembly
       const [result] = await pool.query(`
         INSERT INTO assembly_components 
-        (group_id, pic_id, start_time, completion_time, product_quantity, status)
-        VALUES (?, ?, ?, ?, ?, 'pending')
+        (group_id, pic_id, start_time, completion_time, product_quantity, product_name, product_code, notes, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'processing')
       `, [
         groupId,
         picId,
         parsedStartTime,
         parsedCompletionTime,
-        productQuantity
+        productQuantity,
+        productName || null,
+        productCode || null,
+        notes || null
       ]);
       
       res.status(201).json({ 
@@ -1963,87 +1966,134 @@ app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
   });
   
   app.post('/api/assemblies/:id/plating', isAuthenticatedAPI, async (req, res) => {
+    // Bắt đầu transaction để đảm bảo tính nhất quán dữ liệu
+    const connection = await pool.getConnection();
+    await connection.beginTransaction();
+    
     try {
       const { id } = req.params;
       
-      // Start a transaction
-      const connection = await pool.getConnection();
-      await connection.beginTransaction();
+      // Lấy thông tin từ assembly_components
+      const [assemblyResults] = await connection.query(
+        `SELECT * FROM assembly_components WHERE id = ?`,
+        [id]
+      );
       
-      try {
-        // Update assembly status
-        await connection.query(`
-          UPDATE assembly_components
-          SET status = 'plating'
-          WHERE id = ?
-        `, [id]);
-        
-        // Create plating record
-        const now = new Date();
-        await connection.query(`
-          INSERT INTO plating
-          (assembly_id, plating_start_time, status)
-          VALUES (?, ?, 'pending')
-        `, [id, now]);
-        
-        // Commit transaction
-        await connection.commit();
-        
-        res.json({ 
-          success: true, 
-          message: 'Successfully proceeded to plating'
-        });
-      } catch (error) {
-        // Rollback on error
+      if (assemblyResults.length === 0) {
         await connection.rollback();
-        throw error;
-      } finally {
         connection.release();
+        return res.status(404).json({
+          success: false,
+          error: 'Assembly not found'
+        });
       }
+      
+      const assembly = assemblyResults[0];
+      
+      // Cập nhật trạng thái assembly thành 'plating'
+      await connection.query(
+        `UPDATE assembly_components SET status = 'plating' WHERE id = ?`,
+        [id]
+      );
+      
+      // Tạo bản ghi mới trong bảng plating
+      const now = new Date();
+      await connection.query(
+        `INSERT INTO plating 
+         (assembly_id, product_name, product_code, notes, plating_start_time, status) 
+         VALUES (?, ?, ?, ?, ?, 'pending')`,
+        [
+          id,
+          assembly.product_name,  // Lấy từ assembly_components
+          assembly.product_code,  // Lấy từ assembly_components
+          assembly.notes,        // Lấy từ assembly_components
+          now
+        ]
+      );
+      
+      // Commit transaction
+      await connection.commit();
+      connection.release();
+      
+      res.json({
+        success: true,
+        message: 'Successfully transferred to plating process'
+      });
     } catch (error) {
-      console.error('Error proceeding to plating:', error);
-      res.status(500).json({ success: false, error: 'Failed to proceed to plating' });
+      // Rollback nếu có lỗi
+      await connection.rollback();
+      connection.release();
+      console.error('Error transferring to plating:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to transfer to plating process'
+      });
     }
-  });
+  });  
   
   // Plating routes
   app.get('/api/plating', isAuthenticatedAPI, async (req, res) => {
     try {
+      // Lấy danh sách với thông tin từ bảng assembly_components và users
       const [rows] = await pool.query(`
-        SELECT p.*, ac.group_id, ac.product_quantity, ac.pic_id, u.username as pic_name
+        SELECT 
+          p.id, p.assembly_id, p.plating_start_time, p.plating_end_time, 
+          p.status, p.created_at, p.product_name, p.product_code, p.notes,
+          a.group_id, a.product_quantity, a.pic_id,
+          u.username as pic_name
         FROM plating p
-        JOIN assembly_components ac ON p.assembly_id = ac.id
-        JOIN users u ON ac.pic_id = u.id
+        JOIN assembly_components a ON p.assembly_id = a.id
+        JOIN users u ON a.pic_id = u.id
         ORDER BY p.created_at DESC
       `);
       
-      res.json({ success: true, data: rows });
+      res.json({
+        success: true,
+        data: rows
+      });
     } catch (error) {
       console.error('Error fetching plating records:', error);
-      res.status(500).json({ success: false, error: 'Failed to fetch plating records' });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch plating records'
+      });
     }
-  });
+  });  
   
   app.get('/api/plating/:id', isAuthenticatedAPI, async (req, res) => {
     try {
       const { id } = req.params;
       
+      // Lấy chi tiết plating kèm thông tin từ assembly_components và users
       const [rows] = await pool.query(`
-        SELECT p.*, ac.group_id, ac.product_quantity, ac.pic_id, u.username as pic_name
+        SELECT 
+          p.id, p.assembly_id, p.plating_start_time, p.plating_end_time, 
+          p.status, p.created_at, p.product_name, p.product_code, p.notes,
+          a.group_id, a.product_quantity, a.pic_id,
+          u.username as pic_name
         FROM plating p
-        JOIN assembly_components ac ON p.assembly_id = ac.id
-        JOIN users u ON ac.pic_id = u.id
+        JOIN assembly_components a ON p.assembly_id = a.id
+        JOIN users u ON a.pic_id = u.id
         WHERE p.id = ?
       `, [id]);
       
       if (rows.length === 0) {
-        return res.status(404).json({ success: false, error: 'Plating record not found' });
+        return res.status(404).json({
+          success: false,
+          error: 'Plating record not found'
+        });
       }
       
-      res.json({ success: true, data: rows[0] });
+      res.json({
+        success: true,
+        data: rows[0]
+      });
     } catch (error) {
       console.error('Error fetching plating record:', error);
-      res.status(500).json({ success: false, error: 'Failed to fetch plating record' });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch plating record'
+      });
     }
   });
   
@@ -2051,330 +2101,126 @@ app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
     try {
       const { assemblyId } = req.params;
       
+      // Lấy thông tin plating của một assembly cụ thể
       const [rows] = await pool.query(`
-        SELECT p.*, ac.group_id, ac.product_quantity, ac.pic_id, u.username as pic_name
+        SELECT 
+          p.id, p.assembly_id, p.plating_start_time, p.plating_end_time, 
+          p.status, p.created_at, p.product_name, p.product_code, p.notes,
+          a.group_id, a.product_quantity, a.pic_id,
+          u.username as pic_name
         FROM plating p
-        JOIN assembly_components ac ON p.assembly_id = ac.id
-        JOIN users u ON ac.pic_id = u.id
+        JOIN assembly_components a ON p.assembly_id = a.id
+        JOIN users u ON a.pic_id = u.id
         WHERE p.assembly_id = ?
       `, [assemblyId]);
       
       if (rows.length === 0) {
-        return res.status(404).json({ success: false, error: 'No plating record found for this assembly' });
+        return res.status(404).json({
+          success: false,
+          error: 'No plating record found for this assembly'
+        });
       }
       
-      res.json({ success: true, data: rows[0] });
+      res.json({
+        success: true,
+        data: rows[0]
+      });
     } catch (error) {
       console.error('Error fetching plating by assembly:', error);
-      res.status(500).json({ success: false, error: 'Failed to fetch plating by assembly' });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch plating by assembly'
+      });
     }
   });
   
   app.put('/api/plating/:id', isAuthenticatedAPI, async (req, res) => {
     try {
       const { id } = req.params;
-      const { status, platingEndTime } = req.body;
+      const { product_name, product_code, notes, status } = req.body;
       
-      // Build the SQL update statement dynamically
+      // Xây dựng câu lệnh UPDATE dựa trên dữ liệu được cung cấp
       let updateFields = [];
       let queryParams = [];
       
-      if (status) {
+      if (product_name !== undefined) {
+        updateFields.push('product_name = ?');
+        queryParams.push(product_name);
+      }
+      
+      if (product_code !== undefined) {
+        updateFields.push('product_code = ?');
+        queryParams.push(product_code);
+      }
+      
+      if (notes !== undefined) {
+        updateFields.push('notes = ?');
+        queryParams.push(notes);
+      }
+      
+      if (status !== undefined) {
         updateFields.push('status = ?');
         queryParams.push(status);
+        
+        // Nếu status là 'completed', tự động cập nhật plating_end_time
+        if (status === 'completed') {
+          updateFields.push('plating_end_time = NOW()');
+        }
       }
       
-      if (platingEndTime) {
-        updateFields.push('plating_end_time = ?');
-        queryParams.push(new Date(platingEndTime));
+      // Nếu không có trường nào cần cập nhật
+      if (updateFields.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'No fields to update'
+        });
       }
       
-      // Add the ID at the end of params array
+      // Thêm id vào mảng tham số
       queryParams.push(id);
       
-      if (updateFields.length === 0) {
-        return res.status(400).json({ success: false, error: 'No fields to update' });
-      }
+      // Thực hiện câu lệnh UPDATE
+      await pool.query(
+        `UPDATE plating SET ${updateFields.join(', ')} WHERE id = ?`,
+        queryParams
+      );
       
-      const query = `UPDATE plating SET ${updateFields.join(', ')} WHERE id = ?`;
-      
-      await pool.query(query, queryParams);
-      
-      res.json({ success: true, message: 'Plating record updated successfully' });
+      res.json({
+        success: true,
+        message: 'Plating record updated successfully'
+      });
     } catch (error) {
       console.error('Error updating plating record:', error);
-      res.status(500).json({ success: false, error: 'Failed to update plating record' });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to update plating record'
+      });
     }
   });
   
+  // Route để hoàn thành công đoạn mạ
   app.put('/api/plating/:id/complete', isAuthenticatedAPI, async (req, res) => {
     try {
       const { id } = req.params;
       
-      // Update plating record to completed
+      // Cập nhật trạng thái và thời gian kết thúc
       await pool.query(`
         UPDATE plating
         SET status = 'completed', plating_end_time = NOW()
         WHERE id = ?
       `, [id]);
       
-      res.json({ success: true, message: 'Plating process completed' });
+      res.json({
+        success: true,
+        message: 'Plating process completed successfully'
+      });
     } catch (error) {
       console.error('Error completing plating process:', error);
-      res.status(500).json({ success: false, error: 'Failed to complete plating process' });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to complete plating process'
+      });
     }
-  });
-
-  // Complete plating and move to finished products
-app.post('/api/plating/:id/complete', isAuthenticatedAPI, async (req, res) => {
-  // Start a transaction
-  const connection = await pool.getConnection();
-  await connection.beginTransaction();
-  
-  try {
-    const { id } = req.params;
-    
-    // Get plating information
-    const [platingResults] = await connection.query(`
-      SELECT p.*, ac.id as assembly_id, ac.group_id, ac.product_quantity, ac.pic_id
-      FROM plating p
-      JOIN assembly_components ac ON p.assembly_id = ac.id
-      WHERE p.id = ?
-    `, [id]);
-    
-    if (platingResults.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ success: false, error: 'Plating record not found' });
-    }
-    
-    const plating = platingResults[0];
-    
-    // Update plating status to completed
-    await connection.query(`
-      UPDATE plating
-      SET status = 'completed', plating_end_time = NOW()
-      WHERE id = ?
-    `, [id]);
-    
-    // Get assembly information
-    const [assemblyResults] = await connection.query(`
-      SELECT ac.*, u.username as pic_name
-      FROM assembly_components ac
-      LEFT JOIN users u ON ac.pic_id = u.id
-      WHERE ac.id = ?
-    `, [plating.assembly_id]);
-    
-    if (assemblyResults.length === 0) {
-      await connection.rollback();
-      return res.status(404).json({ success: false, error: 'Assembly record not found' });
-    }
-    
-    const assembly = assemblyResults[0];
-    
-    // Get batch information
-    const [batchResults] = await connection.query(`
-      SELECT b.*, bg.group_id
-      FROM batches b
-      JOIN batch_groups bg ON b.id = bg.batch_id
-      WHERE bg.group_id = ?
-    `, [assembly.group_id]);
-    
-    // Get material information from the first batch
-    let materialInfo = null;
-    if (batchResults.length > 0) {
-      const firstBatch = batchResults[0];
-      
-      // Try to get material info if available
-      try {
-        const [materialResults] = await connection.query(`
-          SELECT *
-          FROM materials
-          WHERE part_name = ?
-          LIMIT 1
-        `, [firstBatch.part_name]);
-        
-        if (materialResults.length > 0) {
-          materialInfo = materialResults[0];
-        }
-      } catch (e) {
-        console.error('Error fetching material info:', e);
-        // Continue without material info
-      }
-    }
-    
-    // Try to get production information
-    let productionInfo = null;
-    try {
-      const [productionResults] = await connection.query(`
-        SELECT * FROM loHangHoa
-        WHERE material_id = ?
-        ORDER BY created_at DESC
-        LIMIT 1
-      `, [materialInfo?.id || 0]);
-      
-      if (productionResults.length > 0) {
-        productionInfo = productionResults[0];
-      }
-    } catch (e) {
-      console.error('Error fetching production info:', e);
-      // Continue without production info
-    }
-    
-    // Create product history for QR code
-    const productHistory = {
-      material: materialInfo,
-      production: productionInfo,
-      batches: batchResults,
-      assembly: {
-        ...assembly,
-        pic_name: assembly.pic_name
-      },
-      plating: {
-        ...plating,
-        platingEndTime: new Date()
-      }
-    };
-    
-    // Create finished product entry
-    const [insertResult] = await connection.query(`
-      INSERT INTO finished_products (
-        plating_id,
-        assembly_id,
-        group_id,
-        product_name,
-        product_code,
-        quantity,
-        completion_date,
-        created_by,
-        status,
-        qr_code_data
-      ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, 'in_stock', ?)
-    `, [
-      id,
-      plating.assembly_id,
-      assembly.group_id,
-      batchResults.length > 0 ? batchResults[0].part_name : 'Product',
-      `PROD-${assembly.group_id}`,
-      assembly.product_quantity,
-      req.session.user.id,
-      JSON.stringify(productHistory)
-    ]);
-    
-    // Update assembly status
-    await connection.query(`
-      UPDATE assembly_components
-      SET status = 'completed'
-      WHERE id = ?
-    `, [plating.assembly_id]);
-    
-    // Commit the transaction
-    await connection.commit();
-    
-    res.json({ 
-      success: true, 
-      message: 'Product moved to finished products warehouse',
-      productId: insertResult.insertId
-    });
-  } catch (error) {
-    // Rollback on error
-    await connection.rollback();
-    console.error('Error completing plating and moving to finished products:', error);
-    res.status(500).json({ success: false, error: 'Failed to complete plating process' });
-  } finally {
-    connection.release();
-  }
-});
-
-  app.get('/api/finished-products', isAuthenticatedAPI, async (req, res) => {
-    try {
-      const [products] = await pool.query(`
-        SELECT fp.*, u.username as created_by_name 
-        FROM finished_products fp
-        LEFT JOIN users u ON fp.created_by = u.id
-        ORDER BY fp.created_at DESC
-      `);
-      
-      // For each product, get its full history
-      for (const product of products) {
-        if (product.qr_code_data) {
-          try {
-            product.history = typeof product.qr_code_data === 'string' 
-              ? JSON.parse(product.qr_code_data) 
-              : product.qr_code_data;
-          } catch (e) {
-            console.error('Error parsing QR code data:', e);
-            product.history = {};
-          }
-        }
-      }
-      
-      res.json({ success: true, data: products });
-    } catch (error) {
-      console.error('Error fetching finished products:', error);
-      res.status(500).json({ success: false, error: 'Failed to fetch finished products' });
-    }
-  });
-  
-  // Get a single finished product by ID
-  app.get('/api/finished-products/:id', isAuthenticatedAPI, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      const [products] = await pool.query(`
-        SELECT fp.*, u.username as created_by_name 
-        FROM finished_products fp
-        LEFT JOIN users u ON fp.created_by = u.id
-        WHERE fp.id = ?
-      `, [id]);
-      
-      if (products.length === 0) {
-        return res.status(404).json({ success: false, error: 'Product not found' });
-      }
-      
-      const product = products[0];
-      
-      // Parse QR code data for history
-      if (product.qr_code_data) {
-        try {
-          product.history = typeof product.qr_code_data === 'string' 
-            ? JSON.parse(product.qr_code_data) 
-            : product.qr_code_data;
-        } catch (e) {
-          console.error('Error parsing QR code data:', e);
-          product.history = {};
-        }
-      }
-      
-      res.json({ success: true, data: product });
-    } catch (error) {
-      console.error('Error fetching finished product:', error);
-      res.status(500).json({ success: false, error: 'Failed to fetch finished product' });
-    }
-  });
-
-  // Update finished product status
-app.put('/api/finished-products/:id/status', isAuthenticatedAPI, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    
-    if (!status) {
-      return res.status(400).json({ success: false, error: 'Status is required' });
-    }
-    
-    await pool.query(
-      'UPDATE finished_products SET status = ? WHERE id = ?',
-      [status, id]
-    );
-    
-    res.json({ 
-      success: true, 
-      message: 'Product status updated successfully' 
-    });
-  } catch (error) {
-    console.error('Error updating product status:', error);
-    res.status(500).json({ success: false, error: 'Failed to update product status' });
-  }
 });
 
 // Start the server

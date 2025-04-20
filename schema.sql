@@ -555,6 +555,7 @@ INSERT INTO loHangHoa (material_id, machine_id, mold_id, created_by, status, exp
 
 ALTER TABLE machines ADD COLUMN status ENUM('running', 'stopping') DEFAULT NULL;
 
+
 -- Assembly components table
 CREATE TABLE IF NOT EXISTS assembly_components (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -563,7 +564,10 @@ CREATE TABLE IF NOT EXISTS assembly_components (
     completion_time DATETIME,
     product_quantity INT NOT NULL,
     pic_id INT NOT NULL,
-    status ENUM('pending', 'processing', 'completed', 'plating') DEFAULT 'pending',
+    product_name VARCHAR(255),
+    product_code VARCHAR(100),
+    notes TEXT,
+    status ENUM('processing', 'completed', 'plating') DEFAULT 'processing',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES batch_groups_counter(id) ON DELETE CASCADE,
     FOREIGN KEY (pic_id) REFERENCES users(id) ON DELETE CASCADE
@@ -573,6 +577,9 @@ CREATE TABLE IF NOT EXISTS assembly_components (
 CREATE TABLE IF NOT EXISTS plating (
     id INT AUTO_INCREMENT PRIMARY KEY,
     assembly_id INT NOT NULL,
+    product_name VARCHAR(255),
+    product_code VARCHAR(100),
+    notes TEXT,
     plating_start_time DATETIME NOT NULL,
     plating_end_time DATETIME,
     status ENUM('pending', 'processing', 'completed') DEFAULT 'pending',
