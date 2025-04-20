@@ -960,6 +960,166 @@ input[type="checkbox"] {
   background-color: white;
   border-top: 1px solid #eee;
 }
+/* ----- Overlay chung cho mọi modal ----- */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+/* ----- Modal “Xác nhận chuyển sang mạ” ----- */
+.confirm-plating-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.confirm-plating-modal .modal-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #ececec;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.confirm-plating-modal .modal-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.confirm-plating-modal .btn-close {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.confirm-plating-modal .btn-close:hover {
+  opacity: 1;
+}
+
+/* Body */
+.confirm-plating-modal .modal-body {
+  padding: 1rem 1.25rem;
+}
+.confirm-plating-modal .alert-info {
+  background-color: #e9f7fe;
+  border-color: #b8e2f2;
+  color: #31708f;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+.confirm-plating-modal .table {
+  margin-bottom: 1rem;
+}
+.confirm-plating-modal .table td {
+  border: none;
+  padding: 0.25rem 0;
+  font-size: 0.95rem;
+}
+.confirm-plating-modal textarea.form-control {
+  width: 100%;
+  resize: vertical;
+}
+
+/* Footer */
+.confirm-plating-modal .modal-footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid #ececec;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.confirm-plating-modal .modal-footer .btn {
+  min-width: 90px;
+}
+
+/* ----- Modal “Nhận hàng sau mạ” ----- */
+.receive-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: 420px;
+  max-width: 90%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.receive-modal .modal-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #ececec;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.receive-modal .modal-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.receive-modal .btn-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.receive-modal .btn-close:hover {
+  opacity: 1;
+}
+
+/* Body */
+.receive-modal .modal-body {
+  padding: 1rem;
+}
+.receive-modal .form-group {
+  margin-bottom: 0.75rem;
+}
+.receive-modal .form-group label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+.receive-modal .form-control {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+}
+.receive-modal .form-control[readonly] {
+  background-color: #e9ecef;
+}
+.receive-modal textarea.form-control {
+  resize: vertical;
+}
+
+/* Footer */
+.receive-modal .modal-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #ececec;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+.receive-modal .modal-footer .btn {
+  min-width: 90px;
+}
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
