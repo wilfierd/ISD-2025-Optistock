@@ -719,10 +719,7 @@ app.post('/api/material-requests', isAuthenticatedAPI, async (req, res) => {
     res.status(500).json({ success: false, error: `Failed to create material request: ${error.message}` });
   }
 });
-<<<<<<< HEAD
 
-=======
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
 // Get a single material request by ID
 app.get('/api/material-requests/:id', isAuthenticatedAPI, async (req, res) => {
   try {
@@ -769,10 +766,7 @@ app.get('/api/material-requests/:id', isAuthenticatedAPI, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch material request' });
   }
 });
-<<<<<<< HEAD
 
-=======
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
 app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req, res) => {
   try {
     const { id } = req.params;
@@ -962,13 +956,6 @@ app.put('/api/material-requests/:id', isAuthenticatedAPI, isAdminAPI, async (req
       await connection.commit();
       
       // Create notification for the requester
-<<<<<<< HEAD
-=======
-      // Cập nhật phần xử lý yêu cầu trong app.js
-
-      // Thay thế đoạn code tạo thông báo trong hàm xử lý yêu cầu:
-
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
       // Tạo thông báo chi tiết hơn cho người yêu cầu dựa trên loại yêu cầu và trạng thái
       let notificationMessage = '';
       const requestTypeMap = {
@@ -1075,12 +1062,7 @@ app.delete('/api/notifications', isAuthenticatedAPI, async (req, res) => {
     console.error('Error clearing notifications:', error);
     res.status(500).json({ success: false, error: 'Failed to clear notifications' });
   }
-<<<<<<< HEAD
 });
-=======
-});({ success: false, error: 'Failed to fetch notifications' });
-;
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
 
 // Lấy số lượng thông báo chưa đọc
 app.get('/api/notifications/unread-count', isAuthenticatedAPI, async (req, res) => {
@@ -1146,16 +1128,9 @@ app.delete('/api/notifications/:id', isAuthenticatedAPI, async (req, res) => {
     res.json({ success: true, message: 'Notification deleted' });
   } catch (error) {
     console.error('Error deleting notification:', error);
-<<<<<<< HEAD
     res.status(500).json({ success: false, error: 'Failed to delete notification' });
   }
 });
-=======
-    res.status(500).json
-  }
-});
-// Add these routes to app.js
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
 
 // ===== BATCHES API =====
 
@@ -1336,7 +1311,6 @@ app.put('/api/batches/:id/status', isAuthenticatedAPI, async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to update batch status' });
   }
 });
-<<<<<<< HEAD
 
 // ===== PRODUCTION API ROUTES =====
 
@@ -2108,9 +2082,6 @@ app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
       res.status(500).json({ success: false, error: 'Failed to complete plating process' });
     }
   });
-=======
-// ===== SERVE REACT APP =====
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
 
 // Start the server
 app.listen(PORT, '0.0.0.0', () => {

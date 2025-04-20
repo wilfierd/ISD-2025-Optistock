@@ -1,37 +1,22 @@
-<<<<<<< HEAD
-=======
-// client/src/components/BatchGrouping.js
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
 import React, { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
 import { useLanguage } from '../contexts/LanguageContext';
 import apiService from '../services/api';
-<<<<<<< HEAD
 import { useQuery } from '@tanstack/react-query';
-=======
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
 
 function BatchGrouping({ user }) {
   const { t } = useLanguage();
   const logoutMutation = useLogout();
-<<<<<<< HEAD
 
   // State for active tab
   const [activeTab, setActiveTab] = useState('ungrouped'); // 'ungrouped' or 'grouped'
 
-=======
-  
-  // State for active tab
-  const [activeTab, setActiveTab] = useState('ungrouped'); // 'ungrouped' or 'grouped'
-  
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
   // State for batches data
   const [ungroupedBatches, setUngroupedBatches] = useState([]);
   const [groupedBatches, setGroupedBatches] = useState([]);
   const [groupedBatchesMap, setGroupedBatchesMap] = useState({});
-<<<<<<< HEAD
 
   // State for loading and error
   const [isLoading, setIsLoading] = useState(false);
@@ -91,42 +76,20 @@ function BatchGrouping({ user }) {
     enabled: activeTab === 'grouped' // Only run when grouped tab is active
   });
 
-=======
-  
-  // State for loading and error
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  
-  // State for selected batches
-  const [selectedBatches, setSelectedBatches] = useState([]);
-  
-  // State for grouping modal
-  const [showGroupModal, setShowGroupModal] = useState(false);
-  
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
   // Fetch batches data
   const fetchBatches = async () => {
     setIsLoading(true);
     setError(null);
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
     try {
       // Fetch ungrouped batches
       const ungroupedResponse = await apiService.batches.getUngrouped();
       setUngroupedBatches(ungroupedResponse.data.data || []);
-<<<<<<< HEAD
 
-=======
-      
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
       // Fetch grouped batches
       const groupedResponse = await apiService.batches.getGrouped();
       const groupedData = groupedResponse.data.data || [];
       setGroupedBatches(groupedData);
-<<<<<<< HEAD
 
       // Organize grouped batches by group number
       const batchesByGroup = {};
@@ -142,34 +105,20 @@ function BatchGrouping({ user }) {
           return;
         }
         
-=======
-      
-      // Organize grouped batches by group number
-      const batchesByGroup = {};
-      groupedData.forEach(batch => {
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
         if (!batchesByGroup[batch.group_id]) {
           batchesByGroup[batch.group_id] = [];
         }
         batchesByGroup[batch.group_id].push(batch);
       });
-<<<<<<< HEAD
       
       setGroupedBatchesMap(batchesByGroup);
     } catch (error) {
       console.error('Error fetching batches:', error);
       setError(error.response?.data?.error || t('failedToFetchBatches'));
-=======
-      setGroupedBatchesMap(batchesByGroup);
-    } catch (error) {
-      console.error('Error fetching batches:', error);
-      setError(error.response?.data?.error || 'Failed to fetch batches');
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
     } finally {
       setIsLoading(false);
     }
   };
-<<<<<<< HEAD
 
   // Load data on component mount
   useEffect(() => {
@@ -206,19 +155,6 @@ function BatchGrouping({ user }) {
     }
   }, [assemblies, groupedBatches]);
 
-=======
-  
-  // Load data on component mount
-  useEffect(() => {
-    fetchBatches();
-    
-    // Refresh data periodically (every 30 seconds)
-    const interval = setInterval(fetchBatches, 30000);
-    
-    return () => clearInterval(interval);
-  }, []);
-  
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
   // Handle batch selection
   const handleBatchSelect = (batchId) => {
     setSelectedBatches(prev => {
@@ -229,7 +165,6 @@ function BatchGrouping({ user }) {
       }
     });
   };
-<<<<<<< HEAD
 
   // Handle grouping button click
   const handleGroupClick = () => {
@@ -250,35 +185,12 @@ function BatchGrouping({ user }) {
 
     setIsLoading(true);
 
-=======
-  
-  // Handle grouping button click
-  const handleGroupClick = () => {
-    if (selectedBatches.length === 0) {
-      toast.error(t('Vui lòng chọn ít nhất một lô để nhóm'));
-      return;
-    }
-    
-    setShowGroupModal(true);
-  };
-  
-  // Handle confirm grouping
-  const handleConfirmGrouping = async () => {
-    if (selectedBatches.length === 0) {
-      toast.error(t('Vui lòng chọn ít nhất một lô để nhóm'));
-      return;
-    }
-    
-    setIsLoading(true);
-    
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
     try {
       // API call to group batches
       await apiService.batches.groupBatches({
         batchIds: selectedBatches,
         status: 'Grouped for Assembly'
       });
-<<<<<<< HEAD
 
       toast.success(t('batchesGroupedSuccessfully'));
 
@@ -291,34 +203,15 @@ function BatchGrouping({ user }) {
       // Refresh data
       fetchBatches();
 
-=======
-      
-      toast.success(t('Các lô đã được nhóm thành công'));
-      
-      // Clear selected batches
-      setSelectedBatches([]);
-      
-      // Close modal
-      setShowGroupModal(false);
-      
-      // Refresh data
-      fetchBatches();
-      
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
       // Switch to grouped tab
       setActiveTab('grouped');
     } catch (error) {
       console.error('Error grouping batches:', error);
-<<<<<<< HEAD
       toast.error(error.response?.data?.error || t('errorGroupingBatches'));
-=======
-      toast.error(error.response?.data?.error || t('Có lỗi xảy ra khi nhóm các lô'));
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
     } finally {
       setIsLoading(false);
     }
   };
-<<<<<<< HEAD
 
   // Handle QR code generation
   const handleGenerateQR = (batch) => {
@@ -497,9 +390,6 @@ function BatchGrouping({ user }) {
     }
   };
 
-=======
-  
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
   // Handle logout
   const handleLogout = () => {
     logoutMutation.mutate();
@@ -511,39 +401,23 @@ function BatchGrouping({ user }) {
 
       <div className="container-fluid mt-4">
         <div className="d-flex justify-content-between align-items-center mb-4">
-<<<<<<< HEAD
           <h2>{t('batchGrouping')}</h2>
-=======
-          <h2>{t('Nhóm lô linh kiện')}</h2>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
           {activeTab === 'ungrouped' && selectedBatches.length > 0 && (
             <button 
               className="btn btn-primary"
               onClick={handleGroupClick}
               disabled={isLoading}
             >
-<<<<<<< HEAD
               {t('group')}
             </button>
           )}
         </div>
 
-=======
-              {t('Nhóm')}
-            </button>
-          )}
-        </div>
-        
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
         {/* Progress Bar Placeholder */}
         <div className="mb-3 text-muted small">
           &lt;Progression Bar&gt; (COMING soon)
         </div>
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
         {/* Tabs */}
         <ul className="nav nav-tabs mb-3">
           <li className="nav-item">
@@ -551,11 +425,7 @@ function BatchGrouping({ user }) {
               className={`nav-link ${activeTab === 'ungrouped' ? 'active bg-light' : ''}`} 
               onClick={() => setActiveTab('ungrouped')}
             >
-<<<<<<< HEAD
               {t('ungroupedBatches')}
-=======
-              {t('Lô linh kiện chưa nhóm')}
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
             </button>
           </li>
           <li className="nav-item">
@@ -563,30 +433,18 @@ function BatchGrouping({ user }) {
               className={`nav-link ${activeTab === 'grouped' ? 'active bg-light' : ''}`} 
               onClick={() => setActiveTab('grouped')}
             >
-<<<<<<< HEAD
               {t('groupedBatches')}
             </button>
           </li>
         </ul>
 
-=======
-              {t('Lô linh kiện đã nhóm')}
-            </button>
-          </li>
-        </ul>
-        
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
         {/* Error Message */}
         {error && (
           <div className="alert alert-danger">
             {error}
           </div>
         )}
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
         {/* Ungrouped Batches Tab */}
         {activeTab === 'ungrouped' && (
           <div className="custom-table-container">
@@ -595,30 +453,18 @@ function BatchGrouping({ user }) {
                 <thead>
                   <tr>
                     <th width="5%"></th>
-<<<<<<< HEAD
                     <th>{t('partName')}</th>
                     <th>{t('machineName')}</th>
                     <th>{t('moldCode')}</th>
                     <th>{t('quantity')}</th>
                     <th>{t('warehouseEntryTime')}</th>
                     <th width="5%"></th>
-=======
-                    <th>{t('Part name')}</th>
-                    <th>{t('Tên máy dập')}</th>
-                    <th>{t('Mã khuôn')}</th>
-                    <th>{t('Số lượng')}</th>
-                    <th>{t('Thời gian nhập kho')}</th>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                   </tr>
                 </thead>
                 <tbody>
                   {isLoading && ungroupedBatches.length === 0 ? (
                     <tr>
-<<<<<<< HEAD
                       <td colSpan="7" className="text-center py-3">
-=======
-                      <td colSpan="6" className="text-center py-3">
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                         <div className="spinner-border text-primary" role="status">
                           <span className="visually-hidden">{t('loading')}</span>
                         </div>
@@ -626,13 +472,8 @@ function BatchGrouping({ user }) {
                     </tr>
                   ) : ungroupedBatches.length === 0 ? (
                     <tr>
-<<<<<<< HEAD
                       <td colSpan="7" className="text-center py-3">
                         {t('noUngroupedBatches')}
-=======
-                      <td colSpan="6" className="text-center py-3">
-                        {t('Không có lô linh kiện nào chưa được nhóm')}
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                       </td>
                     </tr>
                   ) : (
@@ -651,7 +492,6 @@ function BatchGrouping({ user }) {
                         <td>{batch.mold_code}</td>
                         <td>{batch.quantity}</td>
                         <td>{batch.warehouse_entry_time}</td>
-<<<<<<< HEAD
                         <td>
                           <button 
                             className="btn btn-sm" 
@@ -664,8 +504,6 @@ function BatchGrouping({ user }) {
                             <i className="fas fa-qrcode"></i>
                           </button>
                         </td>
-=======
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                       </tr>
                     ))
                   )}
@@ -674,11 +512,7 @@ function BatchGrouping({ user }) {
             </div>
           </div>
         )}
-<<<<<<< HEAD
 
-=======
-        
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
         {/* Grouped Batches Tab */}
         {activeTab === 'grouped' && (
           <div className="custom-table-container">
@@ -686,21 +520,12 @@ function BatchGrouping({ user }) {
               <table className="table">
                 <thead>
                   <tr>
-<<<<<<< HEAD
                     <th width="5%">{t('groupNo')}</th>
                     <th>{t('partName')}</th>
                     <th>{t('machineName')}</th>
                     <th>{t('moldCode')}</th>
                     <th>{t('quantity')}</th>
                     <th>{t('warehouseEntryTime')}</th>
-=======
-                    <th width="5%">{t('STT')}</th>
-                    <th>{t('Part name')}</th>
-                    <th>{t('Tên máy dập')}</th>
-                    <th>{t('Mã khuôn')}</th>
-                    <th>{t('Số lượng')}</th>
-                    <th>{t('Thời gian nhập kho')}</th>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                   </tr>
                 </thead>
                 <tbody>
@@ -715,7 +540,6 @@ function BatchGrouping({ user }) {
                   ) : Object.keys(groupedBatchesMap).length === 0 ? (
                     <tr>
                       <td colSpan="6" className="text-center py-3">
-<<<<<<< HEAD
                         {t('noGroupedBatches')}
                       </td>
                     </tr>
@@ -776,39 +600,6 @@ function BatchGrouping({ user }) {
                         </React.Fragment>
                       );
                     })
-=======
-                        {t('Không có lô linh kiện nào đã được nhóm')}
-                      </td>
-                    </tr>
-                  ) : (
-                    Object.entries(groupedBatchesMap).map(([groupId, batches]) => (
-                      <React.Fragment key={groupId}>
-                        {/* Group Header Row */}
-                        <tr className="table-primary">
-                          <td colSpan="6" className="text-start">
-                            <strong>{t('Nhóm')} #{groupId}</strong>
-                          </td>
-                        </tr>
-                        
-                        {/* Batch Rows */}
-                        {batches.map((batch, index) => (
-                          <tr key={batch.id}>
-                            <td>{groupId}</td>
-                            <td>{batch.part_name}</td>
-                            <td>{batch.machine_name}</td>
-                            <td>{batch.mold_code}</td>
-                            <td>{batch.quantity}</td>
-                            <td>{batch.warehouse_entry_time}</td>
-                          </tr>
-                        ))}
-                        
-                        {/* Empty row for spacing between groups */}
-                        <tr className="table-light">
-                          <td colSpan="6" style={{ height: '10px' }}></td>
-                        </tr>
-                      </React.Fragment>
-                    ))
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                   )}
                 </tbody>
               </table>
@@ -823,11 +614,7 @@ function BatchGrouping({ user }) {
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
-<<<<<<< HEAD
                 <h5 className="modal-title">{t('confirmGrouping')}</h5>
-=======
-                <h5 className="modal-title">{t('Xác nhận nhóm lô')}</h5>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                 <button 
                   type="button" 
                   className="btn-close" 
@@ -835,15 +622,9 @@ function BatchGrouping({ user }) {
                 ></button>
               </div>
               <div className="modal-body">
-<<<<<<< HEAD
                 <p>{t('confirmGroupingMessage')}</p>
                 <p>{t('selectedBatchesCount')}: <strong>{selectedBatches.length}</strong></p>
                 <p>{t('afterGroupingStatus')}</p>
-=======
-                <p>{t('Bạn có chắc chắn muốn nhóm các lô đã chọn?')}</p>
-                <p>{t('Số lô đã chọn')}: <strong>{selectedBatches.length}</strong></p>
-                <p>{t('Sau khi nhóm, trạng thái của các lô sẽ được cập nhật thành "Grouped for Assembly"')}</p>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
               </div>
               <div className="modal-footer">
                 <button 
@@ -852,11 +633,7 @@ function BatchGrouping({ user }) {
                   onClick={() => setShowGroupModal(false)}
                   disabled={isLoading}
                 >
-<<<<<<< HEAD
                   {t('cancel')}
-=======
-                  {t('Hủy')}
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                 </button>
                 <button 
                   type="button" 
@@ -867,17 +644,10 @@ function BatchGrouping({ user }) {
                   {isLoading ? (
                     <>
                       <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-<<<<<<< HEAD
                       {t('processing')}
                     </>
                   ) : (
                     t('confirm')
-=======
-                      {t('Đang xử lý...')}
-                    </>
-                  ) : (
-                    t('Xác nhận')
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                   )}
                 </button>
               </div>
@@ -893,7 +663,6 @@ function BatchGrouping({ user }) {
           onClick={() => !isLoading && setShowGroupModal(false)}
         ></div>
       )}
-<<<<<<< HEAD
 
       {/* QR Code Modal */}
       {showQrModal && selectedBatchForQR && (
@@ -1196,8 +965,6 @@ function BatchGrouping({ user }) {
           onClick={() => setShowDetailsModal(false)}
         ></div>
       )}
-=======
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
     </div>
   );
 }

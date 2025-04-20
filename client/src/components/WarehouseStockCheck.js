@@ -136,7 +136,6 @@ function WarehouseStockCheck({ user }) {
     }
   };
   
-<<<<<<< HEAD
  
   const extractMaterialIdFromScan = (scanValue) => {
     try {
@@ -172,23 +171,10 @@ function WarehouseStockCheck({ user }) {
       }
       
       // Step 3: Check if the entire value is just a number (direct ID)
-=======
-  // Extract material ID from scan value (URL)
-  const extractMaterialIdFromScan = (scanValue) => {
-    try {
-      // If the scanner captures a URL like http://localhost:3000/material/5
-      if (scanValue.includes('/material/')) {
-        const parts = scanValue.split('/material/');
-        return parts[parts.length - 1].trim();
-      }
-      
-      // If the scanner just captures the ID directly
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
       if (/^\d+$/.test(scanValue.trim())) {
         return scanValue.trim();
       }
       
-<<<<<<< HEAD
       // Step 4: Look for material prefixes followed by numbers
       const prefixMatch = scanValue.match(/\b(material|item|product|part|mat)[^a-zA-Z0-9]*([0-9]+)\b/i);
       if (prefixMatch) {
@@ -203,11 +189,6 @@ function WarehouseStockCheck({ user }) {
       return null;
     } catch (error) {
       console.error('Error extracting material ID:', error);
-=======
-      return null;
-    } catch (error) {
-      console.error('Error extracting material ID from scan:', error);
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
       return null;
     }
   };
@@ -665,16 +646,10 @@ function WarehouseStockCheck({ user }) {
                     <th>{t("Trạng thái")}</th>
                     <th>{t("partName")}</th>
                     <th>{t("packetNo")}</th>
-<<<<<<< HEAD
                     <th>{t("materialCode")}</th>
                     <th>{t("length")}(mm)</th>
                     <th>{t("width")}(mm)</th>
                     <th>{t("materialType")}</th>
-=======
-                    <th>{t("length")}(mm)</th>
-                    <th>{t("width")}(mm)</th>
-                    <th>{t("height")}(mm)</th>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                     <th>{t("quantity")}</th>
                     <th>{t("supplier")}</th>
                     <th>{t("updatedBy")}</th>
@@ -693,16 +668,10 @@ function WarehouseStockCheck({ user }) {
                         </td>
                         <td>{material.partName}</td>
                         <td>{material.packetNo}</td>
-<<<<<<< HEAD
                         <td>{material.materialCode}</td>
                         <td>{material.length}</td>
                         <td>{material.width}</td>
                         <td>{material.materialType}</td>
-=======
-                        <td>{material.length}</td>
-                        <td>{material.width}</td>
-                        <td>{material.height}</td>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                         <td>{material.quantity}</td>
                         <td>{material.supplier}</td>
                         <td>{material.updatedBy}</td>

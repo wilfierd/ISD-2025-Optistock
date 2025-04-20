@@ -35,10 +35,7 @@ const translations = {
     newMaterialRequest: "New material request from",
     yourRequestApproved: "Your {requestType} material request has been approved",
     yourRequestRejected: "Your {requestType} material request has been rejected",
-<<<<<<< HEAD
     
-=======
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
     // Toast messages
     loginSuccess: "Login successful",
     logoutSuccess: "Logged out successfully",
@@ -221,7 +218,6 @@ const translations = {
     detail: "Detail",
     confirmAction: "Confirm",
     backToList: "Back to List",
-<<<<<<< HEAD
     
     // Batch Grouping Page
     batchGrouping: "Batch Grouping",
@@ -295,33 +291,6 @@ const translations = {
     "Lỗi khi quét mã QR. Vui lòng thử lại.": "Error scanning QR code. Please try again.",
     "đã được kiểm tra": "has been checked",
     "Trạng thái": "Status",
-=======
-
-      "Kiểm kho": "Stock Check",
-  "Bắt đầu kiểm kho": "Start Stock Check",
-  "Hoàn thành": "Finish",
-  "Quét mã QR": "Scan QR Code",
-  "Quét mã QR hoặc nhập mã nguyên vật liệu": "Scan QR code or enter material ID",
-  "Quét": "Scan",
-  "Đặt con trỏ vào ô nhập liệu này trước khi quét": "Place cursor in this input field before scanning",
-  "Bạn không cần phải nhấp vào ô nhập liệu. Chỉ cần quét trực tiếp mã QR trên vật liệu.": "You don't need to click the input field. Just scan the QR code directly on the material.",
-  "Sẵn sàng quét": "Ready to scan",
-  "Sẵn sàng nhận dữ liệu từ máy quét...": "Ready to receive scanner data...",
-  "Tổng kết kiểm kho": "Stock Check Summary",
-  "Tổng số nguyên vật liệu": "Total Materials",
-  "Đã kiểm tra": "Checked",
-  "Chưa kiểm tra": "Unchecked",
-  "Xem danh sách chưa kiểm tra": "View Unchecked List",
-  "Kiểm tra lại": "Check Again",
-  "Tìm kiếm nguyên vật liệu": "Search Materials",
-  "Không tìm thấy nguyên vật liệu. Vui lòng thử lại": "Material not found. Please try again",
-  "Nguyên vật liệu đã kiểm tra": "Material already checked",
-  "Lỗi khi quét mã QR. Vui lòng thử lại.": "Error scanning QR code. Please try again.",
-  "đã được kiểm tra": "has been checked",
-  "Trạng thái": "Status",
-
-
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
   },
   vi: {
     // Navigation
@@ -355,10 +324,7 @@ const translations = {
     newMaterialRequest: "Yêu cầu nguyên vật liệu mới từ",
     yourRequestApproved: "Yêu cầu {requestType} nguyên vật liệu của bạn đã được phê duyệt",
     yourRequestRejected: "Yêu cầu {requestType} nguyên vật liệu của bạn đã bị từ chối",
-<<<<<<< HEAD
     
-=======
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
     // Toast messages
     loginSuccess: "Đăng nhập thành công",
     logoutSuccess: "Đã đăng xuất thành công",
@@ -405,10 +371,7 @@ const translations = {
     requestAdd: "Yêu cầu thêm",
     packetNo: "Packet No",
     partName: "Tên bộ phận",
-<<<<<<< HEAD
     materialCode: "Mã vật liệu",
-=======
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
     length: "Dày",
     width: "Rộng",
     materialType: "Loại nguyên vật liệu",
@@ -549,7 +512,6 @@ const translations = {
     detail: "Chi tiết",
     confirmAction: "Xác nhận",
     backToList: "Quay lại danh sách",
-<<<<<<< HEAD
     
     // Batch Grouping Page
     batchGrouping: "Nhóm lô linh kiện",
@@ -624,32 +586,6 @@ const translations = {
     "Lỗi khi quét mã QR. Vui lòng thử lại.": "Lỗi khi quét mã QR. Vui lòng thử lại.",
     "đã được kiểm tra": "đã được kiểm tra",
     "Trạng thái": "Trạng thái",
-=======
-
-      // Warehouse Stock Check
-  "Kiểm kho": "Kiểm kho",
-"Bắt đầu kiểm kho": "Bắt đầu kiểm kho",
-"Hoàn thành": "Hoàn thành",
-"Quét mã QR": "Quét mã QR",
-"Quét mã QR hoặc nhập mã nguyên vật liệu": "Quét mã QR hoặc nhập mã nguyên vật liệu",
-"Quét": "Quét",
-"Đặt con trỏ vào ô nhập liệu này trước khi quét": "Đặt con trỏ vào ô nhập liệu này trước khi quét",
-"Bạn không cần phải nhấp vào ô nhập liệu. Chỉ cần quét trực tiếp mã QR trên vật liệu.": "Bạn không cần phải nhấp vào ô nhập liệu. Chỉ cần quét trực tiếp mã QR trên vật liệu.",
-"Sẵn sàng quét": "Sẵn sàng quét",
-"Sẵn sàng nhận dữ liệu từ máy quét...": "Sẵn sàng nhận dữ liệu từ máy quét...",
-"Tổng kết kiểm kho": "Tổng kết kiểm kho",
-"Tổng số nguyên vật liệu": "Tổng số nguyên vật liệu",
-"Đã kiểm tra": "Đã kiểm tra",
-"Chưa kiểm tra": "Chưa kiểm tra",
-"Xem danh sách chưa kiểm tra": "Xem danh sách chưa kiểm tra",
-"Kiểm tra lại": "Kiểm tra lại",
-"Tìm kiếm nguyên vật liệu": "Tìm kiếm nguyên vật liệu",
-"Không tìm thấy nguyên vật liệu. Vui lòng thử lại": "Không tìm thấy nguyên vật liệu. Vui lòng thử lại",
-"Nguyên vật liệu đã kiểm tra": "Nguyên vật liệu đã kiểm tra",
-"Lỗi khi quét mã QR. Vui lòng thử lại.": "Lỗi khi quét mã QR. Vui lòng thử lại.",
-"đã được kiểm tra": "đã được kiểm tra",
-"Trạng thái": "Trạng thái",
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
   }
 };
 

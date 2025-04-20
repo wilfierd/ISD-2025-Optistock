@@ -1,32 +1,18 @@
-<<<<<<< HEAD
 // client/src/components/Navbar.js
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-=======
-// client/src/components/Navbar.js - sửa lỗi
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom'; // Thêm useNavigate hook
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
 import { useNotifications, useMarkNotificationsAsRead } from '../hooks/useNotifications';
 import { hasAdminOnlyAccess, hasAdminOrManagerAccess } from '../utils/rolePermissions';
 import { useLanguage } from '../contexts/LanguageContext';
 
 function Navbar({ user, onLogout }) {
   const location = useLocation();
-<<<<<<< HEAD
   const navigate = useNavigate();
   const isActive = (path) => location.pathname === path;
   const [showNotifications, setShowNotifications] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
-=======
-  const navigate = useNavigate(); // Sử dụng hook useNavigate
-  const isActive = (path) => location.pathname === path;
-  const [showNotifications, setShowNotifications] = useState(false);
-  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [showLogoutDropdown, setShowLogoutDropdown] = useState(false);
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
   
   const { data: notifications = [] } = useNotifications();
   const markAsRead = useMarkNotificationsAsRead();
@@ -45,72 +31,7 @@ function Navbar({ user, onLogout }) {
       markAsRead.mutate(unreadIds);
     }
     
-    // Đóng dropdown và chuyển sang trang thông báo
     setShowNotifications(false);
-<<<<<<< HEAD
-=======
-    // Sử dụng navigate hook để chuyển hướng
-    navigate('/notifications');
-  };
-  
-  // Thêm function handleMarkAllAsRead để sửa lỗi
-  const handleMarkAllAsRead = () => {
-    if (unreadCount > 0) {
-      const unreadIds = notifications
-        .filter(n => !n.is_read)
-        .map(n => n.id);
-      
-      markAsRead.mutate(unreadIds);
-    }
-  };
-  
-  // Helper để xác định màu sắc cho badge dựa trên loại thông báo
-  const getNotificationBadgeColor = (notification) => {
-    if (notification.notification_type === 'request') {
-      return notification.message.includes('đã được phê duyệt') ? 'success' : 
-             notification.message.includes('đã bị từ chối') ? 'danger' : 'warning';
-    }
-    return notification.is_important ? 'danger' : 'info';
-  };
-
-  // Helper để xác định icon cho thông báo
-  const getNotificationIcon = (notification) => {
-    if (notification.notification_type === 'request') {
-      return notification.message.includes('đã được phê duyệt') ? 'fa-check-circle' : 
-             notification.message.includes('đã bị từ chối') ? 'fa-times-circle' : 'fa-clipboard-list';
-    }
-    return notification.is_important ? 'fa-exclamation-circle' : 'fa-bell';
-  };
-
-  // Helper để định dạng thời gian thông báo
-  const formatNotificationTime = (timestamp) => {
-    const now = new Date();
-    const notificationTime = new Date(timestamp);
-    const diffMs = now - notificationTime;
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-
-    if (diffSec < 60) return `${diffSec} giây trước`;
-    if (diffMin < 60) return `${diffMin} phút trước`;
-    if (diffHour < 24) return `${diffHour} giờ trước`;
-    if (diffDay < 7) return `${diffDay} ngày trước`;
-    
-    // Format ngày tháng nếu quá 7 ngày
-    return notificationTime.toLocaleDateString();
-  };
-
-  // Xử lý khi click vào thông báo
-  const handleNotificationClick = (notificationId) => {
-    // Đánh dấu thông báo là đã đọc
-    markAsRead.mutate([notificationId]);
-    
-    // Đóng dropdown
-    setShowNotifications(false);
-    
-    // Chuyển đến trang thông báo
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
     navigate('/notifications');
   };
 
@@ -301,7 +222,6 @@ function Navbar({ user, onLogout }) {
           >
             {getText(navItems.dashboard)}
           </Link>
-<<<<<<< HEAD
           
           {/* Warehouse dropdown */}
           <div className="position-relative warehouse-dropdown-container">
@@ -355,15 +275,6 @@ function Navbar({ user, onLogout }) {
             )}
           </div>
           
-=======
-          {/* // Add this link inside the navbar links section in client/src/components/Navbar.js */}
-          <Link 
-            className={`navbar-brand ${isActive('/batch-grouping') ? 'fw-bold' : ''}`} 
-            to="/batch-grouping"
-          >
-            {t('Nhóm lô')}
-          </Link>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
           <Link 
             className={`navbar-brand ${isActive('/warehouse-check') ? 'fw-bold' : ''}`} 
             to="/warehouse-check"
@@ -372,20 +283,7 @@ function Navbar({ user, onLogout }) {
             {getText(navItems.inventoryCheck)}
           </Link>
           
-<<<<<<< HEAD
           {/* Only show for admin or manager roles */}
-=======
-          {/* Show Warehouse Check link only for admin and manager users */}
-
-            <Link 
-              className={`navbar-brand ${isActive('/warehouse-check') ? 'fw-bold' : ''}`} 
-              to="/warehouse-check"
-            >
-              {t("Kiểm kho")}
-            </Link>
-          
-          {/* Show Employees link for admin and manager users */}
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
           {hasAdminOrManagerAccess(user) && (
             <Link 
               className={`navbar-brand ${isActive('/employees') ? 'fw-bold' : ''}`} 
@@ -396,11 +294,7 @@ function Navbar({ user, onLogout }) {
             </Link>
           )}
           
-<<<<<<< HEAD
           {/* Only show for admin or manager roles */}
-=======
-          {/* Show Requests link to both admins and managers */}
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
           {hasAdminOrManagerAccess(user) && (
             <Link 
               className={`navbar-brand ${isActive('/requests') ? 'fw-bold' : ''}`} 
@@ -489,56 +383,35 @@ function Navbar({ user, onLogout }) {
             
             {/* Enhanced Notifications dropdown */}
             {showNotifications && (
-<<<<<<< HEAD
               <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show notification-dropdown" 
                    style={{ width: '350px', zIndex: 1000, maxHeight: '400px', overflowY: 'auto' }}>
                 <div className="d-flex justify-content-between align-items-center px-3 py-2 dropdown-header border-bottom">
                   <h6 className="mb-0">{getText(navItems.notifications)}</h6>
-=======
-              <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show notification-dropdown" style={{ width: '350px' }}>
-                <div className="d-flex justify-content-between align-items-center px-3 py-2 dropdown-header">
-                  <h6 className="mb-0">{t('notifications')}</h6>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                   {unreadCount > 0 && (
                     <button 
                       className="btn btn-sm btn-link text-decoration-none" 
                       onClick={handleMarkAllAsRead}
                     >
-<<<<<<< HEAD
                       <i className="fas fa-check-double me-1"></i> {getText(navItems.markAllAsRead)}
-=======
-                      <i className="fas fa-check-double me-1"></i> {t('markAllAsRead')}
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                     </button>
                   )}
                 </div>
                 
                 <div className="notifications-scrollable">
                   {notifications.length === 0 ? (
-<<<<<<< HEAD
                     <div className="notification-empty text-center py-4">
                       <i className="fas fa-bell-slash mb-2" style={{ fontSize: '24px', opacity: '0.5' }}></i>
                       <p className="mb-0 text-muted">{getText(navItems.noNotifications)}</p>
-=======
-                    <div className="notification-empty">
-                      <i className="fas fa-bell-slash"></i>
-                      <p>{t('noNotifications')}</p>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                     </div>
                   ) : (
                     notifications.slice(0, 5).map(notification => (
                       <div 
                         key={notification.id} 
-<<<<<<< HEAD
                         className={`dropdown-item py-2 px-3 border-bottom notification-item ${!notification.is_read ? 'bg-light' : ''}`}
-=======
-                        className={`dropdown-item py-2 px-3 border-bottom notification-item ${!notification.is_read ? 'unread' : ''}`}
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                         style={{ cursor: 'pointer' }}
                         onClick={() => handleNotificationClick(notification.id)}
                       >
                         <div className="d-flex align-items-start">
-<<<<<<< HEAD
                           <div className={`me-2 p-2 rounded-circle text-white bg-${getNotificationBadgeColor(notification)}`}
                                style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <i className={`fas ${getNotificationIcon(notification)}`}></i>
@@ -546,26 +419,12 @@ function Navbar({ user, onLogout }) {
                           <div className="flex-grow-1">
                             <div className="notification-message">{notification.message}</div>
                             <div className="notification-time text-muted small">
-=======
-                          <div className={`notification-badge ${getNotificationBadgeColor(notification)}`}>
-                            <i className={`fas ${getNotificationIcon(notification)}`}></i>
-                          </div>
-                          <div>
-                            <div className="notification-message">{notification.message}</div>
-                            <div className="notification-time">
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                               {formatNotificationTime(notification.created_at)}
                             </div>
                           </div>
                           {!notification.is_read && (
                             <div className="ms-auto">
-<<<<<<< HEAD
                               <span className="badge rounded-pill bg-primary" style={{ width: '8px', height: '8px', padding: '0' }}></span>
-=======
-                              <span className="badge rounded-pill bg-primary">
-                                <i className="fas fa-circle fa-xs"></i>
-                              </span>
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                             </div>
                           )}
                         </div>
@@ -574,23 +433,16 @@ function Navbar({ user, onLogout }) {
                   )}
                 </div>
                 
-<<<<<<< HEAD
                 <div className="dropdown-footer p-2 text-center border-top">
                   <Link to="/notifications" className="btn btn-sm btn-link text-primary text-decoration-none w-100" 
                        onClick={() => setShowNotifications(false)}>
                     <i className="fas fa-list me-1"></i> {getText(navItems.viewAllNotifications)}
-=======
-                <div className="dropdown-footer">
-                  <Link to="/notifications" className="text-primary" onClick={() => setShowNotifications(false)}>
-                    <i className="fas fa-list me-1"></i> {t('viewAllNotifications')}
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                   </Link>
                 </div>
               </div>
             )}
           </div>
           
-<<<<<<< HEAD
           {/* User dropdown with avatar */}
           <div className="position-relative user-dropdown-container">
             <button 
@@ -628,27 +480,6 @@ function Navbar({ user, onLogout }) {
                 >
                   <i className="fas fa-sign-out-alt me-2"></i> 
                   {getText(navItems.logout)}
-=======
-          <span className="me-3 text-white">Hi, {user.username}</span>
-          
-          {/* User Avatar with Dropdown Logout */}
-          <div className="position-relative me-3">
-            <button 
-              className="btn btn-link text-white" 
-              onClick={() => setShowLogoutDropdown(!showLogoutDropdown)}
-            >
-              <div className="avatar">{user.username.charAt(0).toUpperCase()}</div>
-            </button>
-            
-            {/* Logout dropdown */}
-            {showLogoutDropdown && (
-              <div className="position-absolute top-100 end-0 mt-2 dropdown-menu show" style={{ minWidth: '150px' }}>
-                <button 
-                  className="dropdown-item" 
-                  onClick={onLogout}
-                >
-                  {t('logout')}
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
                 </button>
               </div>
             )}

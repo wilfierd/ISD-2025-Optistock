@@ -1,4 +1,4 @@
-// client/src/hooks/useNotifications.js - Cải thiện với thêm chức năng
+// client/src/hooks/useNotifications.js
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import apiService from '../services/api';
 import { toast } from 'react-toastify';
@@ -7,10 +7,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 // Hook to fetch user notifications
 export const useNotifications = () => {
   const { t } = useLanguage();
-<<<<<<< HEAD
-=======
-  
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
   return useQuery({
     queryKey: ['notifications'],
     queryFn: async () => {

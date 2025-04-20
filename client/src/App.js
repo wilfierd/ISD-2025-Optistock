@@ -13,10 +13,7 @@ import { hasAdminOrManagerAccess } from './utils/rolePermissions';
 import { LanguageProvider } from './contexts/LanguageContext';
 import BatchGrouping from './components/BatchGrouping';
 import Notifications from './components/Notifications'; // Import thêm component Notifications
-<<<<<<< HEAD
 import Production from './components/Production'; // Import thêm component Production
-=======
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
 
 function App() {
   const { data: authData, isLoading } = useAuthStatus();

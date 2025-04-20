@@ -480,7 +480,6 @@ INSERT INTO batches (part_name, machine_name, mold_code, quantity, warehouse_ent
 ('C2021', 'ZHG513-302', 'ZHG513-302-V2', 20, '19:00:10 05/03/2025', NULL, 1),
 ('C2028', 'ZHG513-303', 'ZHG513-302-V3', 30, '19:00:10 05/03/2025', NULL, 1),
 ('C2022', 'ZHG513-304', 'ZHG513-302-V4', 40, '19:00:10 05/03/2025', NULL, 1),
-<<<<<<< HEAD
 ('C2028', 'ZHG513-305', 'ZHG513-302-V4', 10, '19:00:10 05/03/2025', NULL, 1);
 
 CREATE TABLE IF NOT EXISTS machines (
@@ -581,6 +580,3 @@ CREATE TABLE IF NOT EXISTS plating (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (assembly_id) REFERENCES assembly_components(id) ON DELETE CASCADE
 );
-=======
-('C2028', 'ZHG513-305', 'ZHG513-302-V4', 10, '19:00:10 05/03/2025', NULL, 1);
->>>>>>> aa9def0e9889a298cfcbf130f8a2853fda497849
