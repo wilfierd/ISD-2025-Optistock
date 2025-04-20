@@ -1,4 +1,4 @@
-// Production.js with fixed batch counting and rate limiting
+// Production.js with time-based batch creation and persistent batch tracking
 import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
@@ -34,21 +34,222 @@ const usePlating = () => {
   });
 };
 
-// Store the last processed batch counts in a module-level variable to persist between renders
-const batchProcessingState = {
-  lastProcessedBatchCounts: {},
-  processingLock: false,
-  lastProcessingTime: 0
+// Store the persistent state for batch processing
+// Using localStorage to persist between navigation/renders
+const getLastProcessedBatchCounts = () => {
+  try {
+    const stored = localStorage.getItem('lastProcessedBatchCounts');
+    return stored ? JSON.parse(stored) : {};
+  } catch (e) {
+    console.error('Error reading lastProcessedBatchCounts from localStorage:', e);
+    return {};
+  }
 };
 
+const saveLastProcessedBatchCounts = (counts) => {
+  try {
+    localStorage.setItem('lastProcessedBatchCounts', JSON.stringify(counts));
+  } catch (e) {
+    console.error('Error saving lastProcessedBatchCounts to localStorage:', e);
+  }
+};
+
+// Get last processing time from localStorage
+const getLastProcessingTime = () => {
+  try {
+    const stored = localStorage.getItem('lastBatchProcessingTime');
+    return stored ? parseInt(stored, 10) : 0;
+  } catch (e) {
+    return 0;
+  }
+};
+
+const saveLastProcessingTime = (time) => {
+  try {
+    localStorage.setItem('lastBatchProcessingTime', time.toString());
+  } catch (e) {
+    console.error('Error saving lastBatchProcessingTime to localStorage:', e);
+  }
+};
+
+// This variable helps us avoid concurrent processing 
+let processingLock = false;
+
+// Setup background processing service that runs regardless of current page
+// This uses Web Worker pattern principles but without actually using a Worker
+const BackgroundService = {
+  active: false,
+  initialize: function() {
+    if (this.active) return;
+    console.log("Initializing background batch processing service");
+    
+    // Process batches every 15 seconds (for testing, can be increased to 30 in production)
+    this.processingInterval = setInterval(() => {
+      this.processBatchesInBackground();
+    }, 15000);
+    
+    // Register beforeunload handler to ensure we don't lose processing when page refreshes
+    window.addEventListener('beforeunload', () => {
+      console.log("Page unloading, storing processing state");
+      // Any final cleanup could go here
+    });
+    
+    this.active = true;
+  },
+  
+  // This function will run in the background to process batches
+  processBatchesInBackground: async function() {
+    try {
+      // Prevent concurrent processing
+      if (processingLock) {
+        console.log("Background processing: Already locked, skipping");
+        return;
+      }
+      
+      // Rate limiting
+      const now = Date.now();
+      const lastProcessingTime = getLastProcessingTime();
+      if (now - lastProcessingTime < 10000) {
+        console.log("Background processing: Rate limited, skipping");
+        return;
+      }
+      
+      console.log("Background batch processing running", new Date().toLocaleTimeString());
+      processingLock = true;
+      saveLastProcessingTime(now);
+      
+      // Fetch active productions
+      const productionsResponse = await apiService.production.getAll('running');
+      const productions = productionsResponse.data.data || [];
+      
+      if (productions.length === 0) {
+        console.log("No running productions found");
+        return;
+      }
+      
+      console.log(`Found ${productions.length} running productions to process`);
+      
+      // Get current processed counts
+      const lastProcessedCounts = getLastProcessedBatchCounts();
+      let updatedCounts = {...lastProcessedCounts};
+      let countsChanged = false;
+      
+      // Process each production
+      for (const prod of productions) {
+        try {
+          const startTime = new Date(prod.start_date).getTime();
+          const now = new Date().getTime();
+          const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+          
+          // Calculate completed batches (every 5 minutes)
+          const batchesDone = Math.floor(elapsedMinutes / 5);
+          const lastProcessed = lastProcessedCounts[prod.id] || 0;
+          const totalExpected = prod.expected_output || 100;
+          
+          console.log(`Background processing: Production ${prod.id}: ${batchesDone} batches done, ${lastProcessed} last processed, Total: ${totalExpected}`);
+          
+          // Check if production is at 100% completion
+          if (batchesDone >= totalExpected) {
+            console.log(`Background processing: Production ${prod.id} has reached 100% - stopping`);
+            
+            // Mark production as stopped
+            await apiService.production.update(prod.id, {
+              status: 'stopping',
+              actual_output: totalExpected
+            });
+            
+            // Try to update machine status
+            if (prod.machine_id) {
+              try {
+                await apiService.machines.saveStopReason(prod.machine_id, {
+                  reason: "Production complete - 100% of expected output reached",
+                  stopTime: new Date().toTimeString().split(' ')[0],
+                  stopDate: new Date().toLocaleDateString('en-GB').split('/').join('/')
+                });
+              } catch (err) {
+                console.error("Failed to update machine status:", err);
+              }
+            }
+            
+            // Update the processed count
+            updatedCounts[prod.id] = totalExpected;
+            countsChanged = true;
+            continue;
+          }
+          
+          // If new batches have been completed
+          if (batchesDone > lastProcessed) {
+            const newlyCompletedCount = batchesDone - lastProcessed;
+            
+            if (newlyCompletedCount > 0) {
+              console.log(`Background processing: ${newlyCompletedCount} new batches completed for production ${prod.id}`);
+              
+              // Create batches in warehouse
+              const batchData = {
+                part_name: prod.material_name,
+                machine_name: prod.machine_name,
+                mold_code: prod.mold_code,
+                quantity: Math.min(newlyCompletedCount, 5), // Limit to 5 at once
+                warehouse_entry_time: this.formatDateTime(new Date()),
+                status: null, // Initially ungrouped
+                created_by: 1 // Default to admin user if we don't have user context
+              };
+              
+              // Create the batch
+              await apiService.batches.create(batchData);
+              
+              // Update production with new actual output
+              await apiService.production.update(prod.id, {
+                actual_output: batchesDone
+              });
+              
+              // Update our tracking
+              updatedCounts[prod.id] = batchesDone;
+              countsChanged = true;
+            }
+          }
+        } catch (error) {
+          console.error("Background processing: Error processing production", prod.id, error);
+        }
+      }
+      
+      if (countsChanged) {
+        saveLastProcessedBatchCounts(updatedCounts);
+        console.log("Background processing: Updated processed counts", updatedCounts);
+      }
+    } catch (error) {
+      console.error("Background processing: Error in batch processing", error);
+    } finally {
+      processingLock = false;
+    }
+  },
+  
+  // Helper function to format date
+  formatDateTime: function(date) {
+    const pad = (num) => String(num).padStart(2, '0');
+    
+    const hours = pad(date.getHours());
+    const minutes = pad(date.getMinutes());
+    const seconds = pad(date.getSeconds());
+    const day = pad(date.getDate());
+    const month = pad(date.getMonth() + 1);
+    const year = date.getFullYear();
+    
+    return `${hours}:${minutes}:${seconds} - ${day}/${month}/${year}`;
+  }
+};
+
+// Initialize the background service immediately when this file loads
+BackgroundService.initialize();
+
 function Production({ user }) {
-  const { t, language } = useLanguage();
+  const { t: translate, language } = useLanguage();
   const queryClient = useQueryClient();
   const scanInputRef = useRef(null);
   
   // State for active tab and filters
   const [activeTab, setActiveTab] = useState('production');
-  const [productionFilter, setProductionFilter] = useState('all');
+  const [productionFilter] = useState('all');
   
   // State for modals
   const [showAddModal, setShowAddModal] = useState(false);
@@ -85,6 +286,9 @@ function Production({ user }) {
   // State for next completion
   const [nextCompletion, setNextCompletion] = useState(null);
   
+  // State for tracking last processed batches
+  const [lastProcessedBatchCounts, setLastProcessedBatchCounts] = useState(getLastProcessedBatchCounts());
+  
   // Form data state
   const [formData, setFormData] = useState({
     materialId: '',
@@ -101,10 +305,10 @@ function Production({ user }) {
   });
   
   // Queries for data
-  const { data: materials = [], isLoading: isLoadingMaterials } = useMaterials();
-  const { data: productions = [], isLoading: isLoadingProductions, refetch: refetchProductions } = useProduction(productionFilter);
+  const { data: materials = [] } = useMaterials();
+  const { data: productions = [], isLoading: isLoadingProductions } = useProduction(productionFilter);
   const { data: platingItems = [], isLoading: isLoadingPlating, refetch: refetchPlating } = usePlating();
-  const { data: machines = [], isLoading: isLoadingMachines } = useQuery({
+  const { data: machines = [] } = useQuery({
     queryKey: ['machines'],
     queryFn: async () => {
       try {
@@ -116,7 +320,7 @@ function Production({ user }) {
       }
     },
   });
-  const { data: molds = [], isLoading: isLoadingMolds } = useQuery({
+  const { data: molds = [] } = useQuery({
     queryKey: ['molds'],
     queryFn: async () => {
       try {
@@ -229,10 +433,10 @@ function Production({ user }) {
     return `${hours}:${minutes}:${seconds} - ${day}/${month}/${year}`;
   };
   
-  // Function to create batches in the warehouse
-  const createCompletedBatches = async (production, count) => {
+  // Function to create batches in the warehouse - memoized to avoid dependency issues
+  const createCompletedBatches = React.useCallback(async (production, count) => {
     try {
-      console.log(`Creating ${count} completed batches for production ID: ${production.id}`);
+      console.log(`Creating ${count} completed batches for production ID: ${production.id} at ${new Date().toLocaleTimeString()}`);
       
       // Rate limiting: Only allow creation of max 5 batches at once to prevent flooding
       const maxBatchesPerOperation = 5;
@@ -264,6 +468,11 @@ function Production({ user }) {
       // Call the API to create batches
       const response = await apiService.batches.create(batchData);
       console.log('Batch creation API response:', response.data);
+      
+      // Force a refresh of the batches list
+      queryClient.invalidateQueries({ queryKey: ['batches'] });
+      queryClient.invalidateQueries({ queryKey: ['batches', 'ungrouped'] });
+      
       return response.data;
     } catch (error) {
       console.error('Error creating batches:', error);
@@ -271,12 +480,17 @@ function Production({ user }) {
       if (error.response) {
         console.error('API error response:', error.response.data);
       }
+      toast.error(
+        language === 'vi' 
+          ? `Lỗi tạo lô: ${error.message}` 
+          : `Error creating batch: ${error.message}`
+      );
       throw error;
     }
-  };
+  }, [user.id, queryClient, language, formatDateTime]);
   
-  // Calculate which production will complete a batch next
-  const getNextBatchCompletion = () => {
+  // Calculate which production will complete a batch next - memoized to avoid dependency issues
+  const getNextBatchCompletion = React.useCallback(() => {
     let nextCompletion = null;
     let minTimeLeft = Infinity;
     
@@ -309,21 +523,32 @@ function Production({ user }) {
     });
     
     return nextCompletion;
-  };
+  }, [productions]);
   
   // Function to process batch completions with rate limiting
   const processBatchCompletions = async () => {
-    // Prevent concurrent processing and rate limit
+    // Prevent concurrent processing
+    if (processingLock) {
+      console.log('Skipping batch processing: Already processing');
+      return;
+    }
+    
+    // Rate limiting
     const now = Date.now();
-    if (batchProcessingState.processingLock || (now - batchProcessingState.lastProcessingTime < 10000)) {
-      console.log('Skipping batch processing: Already processing or rate limited');
+    const lastProcessingTime = getLastProcessingTime();
+    if (now - lastProcessingTime < 15000) { // 15 seconds minimum between processing
+      console.log('Skipping batch processing: Rate limited');
       return;
     }
     
     try {
       console.log('Processing batch completions...');
-      batchProcessingState.processingLock = true;
-      batchProcessingState.lastProcessingTime = now;
+      processingLock = true;
+      saveLastProcessingTime(now);
+      
+      // Get a copy of the current processed counts
+      const currentProcessedCounts = {...lastProcessedBatchCounts};
+      let updatedCounts = false;
       
       // Process each running production
       for (const prod of productions) {
@@ -335,7 +560,7 @@ function Production({ user }) {
             
             // Calculate completed batches (every 5 minutes)
             const batchesDone = Math.floor(elapsedMinutes / 5);
-            const lastProcessed = batchProcessingState.lastProcessedBatchCounts[prod.id] || 0;
+            const lastProcessed = currentProcessedCounts[prod.id] || 0;
             
             console.log(`Production ${prod.id}: ${batchesDone} batches done, ${lastProcessed} last processed`);
             
@@ -406,29 +631,34 @@ function Production({ user }) {
                 queryClient.invalidateQueries({ queryKey: ['batches'] });
                 
                 // Update the last processed count for this production
-                batchProcessingState.lastProcessedBatchCounts[prod.id] = batchesDone;
+                currentProcessedCounts[prod.id] = batchesDone;
+                updatedCounts = true;
               }
             }
           } catch (error) {
             console.error(`Error processing batch completion for production ${prod.id}:`, error);
-            toast.error(
-              language === 'vi' 
-                ? `Lỗi khi xử lý hoàn thành lô: ${error.message}` 
-                : `Error processing batch completion: ${error.message}`
-            );
           }
         }
       }
+      
+      // Only update stored counts if we made changes
+      if (updatedCounts) {
+        setLastProcessedBatchCounts(currentProcessedCounts);
+        saveLastProcessedBatchCounts(currentProcessedCounts); 
+      }
     } finally {
       // Always release the lock
-      batchProcessingState.processingLock = false;
+      processingLock = false;
     }
   };
   
   // Initialize production progress and set up batch completion tracking
+  // This effect is for initial setup and state updates, NOT for batch processing
   useEffect(() => {
     if (productions.length > 0) {
       const progress = {};
+      let countsUpdated = false;
+      const updatedCounts = {...lastProcessedBatchCounts};
       
       productions.forEach(prod => {
         if (prod.status === 'running') {
@@ -454,9 +684,14 @@ function Production({ user }) {
             estimatedCompletion: new Date(startTime + (totalExpected * 5 * 60 * 1000))
           };
           
-          // Initialize last processed count if not already set
-          if (!batchProcessingState.lastProcessedBatchCounts[prod.id] && prod.actual_output) {
-            batchProcessingState.lastProcessedBatchCounts[prod.id] = prod.actual_output;
+          // Initialize last processed count if not already set or if actual_output is higher
+          if (!lastProcessedBatchCounts[prod.id] && prod.actual_output) {
+            updatedCounts[prod.id] = prod.actual_output;
+            countsUpdated = true;
+          } else if (prod.actual_output > (lastProcessedBatchCounts[prod.id] || 0)) {
+            // If server has a higher count than what we have locally, update our local count
+            updatedCounts[prod.id] = prod.actual_output;
+            countsUpdated = true;
           }
         } else {
           // For stopped productions, use actual output
@@ -473,24 +708,40 @@ function Production({ user }) {
           };
           
           // Make sure we track stopped productions too
-          batchProcessingState.lastProcessedBatchCounts[prod.id] = actualOutput;
+          if (!lastProcessedBatchCounts[prod.id] || lastProcessedBatchCounts[prod.id] !== actualOutput) {
+            updatedCounts[prod.id] = actualOutput;
+            countsUpdated = true;
+          }
         }
       });
       
       setProductionProgress(progress);
       
+      // Only update if counts have changed
+      if (countsUpdated) {
+        setLastProcessedBatchCounts(updatedCounts);
+        saveLastProcessedBatchCounts(updatedCounts);
+      }
+      
       // Initial calculation of next batch completion
       setNextCompletion(getNextBatchCompletion());
-      
-      // Initial processing of batch completions - only if not processed recently
-      if (Date.now() - batchProcessingState.lastProcessingTime > 10000) {
-        processBatchCompletions();
-      }
+    }
+  }, [productions]);
+  
+  // Set up regular interval for updating progress and checking batch completions
+  useEffect(() => {
+    console.log("Setting up intervals for progress updates and batch processing");
+    
+    // Make sure background service is initialized
+    if (!BackgroundService.active) {
+      BackgroundService.initialize();
     }
     
-    // Update progress and check for completions every 60 seconds
-    // This is a longer interval to avoid too frequent updates
-    const interval = setInterval(() => {
+    // Immediately process batches once at start
+    processBatchCompletions();
+    
+    // Update progress UI more frequently (every 5 seconds)
+    const progressInterval = setInterval(() => {
       // Update production progress
       setProductionProgress(prev => {
         const updated = {...prev};
@@ -522,15 +773,22 @@ function Production({ user }) {
       
       // Update next batch completion
       setNextCompletion(getNextBatchCompletion());
-      
-      // Process batch completions
+    }, 5000); 
+    
+    // Local interval for batch processing in this component instance
+    const batchProcessingInterval = setInterval(() => {
+      console.log("Triggering component-specific batch processing", new Date().toLocaleTimeString());
       processBatchCompletions();
-    }, 60000); // Check every 60 seconds - increased to reduce frequency
+    }, 15000); // Process batches every 15 seconds (reduced for testing, can be set back to 30000)
     
     return () => {
-      clearInterval(interval);
+      // Clear the local intervals when component unmounts
+      clearInterval(progressInterval);
+      clearInterval(batchProcessingInterval);
+      
+      console.log("Component unmounting - local intervals cleared, background service still running");
     };
-  }, [productions, updateProduction, queryClient, user.id, language]);
+  }, [productions, user.id, processBatchCompletions, getNextBatchCompletion]);
   
   // Set up scanner input listener
   useEffect(() => {
@@ -561,18 +819,6 @@ function Production({ user }) {
       }));
     }
   }, [showStopReasonModal, showPlatingModal]);
-  
-  // Initialize last processed batch counts when component loads
-  useEffect(() => {
-    if (productions.length > 0) {
-      // For each production, make sure we have a last processed count
-      productions.forEach(prod => {
-        if (prod.actual_output && !batchProcessingState.lastProcessedBatchCounts[prod.id]) {
-          batchProcessingState.lastProcessedBatchCounts[prod.id] = prod.actual_output;
-        }
-      });
-    }
-  }, [productions]);
   
   // Improved function to extract material ID from scanned QR codes
   const extractMaterialIdFromScan = (scanValue) => {
