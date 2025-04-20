@@ -55,6 +55,9 @@ const translations = {
     materialDeleteFailed: "Failed to delete material",
     requestSubmitFailed: "Failed to submit request",
     requestProcessFailed: "Failed to process request",
+    notesSavedSuccessfully: "Notes saved successfully",
+    errorSavingNotes: "Error saving notes",
+    errorFetchingAssemblyDetails: "Error loading assembly details",
 
     // Dashboard
     totalMaterials: "Total Materials",
@@ -193,6 +196,7 @@ const translations = {
     error: "Error",
     retry: "Retry",
     dimensions: "Dimensions",
+    noData: "No data available",
     
     // Language
     language: "Language",
@@ -226,8 +230,6 @@ const translations = {
     groupedBatches: "Grouped Batches",
     noUngroupedBatches: "No ungrouped batches found",
     noGroupedBatches: "No grouped batches found",
-    machineName: "Machine Name",
-    moldCode: "Mold Code",
     warehouseEntryTime: "Warehouse Entry Time",
     groupNo: "No",
     confirmGrouping: "Confirm Batch Grouping",
@@ -236,7 +238,6 @@ const translations = {
     afterGroupingStatus: "After grouping, the status of these batches will be updated to \"Grouped for Assembly\"",
     batchQRCode: "Batch QR Code",
     batchDetails: "Batch Details",
-    assembly: "Assembly",
     details: "Details",
     confirmAssembly: "Confirm Assembly for this Group?",
     pleaseEnterPIC: "Please enter PIC name:",
@@ -255,7 +256,7 @@ const translations = {
     groupDetails: "Details for Group #{groupId}",
     PIC: "PIC:",
     finishAndProceedToPlating: "Finish and proceed to plating",
-
+    
     // New additions for batch grouping and production
     processProgress: "Production Process Progress",
     ungrouped: "Ungrouped",
@@ -296,6 +297,25 @@ const translations = {
     timeEstimation: "Time Estimation",
     completePlating: "Complete Plating",
     completionDate: "Completion Date",
+
+    // New translations for updated BatchGrouping.js
+    basicAssemblyInfo: "Basic Assembly Information",
+    productInfoAfterAssembly: "Product Information After Assembly",
+    productName: "Product Name",
+    productCode: "Product Code",
+    enterProductName: "Enter product name...",
+    enterProductCode: "Enter product code...",
+    enterNotes: "Enter notes...",
+    pleaseSelectCompletionTime: "Please select completion time",
+    hours: "Hours",
+    minutes: "Minutes",
+    noProductName: "No product name",
+    noProductCode: "No product code",
+    assemblyInfo: "Assembly Information",
+    assemblyComponents: "Assembly Components",
+    confirmPlating: "Confirm Proceeding to Plating",
+    confirmPlatingMessage: "Are you sure you want to proceed group #{groupId} to plating?",
+    notesWillBeTransferredToPlating: "These notes will be transferred to the plating process",
     
     // Validation & Success Messages
     pleaseSelectAtLeastOneBatch: "Please select at least one batch to group",
@@ -303,6 +323,8 @@ const translations = {
     errorGroupingBatches: "Error occurred while grouping batches",
     pleaseSelectPIC: "Please select a PIC",
     pleaseEnterProductQuantity: "Please enter product quantity",
+    pleaseEnterProductName: "Please enter product name",
+    pleaseEnterProductCode: "Please enter product code",
     pleaseEnterCompletionTime: "Please enter completion time",
     assemblyCreatedSuccessfully: "Assembly created successfully",
     errorCreatingAssembly: "Error occurred while creating assembly",
@@ -389,6 +411,9 @@ const translations = {
     materialDeleteFailed: "Không thể xóa nguyên vật liệu",
     requestSubmitFailed: "Không thể gửi yêu cầu",
     requestProcessFailed: "Không thể xử lý yêu cầu",
+    notesSavedSuccessfully: "Đã lưu ghi chú thành công",
+    errorSavingNotes: "Lỗi khi lưu ghi chú",
+    errorFetchingAssemblyDetails: "Lỗi khi tải thông tin lắp ráp",
 
     // Dashboard
     totalMaterials: "Tổng nguyên vật liệu",
@@ -532,6 +557,7 @@ const translations = {
     error: "Lỗi",
     retry: "Thử lại",
     dimensions: "Kích thước",
+    noData: "Không có dữ liệu",
     
     // Language
     language: "Ngôn ngữ",
@@ -565,8 +591,6 @@ const translations = {
     groupedBatches: "Lô linh kiện đã nhóm",
     noUngroupedBatches: "Không có lô linh kiện nào chưa được nhóm",
     noGroupedBatches: "Không có lô linh kiện nào đã được nhóm",
-    machineName: "Tên máy dập",
-    moldCode: "Mã khuôn",
     warehouseEntryTime: "Thời gian nhập kho",
     groupNo: "STT",
     confirmGrouping: "Xác nhận nhóm lô",
@@ -594,7 +618,7 @@ const translations = {
     groupDetails: "Chi tiết nhóm #{groupId}",
     PIC: "PIC:",
     finishAndProceedToPlating: "Xong và tiến hành mạ",
-    
+
     // New additions for batch grouping and production
     processProgress: "Tiến độ quy trình sản xuất",
     ungrouped: "Chưa nhóm",
@@ -636,12 +660,33 @@ const translations = {
     completePlating: "Hoàn thành mạ",
     completionDate: "Ngày hoàn thành",
     
+    // New translations for updated BatchGrouping.js
+    basicAssemblyInfo: "Thông tin lắp ráp cơ bản",
+    productInfoAfterAssembly: "Thông tin sản phẩm sau lắp ráp",
+    productName: "Tên sản phẩm",
+    productCode: "Mã sản phẩm",
+    enterProductName: "Nhập tên sản phẩm...",
+    enterProductCode: "Nhập mã sản phẩm...",
+    enterNotes: "Nhập ghi chú...",
+    pleaseSelectCompletionTime: "Vui lòng chọn thời gian hoàn thành",
+    hours: "Giờ",
+    minutes: "Phút",
+    noProductName: "Chưa có tên sản phẩm",
+    noProductCode: "Chưa có mã sản phẩm",
+    assemblyInfo: "Thông tin lắp ráp",
+    assemblyComponents: "Thành phần lắp ráp",
+    confirmPlating: "Xác nhận chuyển qua công đoạn mạ",
+    confirmPlatingMessage: "Bạn có chắc chắn muốn chuyển nhóm #{groupId} sang công đoạn mạ?",
+    notesWillBeTransferredToPlating: "Ghi chú này sẽ được chuyển sang công đoạn mạ",
+    
     // Validation & Success Messages
     pleaseSelectAtLeastOneBatch: "Vui lòng chọn ít nhất một lô để nhóm",
     batchesGroupedSuccessfully: "Các lô đã được nhóm thành công",
     errorGroupingBatches: "Có lỗi xảy ra khi nhóm các lô",
     pleaseSelectPIC: "Vui lòng chọn PIC",
     pleaseEnterProductQuantity: "Vui lòng nhập số lượng sản phẩm",
+    pleaseEnterProductName: "Vui lòng nhập tên sản phẩm",
+    pleaseEnterProductCode: "Vui lòng nhập mã sản phẩm",
     pleaseEnterCompletionTime: "Vui lòng nhập thời gian hoàn thành",
     assemblyCreatedSuccessfully: "Đã tạo lắp ráp thành công",
     errorCreatingAssembly: "Có lỗi xảy ra khi tạo lắp ráp",
