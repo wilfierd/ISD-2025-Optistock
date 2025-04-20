@@ -1630,6 +1630,61 @@ function Production({ user }) {
   const handleLogout = () => {
     logoutMutation.mutate();
   };
+  // state quản lý modal Receive
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [selectedReceiveItem, setSelectedReceiveItem] = useState(null);
+  const [receiveData, setReceiveData] = useState({
+    receiveDate: formatDateForInput(new Date()),
+    receiveStatus: "full", // 'full' | 'partial' | 'issue'
+    note: "",
+  });
+
+  // Hiện modal khi bấm Nhận hàng
+  const handleShowReceiveModal = (item) => {
+    setSelectedReceiveItem(item);
+    // khởi tạo form với ngày hiện tại
+    setReceiveData({
+      receiveDate: formatDateForInput(new Date()),
+      receiveStatus: "full",
+      note: "",
+    });
+    setShowReceiveModal(true);
+  };
+
+  // Xử lý thay đổi input trong modal
+  const handleReceiveInputChange = (e) => {
+    const { name, value } = e.target;
+    setReceiveData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Khi bấm Xác nhận nhận hàng
+  const handleConfirmReceive = () => {
+    if (!selectedReceiveItem) return;
+    // Chuẩn bị payload
+    const payload = {
+      status: "received",
+      receiveDate: receiveData.receiveDate.split("-").reverse().join("/"),
+      receiveStatus: receiveData.receiveStatus,
+      note: receiveData.note,
+    };
+    // Gọi API update tương tự updatePlating
+    updatePlating
+      .mutateAsync({ id: selectedReceiveItem.id, data: payload })
+      .then(() => {
+        toast.success("Đã nhận hàng thành công");
+        refetchPlating();
+      })
+      .catch((err) => {
+        toast.error("Lỗi nhận hàng: " + err.message);
+      })
+      .finally(() => {
+        setShowReceiveModal(false);
+        setSelectedReceiveItem(null);
+      });
+  };
 
   return (
     <div className="production-container">
@@ -2153,7 +2208,7 @@ function Production({ user }) {
                                 <td>
                                   {item.status === "processing" && (
                                     <button
-                                      className="btn btn-sm btn-success"
+                                      className="btn btn-sm btn-warning me-2"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setSelectedPlating(item);
@@ -2165,7 +2220,19 @@ function Production({ user }) {
                                         : "Complete"}
                                     </button>
                                   )}
-
+                                  {item.status === "completed" && (
+                                    <button
+                                    className="btn btn-sm btn-success me-2"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleShowReceiveModal(item);
+                                      }}
+                                    >
+                                      {language === "vi"
+                                        ? "Nhận hàng"
+                                        : "Receive"}
+                                    </button>
+                                  )}
                                   <button
                                     className="btn btn-sm btn-info ms-2"
                                     onClick={(e) => {
@@ -2665,47 +2732,136 @@ function Production({ user }) {
         </div>
       )}
       {showConfirmPlatingModal && (
-  <div className="modal-overlay">
-    <div className="confirm-plating-modal">
-      <div className="modal-header">
-        <h5 className="modal-title">Xác nhận chuyển sản phẩm sang mạ</h5>
-        <button className="btn-close" onClick={()=>setShowConfirmPlatingModal(false)}>×</button>
-      </div>
-      <div className="modal-body">
-        <div className="alert alert-info">
-          <i className="fas fa-info-circle"></i>
-          <div>Bạn đã chọn {platingData.selectedItems.length} sản phẩm để chuyển sang trạng thái mạ.</div>
+        <div className="modal-overlay">
+          <div className="confirm-plating-modal">
+            <div className="modal-header">
+              <h5 className="modal-title">Xác nhận chuyển sản phẩm sang mạ</h5>
+              <button
+                className="btn-close"
+                onClick={() => setShowConfirmPlatingModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="alert alert-info">
+                <i className="fas fa-info-circle"></i>
+                <div>
+                  Bạn đã chọn {platingData.selectedItems.length} sản phẩm để
+                  chuyển sang trạng thái mạ.
+                </div>
+              </div>
+              <table className="table">
+                <tbody>
+                  {platingItems
+                    .filter((p) => platingData.selectedItems.includes(p.id))
+                    .map((p) => (
+                      <tr key={p.id}>
+                        <td>
+                          Nhóm ID: {p.group_id}: {p.part_name}
+                        </td>
+                        <td className="text-end">
+                          Số lượng: {p.product_quantity} sản phẩm
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+              <textarea
+                className="form-control"
+                rows="3"
+                placeholder="Nhập ghi chú cho quy trình mạ..."
+                value={platingNote}
+                onChange={(e) => setPlatingNote(e.target.value)}
+              />
+              <small className="text-muted d-block mt-2">
+                Lưu ý: Sau khi xác nhận, sản phẩm sẽ chuyển sang trạng thái{" "}
+                <strong>"Đang mạ"</strong>. Bạn sẽ cần nhập ngày nhận khi sản
+                phẩm hoàn thành quá trình mạ và được trả về.
+              </small>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowConfirmPlatingModal(false)}
+              >
+                Hủy
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleConfirmPlating}
+              >
+                Xác nhận chuyển
+              </button>
+            </div>
+          </div>
         </div>
-        <table className="table">
-          <tbody>
-            {platingItems
-              .filter(p => platingData.selectedItems.includes(p.id))
-              .map(p => (
-                <tr key={p.id}>
-                  <td>Nhóm ID: {p.group_id}: {p.part_name}</td>
-                  <td className="text-end">Số lượng: {p.product_quantity} sản phẩm</td>
-                </tr>
-              ))
-            }
-          </tbody>
-        </table>
-        <textarea
-          className="form-control"
-          rows="3"
-          placeholder="Nhập ghi chú cho quy trình mạ..."
-          value={platingNote}
-          onChange={e => setPlatingNote(e.target.value)}
-        />
-        <small className="text-muted d-block mt-2">
-          Lưu ý: Sau khi xác nhận, sản phẩm sẽ chuyển sang trạng thái <strong>"Đang mạ"</strong>. Bạn sẽ cần nhập ngày nhận khi sản phẩm hoàn thành quá trình mạ và được trả về.
-        </small>
+      )}
+      {showReceiveModal && selectedReceiveItem && (
+  <div className="modal-overlay">
+    <div className="receive-modal">
+      
+      {/* Header */}
+      <div className="modal-header">
+        <h5 className="modal-title">
+          Nhận hàng sau mạ - {selectedReceiveItem.group_id}
+        </h5>
+        <button className="btn-close" onClick={() => setShowReceiveModal(false)}>×</button>
       </div>
+      
+      {/* Body */}
+      <div className="modal-body">
+        <div className="form-group mb-2">
+          <label>Tên sản phẩm</label>
+          <input type="text" className="form-control" readOnly
+            value={selectedReceiveItem.part_name || ''} />
+        </div>
+        <div className="form-group mb-2">
+          <label>Số lượng gửi đi</label>
+          <input type="text" className="form-control" readOnly
+            value={selectedReceiveItem.product_quantity} />
+        </div>
+        <div className="form-group mb-2">
+          <label>Ngày chuyển mạ</label>
+          <input type="text" className="form-control" readOnly
+            value={selectedReceiveItem.platingDate} />
+        </div>
+        <div className="form-group mb-2">
+          <label>Ngày nhận</label>
+          <input type="date" className="form-control"
+            name="receiveDate"
+            value={receiveData.receiveDate}
+            onChange={handleReceiveInputChange} />
+        </div>
+        <div className="form-group mb-2">
+          <label>Tình trạng nhận</label>
+          <select className="form-control"
+            name="receiveStatus"
+            value={receiveData.receiveStatus}
+            onChange={handleReceiveInputChange}>
+            <option value="full">Nhận đủ số lượng</option>
+            <option value="partial">Nhận thiếu số lượng</option>
+            <option value="issue">Nhận có vấn đề</option>
+          </select>
+        </div>
+        <div className="form-group mb-2">
+          <label>Ghi chú</label>
+          <textarea className="form-control" rows="3"
+            name="note"
+            placeholder="Nhập ghi chú khi nhận hàng..."
+            value={receiveData.note}
+            onChange={handleReceiveInputChange}>
+          </textarea>
+        </div>
+      </div>
+      
+      {/* Footer */}
       <div className="modal-footer">
-        <button className="btn btn-secondary" onClick={()=>setShowConfirmPlatingModal(false)}>
+        <button className="btn btn-secondary" onClick={()=>setShowReceiveModal(false)}>
           Hủy
         </button>
-        <button className="btn btn-primary" onClick={handleConfirmPlating}>
-          Xác nhận chuyển
+        <button className="btn btn-primary" onClick={handleConfirmReceive}>
+          Xác nhận nhận hàng
         </button>
       </div>
     </div>
