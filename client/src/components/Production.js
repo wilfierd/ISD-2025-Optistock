@@ -1685,7 +1685,24 @@ function Production({ user }) {
         setSelectedReceiveItem(null);
       });
   };
-
+  // Helper to format date string for display
+const formatDateForDisplay = (dateString) => {
+  if (!dateString) return '';
+  
+  // Check if the date is already in our expected format
+  if (dateString.includes(' - ')) {
+    return dateString;
+  }
+  
+  // Try to parse the date
+  try {
+    const date = new Date(dateString);
+    return formatDateTime(date);
+  } catch (e) {
+    console.error('Error formatting date:', e);
+    return dateString;
+  }
+};
   return (
     <div className="production-container">
       <Navbar user={user} onLogout={handleLogout} />
@@ -1943,325 +1960,318 @@ function Production({ user }) {
         )}
 
         {/* Plating List Tab Content */}
-        {activeTab === "platingList" && (
-          <div className="plating-section">
-            {/* Plating settings for ready items */}
-            <div className="card mb-4">
-              <div className="card-header bg-primary text-white">
-                <h5 className="mb-0">
-                  {language === "vi"
-                    ? "Lô chờ mạ"
-                    : "Batches Ready for Plating"}
-                </h5>
-              </div>
-              <div className="card-body">
-                {isLoadingPlating ? (
-                  <div className="text-center my-3">
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">
-                        {language === "vi" ? "Đang tải..." : "Loading..."}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="row mb-3">
-                      <div className="col-md-5">
-                        <label htmlFor="platingDate" className="form-label">
-                          {language === "vi" ? "Ngày mạ" : "Plating Date"}
-                        </label>
-                        <input
-                          type="date"
-                          className="form-control"
-                          id="platingDate"
-                          name="platingDate"
-                          value={platingData.platingDate}
-                          onChange={handlePlatingInputChange}
-                        />
-                      </div>
-                      <div className="col-md-5">
-                        <label htmlFor="platingTime" className="form-label">
-                          {language === "vi" ? "Giờ mạ" : "Plating Time"}
-                        </label>
-                        <input
-                          type="time"
-                          className="form-control"
-                          id="platingTime"
-                          name="platingTime"
-                          value={platingData.platingTime}
-                          onChange={handlePlatingInputChange}
-                        />
-                      </div>
-                      <div className="col-md-2">
-                        <label className="form-label">&nbsp;</label>
-                        <button
-                          className="btn btn-primary w-100"
-                          onClick={() => setShowConfirmPlatingModal(true)}
-                          disabled={
-                            !platingData.platingDate ||
-                            !platingData.platingTime ||
-                            platingData.selectedItems.length === 0
-                          }
-                        >
-                          {language === "vi" ? "Đặt lịch mạ" : "Set Plating"}
-                        </button>
-                      </div>
-                    </div>
 
-                    <div className="table-responsive">
-                      <table className="table table-hover">
-                        <thead>
-                          <tr>
-                            <th width="5%">
-                              <input
-                                type="checkbox"
-                                className="form-check-input"
-                                checked={
-                                  platingItems.filter(
-                                    (p) => p.status === "pending"
-                                  ).length > 0 &&
-                                  platingItems
-                                    .filter((p) => p.status === "pending")
-                                    .every((p) =>
-                                      platingData.selectedItems.includes(p.id)
-                                    )
-                                }
-                                onChange={() => {
-                                  const pendingItems = platingItems.filter(
-                                    (p) => p.status === "pending"
-                                  );
-                                  if (pendingItems.length === 0) return;
 
-                                  const areAllSelected = pendingItems.every(
-                                    (p) =>
-                                      platingData.selectedItems.includes(p.id)
-                                  );
-
-                                  if (areAllSelected) {
-                                    // Deselect all
-                                    setPlatingData((prev) => ({
-                                      ...prev,
-                                      selectedItems: prev.selectedItems.filter(
-                                        (id) =>
-                                          !pendingItems.some((p) => p.id === id)
-                                      ),
-                                    }));
-                                  } else {
-                                    // Select all
-                                    setPlatingData((prev) => ({
-                                      ...prev,
-                                      selectedItems: [
-                                        ...new Set([
-                                          ...prev.selectedItems,
-                                          ...pendingItems.map((p) => p.id),
-                                        ]),
-                                      ],
-                                    }));
-                                  }
-                                }}
-                              />
-                            </th>
-                            <th>
-                              {language === "vi" ? "Nhóm ID" : "Group ID"}
-                            </th>
-                            <th>
-                              {language === "vi" ? "Số lượng" : "Quantity"}
-                            </th>
-                            <th>
-                              {language === "vi" ? "Người phụ trách" : "PIC"}
-                            </th>
-                            <th>
-                              {language === "vi" ? "Trạng thái" : "Status"}
-                            </th>
-                            <th>
-                              {language === "vi"
-                                ? "Ngày bắt đầu"
-                                : "Start Date"}
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {platingItems.filter((p) => p.status === "pending")
-                            .length > 0 ? (
-                            platingItems
-                              .filter((p) => p.status === "pending")
-                              .map((item) => (
-                                <tr
-                                  key={item.id}
-                                  style={{ cursor: "pointer" }}
-                                  onClick={() =>
-                                    handlePlatingItemSelect(item.id)
-                                  }
-                                >
-                                  <td>
-                                    <input
-                                      type="checkbox"
-                                      className="form-check-input"
-                                      checked={platingData.selectedItems.includes(
-                                        item.id
-                                      )}
-                                      onChange={() =>
-                                        handlePlatingItemSelect(item.id)
-                                      }
-                                      onClick={(e) => e.stopPropagation()}
-                                    />
-                                  </td>
-                                  <td>{item.group_id}</td>
-                                  <td>{item.product_quantity}</td>
-                                  <td>{item.pic_name}</td>
-                                  <td>
-                                    <span className="badge bg-warning">
-                                      {language === "vi" ? "Chờ mạ" : "Pending"}
-                                    </span>
-                                  </td>
-                                  <td>{formatTime(item.created_at)}</td>
-                                </tr>
-                              ))
-                          ) : (
-                            <tr>
-                              <td colSpan="6" className="text-center py-3">
-                                {language === "vi"
-                                  ? "Không có lô nào đang chờ mạ"
-                                  : "No batches waiting for plating"}
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Plating in progress items */}
-            <div className="card">
-              <div className="card-header bg-info text-white">
-                <h5 className="mb-0">
-                  {language === "vi"
-                    ? "Lô đang mạ"
-                    : "Batches in Plating Process"}
-                </h5>
-              </div>
-              <div className="card-body">
-                {isLoadingPlating ? (
-                  <div className="text-center my-3">
-                    <div className="spinner-border text-primary" role="status">
-                      <span className="visually-hidden">
-                        {language === "vi" ? "Đang tải..." : "Loading..."}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="table-responsive">
-                    <table className="table table-hover">
-                      <thead>
-                        <tr>
-                          <th>{language === "vi" ? "Nhóm ID" : "Group ID"}</th>
-                          <th>{language === "vi" ? "Số lượng" : "Quantity"}</th>
-                          <th>
-                            {language === "vi" ? "Người phụ trách" : "PIC"}
-                          </th>
-                          <th>{language === "vi" ? "Trạng thái" : "Status"}</th>
-                          <th>
-                            {language === "vi" ? "Ngày mạ" : "Plating Date"}
-                          </th>
-                          <th>{language === "vi" ? "Thao tác" : "Actions"}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {platingItems.filter((p) => p.status !== "pending")
-                          .length > 0 ? (
-                          platingItems
-                            .filter((p) => p.status !== "pending")
-                            .map((item) => (
-                              <tr
-                                key={item.id}
-                                style={{ cursor: "pointer" }}
-                                onClick={() => handleShowPlatingDetail(item)}
-                              >
-                                <td>{item.group_id}</td>
-                                <td>{item.product_quantity}</td>
-                                <td>{item.pic_name}</td>
-                                <td>
-                                  {item.status === "processing" ? (
-                                    <span className="badge bg-primary">
-                                      {language === "vi"
-                                        ? "Đang mạ"
-                                        : "In Progress"}
-                                    </span>
-                                  ) : item.status === "completed" ? (
-                                    <span className="badge bg-success">
-                                      {language === "vi"
-                                        ? "Hoàn thành"
-                                        : "Completed"}
-                                    </span>
-                                  ) : (
-                                    <span className="badge bg-secondary">
-                                      {item.status}
-                                    </span>
-                                  )}
-                                </td>
-                                <td>
-                                  {item.platingDate} {item.platingTime}
-                                </td>
-                                <td>
-                                  {item.status === "processing" && (
-                                    <button
-                                      className="btn btn-sm btn-warning me-2"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedPlating(item);
-                                        handleCompletePlating();
-                                      }}
-                                    >
-                                      {language === "vi"
-                                        ? "Hoàn thành"
-                                        : "Complete"}
-                                    </button>
-                                  )}
-                                  {item.status === "completed" && (
-                                    <button
-                                    className="btn btn-sm btn-success me-2"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleShowReceiveModal(item);
-                                      }}
-                                    >
-                                      {language === "vi"
-                                        ? "Nhận hàng"
-                                        : "Receive"}
-                                    </button>
-                                  )}
-                                  <button
-                                    className="btn btn-sm btn-info ms-2"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleShowPlatingDetail(item);
-                                    }}
-                                  >
-                                    {language === "vi" ? "Chi tiết" : "Details"}
-                                  </button>
-                                </td>
-                              </tr>
-                            ))
-                        ) : (
-                          <tr>
-                            <td colSpan="6" className="text-center py-3">
-                              {language === "vi"
-                                ? "Không có lô nào đang trong quá trình mạ"
-                                : "No batches in plating process"}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+{/* Plating List Tab Content */}
+{activeTab === "platingList" && (
+  <div className="plating-section">
+    {/* Plating settings for ready items */}
+    <div className="card mb-4">
+      <div className="card-header bg-primary text-white">
+        <h5 className="mb-0">
+          {language === "vi"
+            ? "Lô chờ mạ"
+            : "Batches Ready for Plating"}
+        </h5>
+      </div>
+      <div className="card-body">
+        {isLoadingPlating ? (
+          <div className="text-center my-3">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">
+                {language === "vi" ? "Đang tải..." : "Loading..."}
+              </span>
             </div>
           </div>
+        ) : (
+          <>
+            <div className="row mb-3">
+              <div className="col-md-5">
+                <label htmlFor="platingDate" className="form-label">
+                  {language === "vi" ? "Ngày mạ" : "Plating Date"}
+                </label>
+                <input
+                  type="date"
+                  className="form-control"
+                  id="platingDate"
+                  name="platingDate"
+                  value={platingData.platingDate}
+                  onChange={handlePlatingInputChange}
+                />
+              </div>
+              <div className="col-md-5">
+                <label htmlFor="platingTime" className="form-label">
+                  {language === "vi" ? "Giờ mạ" : "Plating Time"}
+                </label>
+                <input
+                  type="time"
+                  className="form-control"
+                  id="platingTime"
+                  name="platingTime"
+                  value={platingData.platingTime}
+                  onChange={handlePlatingInputChange}
+                />
+              </div>
+              <div className="col-md-2">
+                <label className="form-label">&nbsp;</label>
+                <button
+                  className="btn btn-primary w-100"
+                  onClick={() => setShowConfirmPlatingModal(true)}
+                  disabled={
+                    !platingData.platingDate ||
+                    !platingData.platingTime ||
+                    platingData.selectedItems.length === 0
+                  }
+                >
+                  {language === "vi" ? "Đặt lịch mạ" : "Set Plating"}
+                </button>
+              </div>
+            </div>
+
+            <div className="table-responsive">
+              <table className="table table-hover">
+                <thead>
+                  <tr>
+                    <th width="5%">
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        checked={
+                          platingItems.filter(
+                            (p) => p.status === "pending"
+                          ).length > 0 &&
+                          platingItems
+                            .filter((p) => p.status === "pending")
+                            .every((p) =>
+                              platingData.selectedItems.includes(p.id)
+                            )
+                        }
+                        onChange={() => {
+                          const pendingItems = platingItems.filter(
+                            (p) => p.status === "pending"
+                          );
+                          if (pendingItems.length === 0) return;
+
+                          const areAllSelected = pendingItems.every(
+                            (p) =>
+                              platingData.selectedItems.includes(p.id)
+                          );
+
+                          if (areAllSelected) {
+                            // Deselect all
+                            setPlatingData((prev) => ({
+                              ...prev,
+                              selectedItems: prev.selectedItems.filter(
+                                (id) =>
+                                  !pendingItems.some((p) => p.id === id)
+                              ),
+                            }));
+                          } else {
+                            // Select all
+                            setPlatingData((prev) => ({
+                              ...prev,
+                              selectedItems: [
+                                ...new Set([
+                                  ...prev.selectedItems,
+                                  ...pendingItems.map((p) => p.id),
+                                ]),
+                              ],
+                            }));
+                          }
+                        }}
+                      />
+                    </th>
+                    <th>{language === "vi" ? "Nhóm ID" : "Group ID"}</th>
+                    <th>{language === "vi" ? "Trạng thái" : "State"}</th>
+                    <th>{language === "vi" ? "Tên sản phẩm" : "Product Name"}</th>
+                    <th>{language === "vi" ? "Mã sản phẩm" : "Product Code"}</th>
+                    <th>{language === "vi" ? "Số lượng" : "Product Quantity"}</th>
+                    <th>{language === "vi" ? "Thời gian lắp ráp" : "Assembly Time"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {platingItems.filter((p) => p.status === "pending")
+                    .length > 0 ? (
+                    platingItems
+                      .filter((p) => p.status === "pending")
+                      .map((item) => (
+                        <tr
+                          key={item.id}
+                          style={{ cursor: "pointer" }}
+                          onClick={() =>
+                            handlePlatingItemSelect(item.id)
+                          }
+                        >
+                          <td>
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={platingData.selectedItems.includes(
+                                item.id
+                              )}
+                              onChange={() =>
+                                handlePlatingItemSelect(item.id)
+                              }
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </td>
+                          <td>{item.group_id}</td>
+                          <td>
+                            <span className="badge bg-warning">
+                              {language === "vi" ? "Chờ mạ" : "Pending"}
+                            </span>
+                          </td>
+                          <td>{item.product_name || '-'}</td>
+                          <td>{item.product_code || '-'}</td>
+                          <td>{item.product_quantity}</td>
+                          <td>{formatDateForDisplay(item.created_at) || '-'}</td>
+                        </tr>
+                      ))
+                  ) : (
+                    <tr>
+                      <td colSpan="7" className="text-center py-3">
+                        {language === "vi"
+                          ? "Không có lô nào đang chờ mạ"
+                          : "No batches waiting for plating"}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
+      </div>
+    </div>
+
+    {/* Plating in progress items */}
+    <div className="card">
+      <div className="card-header bg-info text-white">
+        <h5 className="mb-0">
+          {language === "vi"
+            ? "Lô đang mạ"
+            : "Batches in Plating Process"}
+        </h5>
+      </div>
+      <div className="card-body">
+        {isLoadingPlating ? (
+          <div className="text-center my-3">
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">
+                {language === "vi" ? "Đang tải..." : "Loading..."}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-hover">
+              <thead>
+                <tr>
+                  <th>{language === "vi" ? "Nhóm ID" : "Group ID"}</th>
+                  <th>{language === "vi" ? "Trạng thái" : "State"}</th>
+                  <th>{language === "vi" ? "Tên sản phẩm" : "Product Name"}</th>
+                  <th>{language === "vi" ? "Mã sản phẩm" : "Product Code"}</th>
+                  <th>{language === "vi" ? "Số lượng" : "Product Quantity"}</th>
+                  <th>{language === "vi" ? "Ngày mạ" : "Plating Date"}</th>
+                  <th>{language === "vi" ? "Thao tác" : "Actions"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {platingItems.filter((p) => p.status !== "pending")
+                  .length > 0 ? (
+                  platingItems
+                    .filter((p) => p.status !== "pending")
+                    .map((item) => (
+                      <tr
+                        key={item.id}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => handleShowPlatingDetail(item)}
+                      >
+                        <td>{item.group_id}</td>
+                        <td>
+                          {item.status === "processing" ? (
+                            <span className="badge bg-primary">
+                              {language === "vi"
+                                ? "Đang mạ"
+                                : "In Progress"}
+                            </span>
+                          ) : item.status === "completed" ? (
+                            <span className="badge bg-success">
+                              {language === "vi"
+                                ? "Hoàn thành"
+                                : "Completed"}
+                            </span>
+                          ) : (
+                            <span className="badge bg-secondary">
+                              {item.status}
+                            </span>
+                          )}
+                        </td>
+                        <td>{item.product_name || '-'}</td>
+                        <td>{item.product_code || '-'}</td>
+                        <td>{item.product_quantity}</td>
+                        <td>
+                          {item.platingDate && item.platingTime ? 
+                            `${item.platingDate} ${item.platingTime}` : 
+                            formatDateForDisplay(item.plating_start_time) || '-'}
+                        </td>
+                        <td>
+                          {item.status === "processing" && (
+                            <button
+                              className="btn btn-sm btn-warning me-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPlating(item);
+                                handleCompletePlating();
+                              }}
+                            >
+                              {language === "vi"
+                                ? "Hoàn thành"
+                                : "Complete"}
+                            </button>
+                          )}
+                          {item.status === "completed" && (
+                            <button
+                              className="btn btn-sm btn-success me-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleShowReceiveModal(item);
+                              }}
+                            >
+                              {language === "vi"
+                                ? "Nhận hàng"
+                                : "Receive"}
+                            </button>
+                          )}
+                          <button
+                            className="btn btn-sm btn-info ms-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShowPlatingDetail(item);
+                            }}
+                          >
+                            {language === "vi" ? "Chi tiết" : "Details"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="text-center py-3">
+                      {language === "vi"
+                        ? "Không có lô nào đang trong quá trình mạ"
+                        : "No batches in plating process"}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
       </div>
 
       {/* Add Production Modal */}
@@ -2731,73 +2741,85 @@ function Production({ user }) {
           </div>
         </div>
       )}
-      {showConfirmPlatingModal && (
-        <div className="modal-overlay">
-          <div className="confirm-plating-modal">
-            <div className="modal-header">
-              <h5 className="modal-title">Xác nhận chuyển sản phẩm sang mạ</h5>
-              <button
-                className="btn-close"
-                onClick={() => setShowConfirmPlatingModal(false)}
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="alert alert-info">
-                <i className="fas fa-info-circle"></i>
-                <div>
-                  Bạn đã chọn {platingData.selectedItems.length} sản phẩm để
-                  chuyển sang trạng thái mạ.
-                </div>
-              </div>
-              <table className="table">
-                <tbody>
-                  {platingItems
-                    .filter((p) => platingData.selectedItems.includes(p.id))
-                    .map((p) => (
-                      <tr key={p.id}>
-                        <td>
-                          Nhóm ID: {p.group_id}: {p.part_name}
-                        </td>
-                        <td className="text-end">
-                          Số lượng: {p.product_quantity} sản phẩm
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-              <textarea
-                className="form-control"
-                rows="3"
-                placeholder="Nhập ghi chú cho quy trình mạ..."
-                value={platingNote}
-                onChange={(e) => setPlatingNote(e.target.value)}
-              />
-              <small className="text-muted d-block mt-2">
-                Lưu ý: Sau khi xác nhận, sản phẩm sẽ chuyển sang trạng thái{" "}
-                <strong>"Đang mạ"</strong>. Bạn sẽ cần nhập ngày nhận khi sản
-                phẩm hoàn thành quá trình mạ và được trả về.
-              </small>
-            </div>
-            <div className="modal-footer">
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowConfirmPlatingModal(false)}
-              >
-                Hủy
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleConfirmPlating}
-              >
-                Xác nhận chuyển
-              </button>
-            </div>
+{showConfirmPlatingModal && (
+  <div className="modal-overlay">
+    <div className="confirm-plating-modal">
+      <div className="modal-header">
+        <h5 className="modal-title">Xác nhận chuyển sản phẩm sang mạ</h5>
+        <button
+          className="btn-close"
+          onClick={() => setShowConfirmPlatingModal(false)}
+        >
+          ×
+        </button>
+      </div>
+      <div className="modal-body">
+        <div className="alert alert-info">
+          <i className="fas fa-info-circle"></i>
+          <div>
+            Bạn đã chọn {platingData.selectedItems.length} sản phẩm để
+            chuyển sang trạng thái mạ.
           </div>
         </div>
-      )}
-      {showReceiveModal && selectedReceiveItem && (
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Thông tin nhóm</th>
+              <th className="text-end">Số lượng</th>
+            </tr>
+          </thead>
+          <tbody>
+            {platingItems
+              .filter((p) => platingData.selectedItems.includes(p.id))
+              .map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <div><strong>Nhóm ID:</strong> {p.group_id}</div>
+                    <div className="text-muted">
+                      <small><strong>Tên sản phẩm:</strong> {p.product_name || 'Chưa có tên'}</small>
+                    </div>
+                    <div className="text-muted">
+                      <small><strong>Mã sản phẩm:</strong> {p.product_code || 'Chưa có mã'}</small>
+                    </div>
+                  </td>
+                  <td className="text-end align-middle">
+                    {p.product_quantity} sản phẩm
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+        <textarea
+          className="form-control"
+          rows="3"
+          placeholder="Nhập ghi chú cho quy trình mạ..."
+          value={platingNote}
+          onChange={(e) => setPlatingNote(e.target.value)}
+        />
+        <small className="text-muted d-block mt-2">
+          Lưu ý: Sau khi xác nhận, sản phẩm sẽ chuyển sang trạng thái{" "}
+          <strong>"Đang mạ"</strong>. Bạn sẽ cần nhập ngày nhận khi sản
+          phẩm hoàn thành quá trình mạ và được trả về.
+        </small>
+      </div>
+      <div className="modal-footer">
+        <button
+          className="btn btn-secondary"
+          onClick={() => setShowConfirmPlatingModal(false)}
+        >
+          Hủy
+        </button>
+        <button
+          className="btn btn-primary"
+          onClick={handleConfirmPlating}
+        >
+          Xác nhận chuyển
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{showReceiveModal && selectedReceiveItem && (
   <div className="modal-overlay">
     <div className="receive-modal">
       
@@ -2814,7 +2836,12 @@ function Production({ user }) {
         <div className="form-group mb-2">
           <label>Tên sản phẩm</label>
           <input type="text" className="form-control" readOnly
-            value={selectedReceiveItem.part_name || ''} />
+            value={selectedReceiveItem.product_name || 'Chưa có tên sản phẩm'} />
+        </div>
+        <div className="form-group mb-2">
+          <label>Mã sản phẩm</label>
+          <input type="text" className="form-control" readOnly
+            value={selectedReceiveItem.product_code || 'Chưa có mã sản phẩm'} />
         </div>
         <div className="form-group mb-2">
           <label>Số lượng gửi đi</label>
@@ -2824,7 +2851,9 @@ function Production({ user }) {
         <div className="form-group mb-2">
           <label>Ngày chuyển mạ</label>
           <input type="text" className="form-control" readOnly
-            value={selectedReceiveItem.platingDate} />
+            value={selectedReceiveItem.platingDate && selectedReceiveItem.platingTime ? 
+              `${selectedReceiveItem.platingDate} ${selectedReceiveItem.platingTime}` :
+              formatDateForDisplay(selectedReceiveItem.plating_start_time) || 'Không có thông tin'} />
         </div>
         <div className="form-group mb-2">
           <label>Ngày nhận</label>
