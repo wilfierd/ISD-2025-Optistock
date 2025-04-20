@@ -1,4 +1,4 @@
-// client/src/components/Production.js
+// Production.js with fixed batch counting and rate limiting
 import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
@@ -32,6 +32,13 @@ const usePlating = () => {
     },
     retry: 1,
   });
+};
+
+// Store the last processed batch counts in a module-level variable to persist between renders
+const batchProcessingState = {
+  lastProcessedBatchCounts: {},
+  processingLock: false,
+  lastProcessingTime: 0
 };
 
 function Production({ user }) {
@@ -95,7 +102,7 @@ function Production({ user }) {
   
   // Queries for data
   const { data: materials = [], isLoading: isLoadingMaterials } = useMaterials();
-  const { data: productions = [], isLoading: isLoadingProductions } = useProduction(productionFilter);
+  const { data: productions = [], isLoading: isLoadingProductions, refetch: refetchProductions } = useProduction(productionFilter);
   const { data: platingItems = [], isLoading: isLoadingPlating, refetch: refetchPlating } = usePlating();
   const { data: machines = [], isLoading: isLoadingMachines } = useQuery({
     queryKey: ['machines'],
@@ -225,22 +232,45 @@ function Production({ user }) {
   // Function to create batches in the warehouse
   const createCompletedBatches = async (production, count) => {
     try {
+      console.log(`Creating ${count} completed batches for production ID: ${production.id}`);
+      
+      // Rate limiting: Only allow creation of max 5 batches at once to prevent flooding
+      const maxBatchesPerOperation = 5;
+      const batchesToCreate = Math.min(count, maxBatchesPerOperation);
+      
+      if (batchesToCreate <= 0) {
+        console.log(`No batches to create for production ${production.id}`);
+        return null;
+      }
+      
+      if (!production.material_name || !production.machine_name || !production.mold_code) {
+        console.error('Missing required production data:', production);
+        throw new Error('Missing required production data');
+      }
+      
       // Prepare the batch data
       const batchData = {
         part_name: production.material_name,
         machine_name: production.machine_name,
         mold_code: production.mold_code,
-        quantity: count,
+        quantity: batchesToCreate,
         warehouse_entry_time: formatDateTime(new Date()),
         status: null, // Initially ungrouped
         created_by: user.id
       };
       
+      console.log('Sending batch data to API:', batchData);
+      
       // Call the API to create batches
       const response = await apiService.batches.create(batchData);
+      console.log('Batch creation API response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error creating batches:', error);
+      // Log more detail about the error for debugging
+      if (error.response) {
+        console.error('API error response:', error.response.data);
+      }
       throw error;
     }
   };
@@ -281,6 +311,120 @@ function Production({ user }) {
     return nextCompletion;
   };
   
+  // Function to process batch completions with rate limiting
+  const processBatchCompletions = async () => {
+    // Prevent concurrent processing and rate limit
+    const now = Date.now();
+    if (batchProcessingState.processingLock || (now - batchProcessingState.lastProcessingTime < 10000)) {
+      console.log('Skipping batch processing: Already processing or rate limited');
+      return;
+    }
+    
+    try {
+      console.log('Processing batch completions...');
+      batchProcessingState.processingLock = true;
+      batchProcessingState.lastProcessingTime = now;
+      
+      // Process each running production
+      for (const prod of productions) {
+        if (prod.status === 'running') {
+          try {
+            const startTime = new Date(prod.start_date).getTime();
+            const now = new Date().getTime();
+            const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+            
+            // Calculate completed batches (every 5 minutes)
+            const batchesDone = Math.floor(elapsedMinutes / 5);
+            const lastProcessed = batchProcessingState.lastProcessedBatchCounts[prod.id] || 0;
+            
+            console.log(`Production ${prod.id}: ${batchesDone} batches done, ${lastProcessed} last processed`);
+            
+            // If new batches have been completed since last check
+            if (batchesDone > lastProcessed) {
+              // Calculate newly completed batches
+              const newlyCompletedCount = batchesDone - lastProcessed;
+              
+              if (newlyCompletedCount > 0) {
+                console.log(`${newlyCompletedCount} new batches completed for production ${prod.id}`);
+                
+                // Show completion popup for the most recent batch
+                setCompletedBatchInfo({
+                  productionId: prod.id,
+                  materialName: prod.material_name,
+                  machineName: prod.machine_name,
+                  moldCode: prod.mold_code,
+                  batchNumber: batchesDone,
+                  completionTime: new Date(),
+                });
+                setShowCompletionPopup(true);
+                
+                // Automatically hide after 10 seconds
+                setTimeout(() => {
+                  setShowCompletionPopup(false);
+                }, 10000);
+                
+                // Create batches in warehouse - limit to max 5 per operation to prevent flooding
+                await createCompletedBatches(prod, Math.min(newlyCompletedCount, 5));
+                
+                // Add to recent completions
+                setRecentCompletions(prevCompletions => {
+                  const newCompletions = [...prevCompletions];
+                  newCompletions.unshift({
+                    id: Date.now(),
+                    productionId: prod.id,
+                    count: newlyCompletedCount,
+                    materialName: prod.material_name,
+                    timestamp: new Date()
+                  });
+                  
+                  // Keep only the last 5 completions
+                  return newCompletions.slice(0, 5);
+                });
+                
+                // Show notification alert
+                setShowCompletionAlert(true);
+                setTimeout(() => {
+                  setShowCompletionAlert(false);
+                }, 10000);
+                
+                // Show toast notification
+                toast.success(
+                  language === 'vi' 
+                    ? `${newlyCompletedCount} lô đã hoàn thành từ sản xuất ID: ${prod.id}` 
+                    : `${newlyCompletedCount} batches completed from production ID: ${prod.id}`
+                );
+                
+                // Update production with actual output
+                await updateProduction.mutateAsync({
+                  id: prod.id,
+                  data: {
+                    actual_output: batchesDone
+                  }
+                });
+                
+                // Refresh batches data
+                queryClient.invalidateQueries({ queryKey: ['batches'] });
+                
+                // Update the last processed count for this production
+                batchProcessingState.lastProcessedBatchCounts[prod.id] = batchesDone;
+              }
+            }
+          } catch (error) {
+            console.error(`Error processing batch completion for production ${prod.id}:`, error);
+            toast.error(
+              language === 'vi' 
+                ? `Lỗi khi xử lý hoàn thành lô: ${error.message}` 
+                : `Error processing batch completion: ${error.message}`
+            );
+          }
+        }
+      }
+    } finally {
+      // Always release the lock
+      batchProcessingState.processingLock = false;
+    }
+  };
+  
   // Initialize production progress and set up batch completion tracking
   useEffect(() => {
     if (productions.length > 0) {
@@ -309,6 +453,11 @@ function Production({ user }) {
             // Estimated completion time
             estimatedCompletion: new Date(startTime + (totalExpected * 5 * 60 * 1000))
           };
+          
+          // Initialize last processed count if not already set
+          if (!batchProcessingState.lastProcessedBatchCounts[prod.id] && prod.actual_output) {
+            batchProcessingState.lastProcessedBatchCounts[prod.id] = prod.actual_output;
+          }
         } else {
           // For stopped productions, use actual output
           const actualOutput = prod.actual_output || 0;
@@ -322,6 +471,9 @@ function Production({ user }) {
             percentage,
             stopped: true
           };
+          
+          // Make sure we track stopped productions too
+          batchProcessingState.lastProcessedBatchCounts[prod.id] = actualOutput;
         }
       });
       
@@ -329,44 +481,17 @@ function Production({ user }) {
       
       // Initial calculation of next batch completion
       setNextCompletion(getNextBatchCompletion());
+      
+      // Initial processing of batch completions - only if not processed recently
+      if (Date.now() - batchProcessingState.lastProcessingTime > 10000) {
+        processBatchCompletions();
+      }
     }
     
-    // Check for batch completions
-    const checkBatchCompletions = () => {
-      productions.forEach(prod => {
-        if (prod.status === 'running') {
-          const startTime = new Date(prod.start_date).getTime();
-          const now = new Date().getTime();
-          const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
-          
-          // Assuming 5 min per batch
-          const batchesDone = Math.floor(elapsedMinutes / 5);
-          const previousBatchesDone = productionProgress[prod.id]?.batchesDone || 0;
-          
-          // A new batch just completed
-          if (batchesDone > previousBatchesDone) {
-            // Show completion popup
-            setCompletedBatchInfo({
-              productionId: prod.id,
-              materialName: prod.material_name,
-              machineName: prod.machine_name,
-              moldCode: prod.mold_code,
-              batchNumber: batchesDone,
-              completionTime: new Date(),
-            });
-            setShowCompletionPopup(true);
-            
-            // Automatically hide after 10 seconds
-            setTimeout(() => {
-              setShowCompletionPopup(false);
-            }, 10000);
-          }
-        }
-      });
-    };
-    
-    // Update progress every minute
+    // Update progress and check for completions every 60 seconds
+    // This is a longer interval to avoid too frequent updates
     const interval = setInterval(() => {
+      // Update production progress
       setProductionProgress(prev => {
         const updated = {...prev};
         
@@ -389,67 +514,6 @@ function Production({ user }) {
               percentage,
               estimatedCompletion: new Date(startTime + (totalExpected * 5 * 60 * 1000))
             };
-            
-            // If batches are done, update stage warehouse
-            if (batchesDone > 0 && batchesDone !== prev[prod.id]?.batchesDone) {
-              // Calculate the new batches completed since last update
-              const newlyCompletedCount = batchesDone - (prev[prod.id]?.batchesDone || 0);
-              
-              if (newlyCompletedCount > 0) {
-                // Create actual batches in warehouse through API call
-                createCompletedBatches(prod, newlyCompletedCount)
-                  .then(() => {
-                    // Add to recent completions
-                    setRecentCompletions(prevCompletions => {
-                      const newCompletions = [...prevCompletions];
-                      newCompletions.unshift({
-                        id: Date.now(), // unique id for the notification
-                        productionId: prod.id,
-                        count: newlyCompletedCount,
-                        materialName: prod.material_name,
-                        timestamp: new Date()
-                      });
-                      
-                      // Keep only the last 5 completions
-                      return newCompletions.slice(0, 5);
-                    });
-                    
-                    // Show the alert
-                    setShowCompletionAlert(true);
-                    
-                    // Auto-hide the alert after 10 seconds
-                    setTimeout(() => {
-                      setShowCompletionAlert(false);
-                    }, 10000);
-                    
-                    // Show toast notification when batch is completed
-                    toast.success(
-                      language === 'vi' 
-                        ? `${newlyCompletedCount} lô đã hoàn thành từ sản xuất ID: ${prod.id}` 
-                        : `${newlyCompletedCount} batches completed from production ID: ${prod.id}`
-                    );
-                    
-                    // Update production with actual output
-                    updateProduction.mutate({
-                      id: prod.id,
-                      data: {
-                        actual_output: batchesDone
-                      }
-                    });
-                    
-                    // Refresh batch data to show new batches in warehouse
-                    queryClient.invalidateQueries({ queryKey: ['batches'] });
-                  })
-                  .catch(error => {
-                    console.error('Error creating batches:', error);
-                    toast.error(
-                      language === 'vi' 
-                        ? 'Lỗi khi cập nhật kho công đoạn' 
-                        : 'Error updating stage warehouse'
-                    );
-                  });
-              }
-            }
           }
         });
         
@@ -459,18 +523,14 @@ function Production({ user }) {
       // Update next batch completion
       setNextCompletion(getNextBatchCompletion());
       
-      // Check for batch completions
-      checkBatchCompletions();
-    }, 60000); // Update every minute
-    
-    // Set up separate interval to check for completions more frequently
-    const checkInterval = setInterval(checkBatchCompletions, 15000);
+      // Process batch completions
+      processBatchCompletions();
+    }, 60000); // Check every 60 seconds - increased to reduce frequency
     
     return () => {
       clearInterval(interval);
-      clearInterval(checkInterval);
     };
-  }, [productions, productionProgress, updateProduction, queryClient, user.id, language]);
+  }, [productions, updateProduction, queryClient, user.id, language]);
   
   // Set up scanner input listener
   useEffect(() => {
@@ -501,6 +561,18 @@ function Production({ user }) {
       }));
     }
   }, [showStopReasonModal, showPlatingModal]);
+  
+  // Initialize last processed batch counts when component loads
+  useEffect(() => {
+    if (productions.length > 0) {
+      // For each production, make sure we have a last processed count
+      productions.forEach(prod => {
+        if (prod.actual_output && !batchProcessingState.lastProcessedBatchCounts[prod.id]) {
+          batchProcessingState.lastProcessedBatchCounts[prod.id] = prod.actual_output;
+        }
+      });
+    }
+  }, [productions]);
   
   // Improved function to extract material ID from scanned QR codes
   const extractMaterialIdFromScan = (scanValue) => {
