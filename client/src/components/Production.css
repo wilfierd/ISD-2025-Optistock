@@ -960,6 +960,74 @@ input[type="checkbox"] {
   background-color: white;
   border-top: 1px solid #eee;
 }
+/* Overlay đen mờ */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+}
+
+/* Kích thước modal chính */
+.confirm-plating-modal {
+  background: #fff;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  overflow: hidden;
+}
+
+/* Header & Footer */
+.confirm-plating-modal .modal-header,
+.confirm-plating-modal .modal-footer {
+  padding: 1rem;
+  border-bottom: 1px solid #e9ecef;
+}
+.confirm-plating-modal .modal-footer {
+  border-top: 1px solid #e9ecef;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Title */
+.confirm-plating-modal .modal-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Nút đóng */
+.confirm-plating-modal .btn-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: #000;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+/* Alert info */
+.confirm-plating-modal .alert-info {
+  background-color: #e9f7fe;
+  border-color: #b8e2f2;
+  color: #31708f;
+}
+
+/* Bảng sản phẩm */
+.confirm-plating-modal .table-borderless td {
+  padding: 0.25rem 0;
+  font-size: 0.95rem;
+}
+
+/* Textarea */
+.confirm-plating-modal .form-control {
+  resize: vertical;
+}
 
 /* Responsive adjustments */
 @media (max-width: 768px) {

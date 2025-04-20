@@ -265,7 +265,7 @@ function Navbar({ user, onLogout }) {
                   {getText(navItems.warehouseOptions.processWarehouse)}
                 </Link>
                 <Link 
-                  to="/product-warehouse" 
+                       to="/materials?type=process" 
                   className="dropdown-item"
                   onClick={() => setShowWarehouseDropdown(false)}
                 >

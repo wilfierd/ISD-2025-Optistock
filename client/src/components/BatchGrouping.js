@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
 import { toast } from 'react-toastify';
@@ -28,10 +28,9 @@ function BatchGrouping({ user }) {
   // State for grouping modal
   const [showGroupModal, setShowGroupModal] = useState(false);
   
-  // State for QR code modal - both for individual batch and group
+  // State for QR code modal
   const [showQrModal, setShowQrModal] = useState(false);
   const [selectedBatchForQR, setSelectedBatchForQR] = useState(null);
-  const [selectedGroupForQR, setSelectedGroupForQR] = useState(null);
 
   // State for assembly modal
   const [showAssemblyModal, setShowAssemblyModal] = useState(false);
@@ -47,15 +46,6 @@ function BatchGrouping({ user }) {
   // State for details modal
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedAssembly, setSelectedAssembly] = useState(null);
-  
-  // State for process tracking
-  const [processSteps, setProcessSteps] = useState({
-    ungrouped: { count: 0, percentage: 0 },
-    grouped: { count: 0, percentage: 0 },
-    assembly: { count: 0, percentage: 0 },
-    plating: { count: 0, percentage: 0 },
-    completed: { count: 0, percentage: 0 }
-  });
 
   // Get users for PIC dropdown
   const { data: users = [] } = useQuery({
@@ -122,58 +112,12 @@ function BatchGrouping({ user }) {
       });
       
       setGroupedBatchesMap(batchesByGroup);
-      
-      // Update process steps tracking
-      updateProcessSteps(ungroupedResponse.data.data || [], groupedData, assemblies);
     } catch (error) {
       console.error('Error fetching batches:', error);
       setError(error.response?.data?.error || t('failedToFetchBatches'));
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  // Update process steps tracking data
-  const updateProcessSteps = (ungrouped, grouped, assemblies) => {
-    const totalBatches = ungrouped.length + grouped.length;
-    
-    // Count batches in different stages
-    const ungroupedCount = ungrouped.length;
-    
-    // Get unique group IDs for grouped batches
-    const groupIds = [...new Set(grouped.map(batch => batch.group_id))];
-    const groupedCount = groupIds.length;
-    
-    // Count assemblies in different states
-    const assemblyCount = assemblies.filter(a => a.status === 'pending').length;
-    const platingCount = assemblies.filter(a => a.status === 'plating').length;
-    const completedCount = assemblies.filter(a => a.status === 'completed').length;
-    
-    // Calculate percentages (avoid division by zero)
-    const totalSteps = totalBatches > 0 ? totalBatches : 1;
-    
-    setProcessSteps({
-      ungrouped: { 
-        count: ungroupedCount, 
-        percentage: Math.round((ungroupedCount / totalSteps) * 100) 
-      },
-      grouped: { 
-        count: groupedCount, 
-        percentage: Math.round((groupedCount / totalSteps) * 100) 
-      },
-      assembly: { 
-        count: assemblyCount, 
-        percentage: Math.round((assemblyCount / totalSteps) * 100) 
-      },
-      plating: { 
-        count: platingCount, 
-        percentage: Math.round((platingCount / totalSteps) * 100) 
-      },
-      completed: { 
-        count: completedCount, 
-        percentage: Math.round((completedCount / totalSteps) * 100) 
-      }
-    });
   };
 
   // Load data on component mount
@@ -269,20 +213,9 @@ function BatchGrouping({ user }) {
     }
   };
 
-  // Handle QR code generation for individual batch
-  const handleGenerateBatchQR = (batch) => {
+  // Handle QR code generation
+  const handleGenerateQR = (batch) => {
     setSelectedBatchForQR(batch);
-    setSelectedGroupForQR(null);
-    setShowQrModal(true);
-  };
-  
-  // Handle QR code generation for group
-  const handleGenerateGroupQR = (groupId, batches) => {
-    setSelectedBatchForQR(null);
-    setSelectedGroupForQR({
-      id: groupId,
-      batches: batches
-    });
     setShowQrModal(true);
   };
 
@@ -480,36 +413,9 @@ function BatchGrouping({ user }) {
           )}
         </div>
 
-        {/* Process Tracking Bar */}
-        <div className="mb-4">
-          <h5 className="mb-2">{t('processProgress')}</h5>
-          <div className="progress" style={{ height: '25px' }}>
-            <div className="progress-bar bg-secondary" role="progressbar" 
-                style={{ width: `${processSteps.ungrouped.percentage}%` }} 
-                aria-valuenow={processSteps.ungrouped.percentage} aria-valuemin="0" aria-valuemax="100">
-              {t('ungrouped')} ({processSteps.ungrouped.count})
-            </div>
-            <div className="progress-bar bg-primary" role="progressbar" 
-                style={{ width: `${processSteps.grouped.percentage}%` }} 
-                aria-valuenow={processSteps.grouped.percentage} aria-valuemin="0" aria-valuemax="100">
-              {t('grouped')} ({processSteps.grouped.count})
-            </div>
-            <div className="progress-bar bg-info" role="progressbar" 
-                style={{ width: `${processSteps.assembly.percentage}%` }} 
-                aria-valuenow={processSteps.assembly.percentage} aria-valuemin="0" aria-valuemax="100">
-              {t('assembly')} ({processSteps.assembly.count})
-            </div>
-            <div className="progress-bar bg-warning" role="progressbar" 
-                style={{ width: `${processSteps.plating.percentage}%` }} 
-                aria-valuenow={processSteps.plating.percentage} aria-valuemin="0" aria-valuemax="100">
-              {t('plating')} ({processSteps.plating.count})
-            </div>
-            <div className="progress-bar bg-success" role="progressbar" 
-                style={{ width: `${processSteps.completed.percentage}%` }} 
-                aria-valuenow={processSteps.completed.percentage} aria-valuemin="0" aria-valuemax="100">
-              {t('completed')} ({processSteps.completed.count})
-            </div>
-          </div>
+        {/* Progress Bar Placeholder */}
+        <div className="mb-3 text-muted small">
+          &lt;Progression Bar&gt; (COMING soon)
         </div>
 
         {/* Tabs */}
@@ -591,7 +497,7 @@ function BatchGrouping({ user }) {
                             className="btn btn-sm" 
                             onClick={(e) => {
                               e.stopPropagation(); // Prevent row click
-                              handleGenerateBatchQR(batch);
+                              handleGenerateQR(batch);
                             }}
                             title={t('generateQRCode')}
                           >
@@ -647,18 +553,7 @@ function BatchGrouping({ user }) {
                           {/* Group Header Row */}
                           <tr className="table-primary">
                             <td colSpan="6" className="text-start">
-                              <div className="d-flex align-items-center justify-content-between">
-                                <strong>{t('group')} #{groupId}</strong>
-                                
-                                {/* Add QR code button for the entire group */}
-                                <button 
-                                  className="btn btn-sm btn-outline-primary me-2"
-                                  onClick={() => handleGenerateGroupQR(groupId, batches)}
-                                  title={t('generateGroupQRCode')}
-                                >
-                                  <i className="fas fa-qrcode me-1"></i> {t('groupQR')}
-                                </button>
-                              </div>
+                              <strong>{t('group')} #{groupId}</strong>
                             </td>
                           </tr>
 
@@ -769,17 +664,14 @@ function BatchGrouping({ user }) {
         ></div>
       )}
 
-      {/* QR Code Modal - Enhanced to handle both batch and group QR codes */}
-      {showQrModal && (selectedBatchForQR || selectedGroupForQR) && (
+      {/* QR Code Modal */}
+      {showQrModal && selectedBatchForQR && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">
-                  {selectedBatchForQR 
-                    ? t('batchQRCode') + ': ' + selectedBatchForQR.part_name
-                    : t('groupQRCode') + ': ' + t('group') + ' #' + selectedGroupForQR.id
-                  }
+                  {t('batchQRCode')}: {selectedBatchForQR.part_name}
                 </h5>
                 <button 
                   type="button" 
@@ -787,65 +679,31 @@ function BatchGrouping({ user }) {
                   onClick={() => {
                     setShowQrModal(false);
                     setSelectedBatchForQR(null);
-                    setSelectedGroupForQR(null);
                   }}
                 ></button>
               </div>
               <div className="modal-body text-center">
                 <p>{t('scanQRCode')}</p>
-                
-                {/* QR Code Image - different content for batch vs. group */}
-                {selectedBatchForQR ? (
-                  <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify({
-                      id: selectedBatchForQR.id,
-                      part_name: selectedBatchForQR.part_name,
-                      machine_name: selectedBatchForQR.machine_name,
-                      mold_code: selectedBatchForQR.mold_code,
-                      quantity: selectedBatchForQR.quantity,
-                      warehouse_entry_time: selectedBatchForQR.warehouse_entry_time
-                    }))}`}
-                    alt="QR Code"
-                    className="img-fluid mb-3"
-                    style={{ maxWidth: '200px' }}
-                  />
-                ) : (
-                  <img 
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify({
-                      group_id: selectedGroupForQR.id,
-                      assembly_date: new Date().toISOString(),
-                      assembled_by: user.username,
-                      batches: selectedGroupForQR.batches.map(b => ({
-                        id: b.id,
-                        part_name: b.part_name,
-                        quantity: b.quantity
-                      })),
-                      total_quantity: selectedGroupForQR.batches.reduce((sum, b) => sum + (parseInt(b.quantity) || 0), 0)
-                    }))}`}
-                    alt="Group QR Code"
-                    className="img-fluid mb-3"
-                    style={{ maxWidth: '200px' }}
-                  />
-                )}
-                
-                {/* Display information based on what's selected */}
-                {selectedBatchForQR ? (
-                  <div className="small text-muted">
-                    <p><strong>{t('batchDetails')}</strong></p>
-                    <p><strong>{t('partName')}:</strong> {selectedBatchForQR.part_name}</p>
-                    <p><strong>{t('machineName')}:</strong> {selectedBatchForQR.machine_name}</p>
-                    <p><strong>{t('moldCode')}:</strong> {selectedBatchForQR.mold_code}</p>
-                    <p><strong>{t('quantity')}:</strong> {selectedBatchForQR.quantity}</p>
-                  </div>
-                ) : (
-                  <div className="small text-muted">
-                    <p><strong>{t('groupDetails')}</strong></p>
-                    <p><strong>{t('group')} ID:</strong> {selectedGroupForQR.id}</p>
-                    <p><strong>{t('assembledBy')}:</strong> {user.username}</p>
-                    <p><strong>{t('totalQuantity')}:</strong> {selectedGroupForQR.batches.reduce((sum, b) => sum + (parseInt(b.quantity) || 0), 0)}</p>
-                    <p><strong>{t('batchCount')}:</strong> {selectedGroupForQR.batches.length}</p>
-                  </div>
-                )}
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify({
+                    id: selectedBatchForQR.id,
+                    part_name: selectedBatchForQR.part_name,
+                    machine_name: selectedBatchForQR.machine_name,
+                    mold_code: selectedBatchForQR.mold_code,
+                    quantity: selectedBatchForQR.quantity,
+                    warehouse_entry_time: selectedBatchForQR.warehouse_entry_time
+                  }))}`}
+                  alt="QR Code"
+                  className="img-fluid mb-3"
+                  style={{ maxWidth: '200px' }}
+                />
+                <div className="small text-muted">
+                  <p><strong>{t('batchDetails')}</strong></p>
+                  <p><strong>{t('partName')}:</strong> {selectedBatchForQR.part_name}</p>
+                  <p><strong>{t('machineName')}:</strong> {selectedBatchForQR.machine_name}</p>
+                  <p><strong>{t('moldCode')}:</strong> {selectedBatchForQR.mold_code}</p>
+                  <p><strong>{t('quantity')}:</strong> {selectedBatchForQR.quantity}</p>
+                </div>
               </div>
               <div className="modal-footer">
                 <button 
@@ -854,7 +712,6 @@ function BatchGrouping({ user }) {
                   onClick={() => {
                     setShowQrModal(false);
                     setSelectedBatchForQR(null);
-                    setSelectedGroupForQR(null);
                   }}
                 >
                   {t('close')}
@@ -865,121 +722,58 @@ function BatchGrouping({ user }) {
                   onClick={() => {
                     // Print functionality
                     const printWindow = window.open('', '_blank');
-                    let printContent = '';
-                    
-                    if (selectedBatchForQR) {
-                      // Batch QR print content
-                      printContent = `
-                        <html>
-                        <head>
-                          <title>${t('batchQRCode')}: ${selectedBatchForQR.part_name}</title>
-                          <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
-                            h2 { color: #0a4d8c; }
-                            .batch-info { margin: 20px 0; }
-                            .qr-code { max-width: 300px; margin: 20px auto; }
-                            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                            table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            table th { background-color: #f2f2f2; }
-                          </style>
-                        </head>
-                        <body>
-                          <h2>${t('batchQRCode')}</h2>
-                          <div class="batch-info">
-                            <h3>${selectedBatchForQR.part_name}</h3>
-                            <table>
-                              <tr>
-                                <th>${t('partName')}</th>
-                                <td>${selectedBatchForQR.part_name}</td>
-                              </tr>
-                              <tr>
-                                <th>${t('machineName')}</th>
-                                <td>${selectedBatchForQR.machine_name}</td>
-                              </tr>
-                              <tr>
-                                <th>${t('moldCode')}</th>
-                                <td>${selectedBatchForQR.mold_code}</td>
-                              </tr>
-                              <tr>
-                                <th>${t('quantity')}</th>
-                                <td>${selectedBatchForQR.quantity}</td>
-                              </tr>
-                              <tr>
-                                <th>${t('warehouseEntryTime')}</th>
-                                <td>${selectedBatchForQR.warehouse_entry_time}</td>
-                              </tr>
-                            </table>
-                          </div>
-                          <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(JSON.stringify({
-                            id: selectedBatchForQR.id,
-                            part_name: selectedBatchForQR.part_name,
-                            machine_name: selectedBatchForQR.machine_name,
-                            mold_code: selectedBatchForQR.mold_code,
-                            quantity: selectedBatchForQR.quantity,
-                            warehouse_entry_time: selectedBatchForQR.warehouse_entry_time
-                          }))}" class="qr-code" />
-                        </body>
-                        </html>
-                      `;
-                    } else {
-                      // Group QR print content
-                      printContent = `
-                        <html>
-                        <head>
-                          <title>${t('groupQRCode')}: ${t('group')} #${selectedGroupForQR.id}</title>
-                          <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
-                            h2 { color: #0a4d8c; }
-                            .group-info { margin: 20px 0; }
-                            .qr-code { max-width: 300px; margin: 20px auto; }
-                            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-                            table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            table th { background-color: #f2f2f2; }
-                          </style>
-                        </head>
-                        <body>
-                          <h2>${t('groupQRCode')}</h2>
-                          <div class="group-info">
-                            <h3>${t('group')} #${selectedGroupForQR.id}</h3>
-                            <p><strong>${t('assembledBy')}:</strong> ${user.username}</p>
-                            <p><strong>${t('assemblyDate')}:</strong> ${new Date().toLocaleString()}</p>
-                            <p><strong>${t('totalQuantity')}:</strong> ${selectedGroupForQR.batches.reduce((sum, b) => sum + (parseInt(b.quantity) || 0), 0)}</p>
-                            
-                            <h4>${t('groupContents')}</h4>
-                            <table>
-                              <tr>
-                                <th>${t('partName')}</th>
-                                <th>${t('machineName')}</th>
-                                <th>${t('moldCode')}</th>
-                                <th>${t('quantity')}</th>
-                              </tr>
-                              ${selectedGroupForQR.batches.map(batch => `
-                                <tr>
-                                  <td>${batch.part_name}</td>
-                                  <td>${batch.machine_name}</td>
-                                  <td>${batch.mold_code}</td>
-                                  <td>${batch.quantity}</td>
-                                </tr>
-                              `).join('')}
-                            </table>
-                          </div>
-                          <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(JSON.stringify({
-                            group_id: selectedGroupForQR.id,
-                            assembly_date: new Date().toISOString(),
-                            assembled_by: user.username,
-                            batches: selectedGroupForQR.batches.map(b => ({
-                              id: b.id,
-                              part_name: b.part_name,
-                              quantity: b.quantity
-                            })),
-                            total_quantity: selectedGroupForQR.batches.reduce((sum, b) => sum + (parseInt(b.quantity) || 0), 0)
-                          }))}" class="qr-code" />
-                        </body>
-                        </html>
-                      `;
-                    }
-                    
-                    printWindow.document.write(printContent);
+                    printWindow.document.write(`
+                      <html>
+                      <head>
+                        <title>${t('batchQRCode')}: ${selectedBatchForQR.part_name}</title>
+                        <style>
+                          body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
+                          h2 { color: #0a4d8c; }
+                          .batch-info { margin: 20px 0; }
+                          .qr-code { max-width: 300px; margin: 20px auto; }
+                          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                          table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                          table th { background-color: #f2f2f2; }
+                        </style>
+                      </head>
+                      <body>
+                        <h2>${t('batchQRCode')}</h2>
+                        <div class="batch-info">
+                          <h3>${selectedBatchForQR.part_name}</h3>
+                          <table>
+                            <tr>
+                              <th>${t('partName')}</th>
+                              <td>${selectedBatchForQR.part_name}</td>
+                            </tr>
+                            <tr>
+                              <th>${t('machineName')}</th>
+                              <td>${selectedBatchForQR.machine_name}</td>
+                            </tr>
+                            <tr>
+                              <th>${t('moldCode')}</th>
+                              <td>${selectedBatchForQR.mold_code}</td>
+                            </tr>
+                            <tr>
+                              <th>${t('quantity')}</th>
+                              <td>${selectedBatchForQR.quantity}</td>
+                            </tr>
+                            <tr>
+                              <th>${t('warehouseEntryTime')}</th>
+                              <td>${selectedBatchForQR.warehouse_entry_time}</td>
+                            </tr>
+                          </table>
+                        </div>
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(JSON.stringify({
+                          id: selectedBatchForQR.id,
+                          part_name: selectedBatchForQR.part_name,
+                          machine_name: selectedBatchForQR.machine_name,
+                          mold_code: selectedBatchForQR.mold_code,
+                          quantity: selectedBatchForQR.quantity,
+                          warehouse_entry_time: selectedBatchForQR.warehouse_entry_time
+                        }))}" class="qr-code" />
+                      </body>
+                      </html>
+                    `);
                     printWindow.document.close();
                     setTimeout(() => {
                       printWindow.print();
@@ -1001,7 +795,6 @@ function BatchGrouping({ user }) {
           onClick={() => {
             setShowQrModal(false);
             setSelectedBatchForQR(null);
-            setSelectedGroupForQR(null);
           }}
         ></div>
       )}
