@@ -292,7 +292,9 @@ function Production({ user }) {
 
   // State for batch production progress
   const [productionProgress, setProductionProgress] = useState({});
-
+  //QR CODE
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedBatchForQR, setSelectedBatchForQR] = useState(null);
   // Helper functions to format date and time for input fields
   const formatDateForInput = (date) => {
     const d = new Date(date);
@@ -1685,6 +1687,10 @@ function Production({ user }) {
         setSelectedReceiveItem(null);
       });
   };
+  const handleGenerateQRForPlating = (batch) => {
+    setSelectedBatchForQR(batch);
+    setShowQRModal(true);
+  };
   // Helper to format date string for display
 const formatDateForDisplay = (dateString) => {
   if (!dateString) return '';
@@ -1703,6 +1709,7 @@ const formatDateForDisplay = (dateString) => {
     return dateString;
   }
 };
+
   return (
     <div className="production-container">
       <Navbar user={user} onLogout={handleLogout} />
@@ -2087,6 +2094,7 @@ const formatDateForDisplay = (dateString) => {
                     <th>{language === "vi" ? "Mã sản phẩm" : "Product Code"}</th>
                     <th>{language === "vi" ? "Số lượng" : "Product Quantity"}</th>
                     <th>{language === "vi" ? "Thời gian lắp ráp" : "Assembly Time"}</th>
+                    <th>{language === "vi" ? "Thao tác" : "Actions"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2125,6 +2133,18 @@ const formatDateForDisplay = (dateString) => {
                           <td>{item.product_code || '-'}</td>
                           <td>{item.product_quantity}</td>
                           <td>{formatDateForDisplay(item.created_at) || '-'}</td>
+                          <td>
+                            <button 
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGenerateQRForPlating(item);
+                              }}
+                              title={language === "vi" ? "Tạo mã QR" : "Generate QR Code"}
+                            >
+                              <i className="fas fa-qrcode"></i>
+                            </button>
+                          </td>
                         </tr>
                       ))
                   ) : (
@@ -2273,7 +2293,174 @@ const formatDateForDisplay = (dateString) => {
   </div>
 )}
       </div>
+      {showQRModal && selectedBatchForQR && (
+        <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content">
+              <div className="modal-header bg-primary text-white">
+                <h5 className="modal-title">
+                  {language === "vi" ? "Mã QR lô mạ" : "Plating Batch QR Code"}
+                </h5>
+                <button 
+                  type="button" 
+                  className="btn-close btn-close-white" 
+                  onClick={() => {
+                    setShowQRModal(false);
+                    setSelectedBatchForQR(null);
+                  }}
+                ></button>
+              </div>
+              <div className="modal-body text-center">
+                <p>
+                  {language === "vi" 
+                    ? "Quét mã QR này để theo dõi thông tin lô mạ:" 
+                    : "Scan this QR Code to track plating batch information:"}
+                </p>
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(JSON.stringify({
+                    id: selectedBatchForQR.id,
+                    group_id: selectedBatchForQR.group_id,
+                    product_name: selectedBatchForQR.product_name || 'Không có tên',
+                    product_code: selectedBatchForQR.product_code || 'Không có mã',
+                    product_quantity: selectedBatchForQR.product_quantity,
+                    assembly_time: formatDateForDisplay(selectedBatchForQR.start_time),
+                    plating_time: selectedBatchForQR.platingDate && selectedBatchForQR.platingTime 
+                      ? `${selectedBatchForQR.platingDate} ${selectedBatchForQR.platingTime}` 
+                      : formatDateForDisplay(selectedBatchForQR.plating_start_time) || 'Chưa có',
+                    status: "pending"
+                  }))}`}
+                  alt="QR Code"
+                  className="img-fluid mb-3 border p-2"
+                  style={{ maxWidth: '250px' }}
+                />
+                <div className="text-muted mt-3">
+                  <div className="card">
+                    <div className="card-header bg-light">
+                      <h6 className="mb-0">
+                        {language === "vi" ? "Thông tin lô mạ" : "Plating Batch Info"}
+                      </h6>
+                    </div>
+                    <div className="card-body">
+                      <table className="table table-sm table-borderless">
+                        <tbody>
+                          <tr>
+                            <th style={{width: "40%"}}>
+                              {language === "vi" ? "Nhóm ID" : "Group ID"}:
+                            </th>
+                            <td>{selectedBatchForQR.group_id}</td>
+                          </tr>
+                          <tr>
+                            <th>
+                              {language === "vi" ? "Tên sản phẩm" : "Product Name"}:
+                            </th>
+                            <td>{selectedBatchForQR.product_name || 'Không có tên'}</td>
+                          </tr>
+                          <tr>
+                            <th>
+                              {language === "vi" ? "Mã sản phẩm" : "Product Code"}:
+                            </th>
+                            <td>{selectedBatchForQR.product_code || 'Không có mã'}</td>
+                          </tr>
+                          <tr>
+                            <th>
+                              {language === "vi" ? "Số lượng" : "Quantity"}:
+                            </th>
+                            <td>{selectedBatchForQR.product_quantity}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => {
+                    setShowQRModal(false);
+                    setSelectedBatchForQR(null);
+                  }}
+                >
+                  {language === "vi" ? "Đóng" : "Close"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    // Print functionality
+                    const printWindow = window.open('', '_blank');
+                    printWindow.document.write(`
+                      <html>
+                      <head>
+                        <title>${language === "vi" ? "Mã QR lô mạ" : "Plating Batch QR Code"}</title>
+                        <style>
+                          body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
+                          h2 { color: #0a4d8c; }
+                          .batch-info { margin: 20px 0; }
+                          .qr-code { max-width: 300px; margin: 20px auto; border: 1px solid #ddd; padding: 10px; }
+                          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                          table th, table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                          table th { background-color: #f2f2f2; width: 40%; }
+                        </style>
+                      </head>
+                      <body>
+                        <h2>${language === "vi" ? "Mã QR lô mạ" : "Plating Batch QR Code"}</h2>
+                        <div class="batch-info">
+                          <h3>${selectedBatchForQR.product_name || 'Không có tên'}</h3>
+                          <table>
+                            <tr>
+                              <th>${language === "vi" ? "Nhóm ID" : "Group ID"}</th>
+                              <td>${selectedBatchForQR.group_id}</td>
+                            </tr>
+                            <tr>
+                              <th>${language === "vi" ? "Mã sản phẩm" : "Product Code"}</th>
+                              <td>${selectedBatchForQR.product_code || 'Không có mã'}</td>
+                            </tr>
+                            <tr>
+                              <th>${language === "vi" ? "Số lượng" : "Quantity"}</th>
+                              <td>${selectedBatchForQR.product_quantity}</td>
+                            </tr>
+                            <tr>
+                              <th>${language === "vi" ? "Thời gian lắp ráp" : "Assembly Time"}</th>
+                              <td>${formatDateForDisplay(selectedBatchForQR.start_time) || '-'}</td>
+                            </tr>
+                          </table>
+                        </div>
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(JSON.stringify({
+                          id: selectedBatchForQR.id,
+                          group_id: selectedBatchForQR.group_id,
+                          product_name: selectedBatchForQR.product_name || 'Không có tên',
+                          product_code: selectedBatchForQR.product_code || 'Không có mã',
+                          product_quantity: selectedBatchForQR.product_quantity
+                        }))}" class="qr-code" />
+                      </body>
+                      </html>
+                    `);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                      printWindow.print();
+                    }, 300);
+                  }}
+                >
+                  {language === "vi" ? "In" : "Print"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* QR Code Modal Backdrop */}
+      {showQRModal && (
+        <div 
+          className="modal-backdrop fade show"
+          onClick={() => {
+            setShowQRModal(false);
+            setSelectedBatchForQR(null);
+          }}
+        ></div>
+      )}
       {/* Add Production Modal */}
       {showAddModal && (
         <div className="modal-overlay">
