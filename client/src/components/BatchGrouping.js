@@ -31,7 +31,14 @@ function BatchGrouping({ user }) {
   // State for QR code modal
   const [showQrModal, setShowQrModal] = useState(false);
   const [selectedBatchForQR, setSelectedBatchForQR] = useState(null);
-
+  // State for process tracking
+  const [processSteps, setProcessSteps] = useState({
+    ungrouped: { count: 0, percentage: 0 },
+    grouped: { count: 0, percentage: 0 },
+    assembly: { count: 0, percentage: 0 },
+    plating: { count: 0, percentage: 0 },
+    completed: { count: 0, percentage: 0 }
+  });
   // State for assembly modal
   const [showAssemblyModal, setShowAssemblyModal] = useState(false);
   const [selectedGroupForAssembly, setSelectedGroupForAssembly] = useState(null);
@@ -117,6 +124,8 @@ function BatchGrouping({ user }) {
       });
       
       setGroupedBatchesMap(batchesByGroup);
+      updateProcessSteps(ungroupedResponse.data.data || [], groupedData, assemblies);
+
     } catch (error) {
       console.error('Error fetching batches:', error);
       setError(error.response?.data?.error || t('failedToFetchBatches'));
@@ -124,7 +133,48 @@ function BatchGrouping({ user }) {
       setIsLoading(false);
     }
   };
-
+// Update process steps tracking data
+const updateProcessSteps = (ungrouped, grouped, assemblies) => {
+  const totalBatches = ungrouped.length + grouped.length;
+  
+  // Count batches in different stages
+  const ungroupedCount = ungrouped.length;
+  
+  // Get unique group IDs for grouped batches
+  const groupIds = [...new Set(grouped.map(batch => batch.group_id))];
+  const groupedCount = groupIds.length;
+  
+  // Count assemblies in different states
+  const assemblyCount = assemblies.filter(a => a.status === 'pending').length;
+  const platingCount = assemblies.filter(a => a.status === 'plating').length;
+  const completedCount = assemblies.filter(a => a.status === 'completed').length;
+  
+  // Calculate percentages (avoid division by zero)
+  const totalSteps = totalBatches > 0 ? totalBatches : 1;
+  
+  setProcessSteps({
+    ungrouped: { 
+      count: ungroupedCount, 
+      percentage: Math.round((ungroupedCount / totalSteps) * 100) 
+    },
+    grouped: { 
+      count: groupedCount, 
+      percentage: Math.round((groupedCount / totalSteps) * 100) 
+    },
+    assembly: { 
+      count: assemblyCount, 
+      percentage: Math.round((assemblyCount / totalSteps) * 100) 
+    },
+    plating: { 
+      count: platingCount, 
+      percentage: Math.round((platingCount / totalSteps) * 100) 
+    },
+    completed: { 
+      count: completedCount, 
+      percentage: Math.round((completedCount / totalSteps) * 100) 
+    }
+  });
+};
   // Load data on component mount
   useEffect(() => {
     fetchBatches();
@@ -469,11 +519,37 @@ function BatchGrouping({ user }) {
           )}
         </div>
 
-        {/* Progress Bar Placeholder */}
-        <div className="mb-3 text-muted small">
-          &lt;Progression Bar&gt; (COMING soon)
+{/* Process Tracking Bar */}
+<div className="mb-4">
+          <h5 className="mb-2">{t('processProgress')}</h5>
+          <div className="progress" style={{ height: '25px' }}>
+            <div className="progress-bar bg-secondary" role="progressbar" 
+                style={{ width: `${processSteps.ungrouped.percentage}%` }} 
+                aria-valuenow={processSteps.ungrouped.percentage} aria-valuemin="0" aria-valuemax="100">
+              {t('ungrouped')} ({processSteps.ungrouped.count})
+            </div>
+            <div className="progress-bar bg-primary" role="progressbar" 
+                style={{ width: `${processSteps.grouped.percentage}%` }} 
+                aria-valuenow={processSteps.grouped.percentage} aria-valuemin="0" aria-valuemax="100">
+              {t('grouped')} ({processSteps.grouped.count})
+            </div>
+            <div className="progress-bar bg-info" role="progressbar" 
+                style={{ width: `${processSteps.assembly.percentage}%` }} 
+                aria-valuenow={processSteps.assembly.percentage} aria-valuemin="0" aria-valuemax="100">
+              {t('assembly')} ({processSteps.assembly.count})
+            </div>
+            <div className="progress-bar bg-warning" role="progressbar" 
+                style={{ width: `${processSteps.plating.percentage}%` }} 
+                aria-valuenow={processSteps.plating.percentage} aria-valuemin="0" aria-valuemax="100">
+              {t('plating')} ({processSteps.plating.count})
+            </div>
+            <div className="progress-bar bg-success" role="progressbar" 
+                style={{ width: `${processSteps.completed.percentage}%` }} 
+                aria-valuenow={processSteps.completed.percentage} aria-valuemin="0" aria-valuemax="100">
+              {t('completed')} ({processSteps.completed.count})
+            </div>
+          </div>
         </div>
-
         {/* Tabs */}
         <ul className="nav nav-tabs mb-3">
           <li className="nav-item">
