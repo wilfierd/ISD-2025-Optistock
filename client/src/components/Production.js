@@ -2804,7 +2804,7 @@ function Production({ user }) {
       {/* Header */}
       <div className="modal-header">
         <h5 className="modal-title">
-          Nhận hàng sau mạ - {selectedReceiveItem.group_id}
+          Nhận hàng sau mạ - ID:{selectedReceiveItem.group_id}
         </h5>
         <button className="btn-close" onClick={() => setShowReceiveModal(false)}>×</button>
       </div>
