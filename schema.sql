@@ -398,7 +398,6 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-
 -- ===============================================
 -- INITIAL DATA
 -- ===============================================
@@ -579,4 +578,25 @@ CREATE TABLE IF NOT EXISTS plating (
     status ENUM('pending', 'processing', 'completed') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (assembly_id) REFERENCES assembly_components(id) ON DELETE CASCADE
+);
+
+-- IMPORTANT: Finished Products table must be created AFTER the plating table
+-- since it references plating(id)
+CREATE TABLE IF NOT EXISTS finished_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plating_id INT NOT NULL,
+    assembly_id INT NOT NULL,
+    group_id INT NOT NULL,
+    product_name VARCHAR(100) NOT NULL,
+    product_code VARCHAR(50) NOT NULL,
+    quantity INT NOT NULL,
+    completion_date DATETIME NOT NULL,
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'in_stock',
+    qr_code_data JSON,
+    FOREIGN KEY (plating_id) REFERENCES plating(id),
+    FOREIGN KEY (assembly_id) REFERENCES assembly_components(id),
+    FOREIGN KEY (group_id) REFERENCES batch_groups_counter(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
 );

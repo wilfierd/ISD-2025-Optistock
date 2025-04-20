@@ -1281,18 +1281,59 @@ function Production({ user }) {
       }
     });
   };
-  
   // Handle plating completion
   const handleCompletePlating = () => {
     if (!selectedPlating) return;
     
-    updatePlating.mutate({
-      id: selectedPlating.id,
-      data: {
-        status: 'completed',
-        platingEndTime: new Date().toISOString()
+    // Show confirmation dialog
+    if (window.confirm(language === 'vi' ? 
+      'Bạn có chắc chắn muốn hoàn thành quá trình mạ và chuyển sản phẩm này đến kho thành phẩm?' : 
+      'Are you sure you want to complete plating and move this product to the finished products warehouse?')) {
+        
+      // Call the API to complete plating and move to finished products
+      try {
+        // Show loading toast
+        const loadingToastId = toast.info(
+          language === 'vi' ? 'Đang hoàn thành quá trình mạ...' : 'Completing plating process...',
+          { autoClose: false }
+        );
+        
+        // Call the API
+        apiService.plating.completePlating(selectedPlating.id)
+          .then(response => {
+            // Close loading toast and show success
+            toast.dismiss(loadingToastId);
+            toast.success(
+              language === 'vi' ? 
+              'Đã hoàn thành quá trình mạ và chuyển sản phẩm đến kho thành phẩm' : 
+              'Plating process completed and product moved to finished products warehouse'
+            );
+            
+            // Close the modal
+            setShowPlatingModal(false);
+            setSelectedPlating(null);
+            
+            // Refresh the data
+            refetchPlating();
+          })
+          .catch(error => {
+            // Show error message
+            toast.dismiss(loadingToastId);
+            toast.error(
+              language === 'vi' ? 
+              `Lỗi: ${error.message || 'Không thể hoàn thành quá trình mạ'}` : 
+              `Error: ${error.message || 'Failed to complete plating process'}`
+            );
+          });
+      } catch (error) {
+        console.error('Error completing plating:', error);
+        toast.error(
+          language === 'vi' ? 
+          'Lỗi hoàn thành quá trình mạ' : 
+          'Error completing plating process'
+        );
       }
-    });
+    }
   };
   
   // Handle start/continue production

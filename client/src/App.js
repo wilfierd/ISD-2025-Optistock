@@ -14,6 +14,8 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import BatchGrouping from './components/BatchGrouping';
 import Notifications from './components/Notifications';
 import Production from './components/Production';
+import ProductWarehouse from './components/ProductWarehouse';
+import ProductDetail from './components/ProductDetail';
 
 function App() {
   const { data: authData, isLoading } = useAuthStatus();
@@ -67,6 +69,16 @@ function App() {
           key="production"
           path="/production" 
           element={user ? <Production user={user} /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          key="product-warehouse"
+          path="/product-warehouse" 
+          element={user ? <ProductWarehouse user={user} /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          key="product-detail"
+          path="/product/:id" 
+          element={user ? <ProductDetail user={user} /> : <Navigate to="/login" />}
         />
         <Route key="default" path="/" element={<Navigate to="/dashboard" />} />
       </Routes>

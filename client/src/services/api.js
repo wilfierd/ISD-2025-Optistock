@@ -122,8 +122,15 @@ const apiService = {
   plating: {
     getAll: () => api.get('/plating'),
     getById: (id) => api.get(`/plating/${id}`),
-    update: (id, data) => api.put(`/plating/${id}`, data)
-  }
+    update: (id, data) => api.put(`/plating/${id}`, data),
+    completePlating: (id) => api.post(`/plating/${id}/complete`)
+  },
+  
+  finishedProducts: {
+    getAll: () => api.get('/finished-products'),
+    getById: (id) => api.get(`/finished-products/${id}`),
+    updateStatus: (id, status) => api.put(`/finished-products/${id}/status`, { status }),
+  },
 };
 
 export default apiService;
