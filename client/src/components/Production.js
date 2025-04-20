@@ -268,10 +268,21 @@ function Production({ user }) {
   // State for batch production progress
   const [productionProgress, setProductionProgress] = useState({});
   
-  // State for plating date/time
+  // Helper functions to format date and time for input fields
+  const formatDateForInput = (date) => {
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  const formatTimeForInput = (date) => {
+    const d = new Date(date);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+  
+  // State for plating date/time - initialize with current date/time in proper format
   const [platingData, setPlatingData] = useState({
-    platingDate: '',
-    platingTime: '',
+    platingDate: formatDateForInput(new Date()),
+    platingTime: formatTimeForInput(new Date()),
     selectedItems: []
   });
   
@@ -810,15 +821,15 @@ function Production({ user }) {
       );
     }
     
-    if (showPlatingModal) {
+    if (showPlatingModal || activeTab === 'platingList') {
       const now = new Date();
       setPlatingData(prev => ({
         ...prev,
-        platingTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`,
-        platingDate: `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+        platingTime: formatTimeForInput(now),
+        platingDate: formatDateForInput(now)
       }));
     }
-  }, [showStopReasonModal, showPlatingModal]);
+  }, [showStopReasonModal, showPlatingModal, activeTab]);
   
   // Improved function to extract material ID from scanned QR codes
   const extractMaterialIdFromScan = (scanValue) => {
@@ -1124,20 +1135,74 @@ function Production({ user }) {
       return;
     }
     
-    // For each selected item, update its plating information
-    platingData.selectedItems.forEach(itemId => {
-      const item = platingItems.find(p => p.id === itemId);
-      if (item) {
-        updatePlating.mutate({
-          id: itemId,
-          data: {
-            platingDate: platingData.platingDate,
-            platingTime: platingData.platingTime,
-            status: 'inProcess'
-          }
+    // Convert the date and time to a proper format
+    try {
+      // Format the date and time in a way the server expects
+      const formattedDate = platingData.platingDate.split('-').reverse().join('/');
+      const formattedPlatingData = {
+        platingDate: formattedDate,
+        platingTime: platingData.platingTime,
+        status: 'processing'
+      };
+      
+      // For each selected item, update its plating information
+      let updatePromises = [];
+      
+      platingData.selectedItems.forEach(itemId => {
+        const item = platingItems.find(p => p.id === itemId);
+        if (item) {
+          updatePromises.push(
+            updatePlating.mutateAsync({
+              id: itemId,
+              data: formattedPlatingData
+            })
+          );
+        }
+      });
+      
+      // Show loading toast
+      const loadingToastId = toast.info(
+        language === 'vi' ? 'Đang cập nhật dữ liệu mạ...' : 'Updating plating data...',
+        { autoClose: false }
+      );
+      
+      // Execute all updates and handle results
+      Promise.all(updatePromises)
+        .then(() => {
+          // Clear selection after successful update
+          setPlatingData(prev => ({
+            ...prev,
+            selectedItems: []
+          }));
+          
+          // Close loading toast and show success
+          toast.dismiss(loadingToastId);
+          toast.success(
+            language === 'vi' ? 
+            'Đã cập nhật thông tin mạ thành công' : 
+            'Plating information updated successfully'
+          );
+          
+          // Refresh the data
+          refetchPlating();
+        })
+        .catch(error => {
+          // Show error message
+          toast.dismiss(loadingToastId);
+          toast.error(
+            language === 'vi' ? 
+            `Lỗi: ${error.message || 'Không thể cập nhật thông tin mạ'}` : 
+            `Error: ${error.message || 'Failed to update plating information'}`
+          );
         });
-      }
-    });
+    } catch (error) {
+      console.error('Error processing plating data:', error);
+      toast.error(
+        language === 'vi' ? 
+        'Lỗi xử lý dữ liệu mạ' : 
+        'Error processing plating data'
+      );
+    }
   };
   
   // Handle show plating detail
@@ -1511,26 +1576,33 @@ function Production({ user }) {
                   <>
                     <div className="row mb-3">
                       <div className="col-md-5">
+                        <label htmlFor="platingDate" className="form-label">
+                          {language === 'vi' ? 'Ngày mạ' : 'Plating Date'}
+                        </label>
                         <input 
                           type="date" 
                           className="form-control" 
+                          id="platingDate"
                           name="platingDate"
                           value={platingData.platingDate}
                           onChange={handlePlatingInputChange}
-                          placeholder={language === 'vi' ? 'Ngày mạ' : 'Plating Date'}
                         />
                       </div>
                       <div className="col-md-5">
+                        <label htmlFor="platingTime" className="form-label">
+                          {language === 'vi' ? 'Giờ mạ' : 'Plating Time'}
+                        </label>
                         <input 
                           type="time" 
                           className="form-control" 
+                          id="platingTime"
                           name="platingTime"
                           value={platingData.platingTime}
                           onChange={handlePlatingInputChange}
-                          placeholder={language === 'vi' ? 'Giờ mạ' : 'Plating Time'}
                         />
                       </div>
                       <div className="col-md-2">
+                        <label className="form-label">&nbsp;</label>
                         <button
                           className="btn btn-primary w-100"
                           onClick={handleSetPlatingTime}
@@ -1652,7 +1724,7 @@ function Production({ user }) {
                               <td>{item.product_quantity}</td>
                               <td>{item.pic_name}</td>
                               <td>
-                                {item.status === 'inProcess' ? (
+                                {item.status === 'processing' ? (
                                   <span className="badge bg-primary">
                                     {language === 'vi' ? 'Đang mạ' : 'In Progress'}
                                   </span>
@@ -1668,7 +1740,7 @@ function Production({ user }) {
                               </td>
                               <td>{item.platingDate} {item.platingTime}</td>
                               <td>
-                                {item.status === 'inProcess' && (
+                                {item.status === 'processing' && (
                                   <button
                                     className="btn btn-sm btn-success"
                                     onClick={(e) => {
