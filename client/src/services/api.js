@@ -129,6 +129,7 @@ const apiService = {
   finishedProducts: {
     getAll: () => api.get('/finished-products'),
     getById: (id) => api.get(`/finished-products/${id}`),
+    create: (data) => api.post('/finished-products', data),
     updateStatus: (id, status) => api.put(`/finished-products/${id}/status`, { status }),
   },
 };
