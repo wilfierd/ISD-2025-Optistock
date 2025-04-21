@@ -398,7 +398,6 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-
 -- ===============================================
 -- INITIAL DATA
 -- ===============================================
@@ -556,6 +555,7 @@ INSERT INTO loHangHoa (material_id, machine_id, mold_id, created_by, status, exp
 
 ALTER TABLE machines ADD COLUMN status ENUM('running', 'stopping') DEFAULT NULL;
 
+
 -- Assembly components table
 CREATE TABLE IF NOT EXISTS assembly_components (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -564,7 +564,10 @@ CREATE TABLE IF NOT EXISTS assembly_components (
     completion_time DATETIME,
     product_quantity INT NOT NULL,
     pic_id INT NOT NULL,
-    status ENUM('pending', 'processing', 'completed', 'plating') DEFAULT 'pending',
+    product_name VARCHAR(255),
+    product_code VARCHAR(100),
+    notes TEXT,
+    status ENUM('processing', 'completed', 'plating') DEFAULT 'processing',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES batch_groups_counter(id) ON DELETE CASCADE,
     FOREIGN KEY (pic_id) REFERENCES users(id) ON DELETE CASCADE
@@ -574,9 +577,33 @@ CREATE TABLE IF NOT EXISTS assembly_components (
 CREATE TABLE IF NOT EXISTS plating (
     id INT AUTO_INCREMENT PRIMARY KEY,
     assembly_id INT NOT NULL,
+    product_name VARCHAR(255),
+    product_code VARCHAR(100),
+    notes TEXT,
     plating_start_time DATETIME NOT NULL,
     plating_end_time DATETIME,
-    status ENUM('pending', 'processing', 'completed') DEFAULT 'pending',
+    status ENUM('pending', 'processing', 'completed', 'received') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (assembly_id) REFERENCES assembly_components(id) ON DELETE CASCADE
+);
+
+-- IMPORTANT: Finished Products table must be created AFTER the plating table
+-- since it references plating(id)
+CREATE TABLE IF NOT EXISTS finished_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    plating_id INT NOT NULL,
+    assembly_id INT NOT NULL,
+    group_id INT NOT NULL,
+    product_name VARCHAR(100) NOT NULL,
+    product_code VARCHAR(50) NOT NULL,
+    quantity INT NOT NULL,
+    completion_date DATETIME NOT NULL,
+    created_by INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(50) DEFAULT 'in_stock',
+    qr_code_data JSON,
+    FOREIGN KEY (plating_id) REFERENCES plating(id),
+    FOREIGN KEY (assembly_id) REFERENCES assembly_components(id),
+    FOREIGN KEY (group_id) REFERENCES batch_groups_counter(id),
+    FOREIGN KEY (created_by) REFERENCES users(id)
 );
