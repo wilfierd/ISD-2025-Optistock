@@ -582,7 +582,7 @@ CREATE TABLE IF NOT EXISTS plating (
     notes TEXT,
     plating_start_time DATETIME NOT NULL,
     plating_end_time DATETIME,
-    status ENUM('pending', 'processing', 'completed') DEFAULT 'pending',
+    status ENUM('pending', 'processing', 'completed', 'received') DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (assembly_id) REFERENCES assembly_components(id) ON DELETE CASCADE
 );

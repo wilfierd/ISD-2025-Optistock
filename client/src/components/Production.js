@@ -1665,22 +1665,66 @@ function Production({ user }) {
   // Khi bấm Xác nhận nhận hàng
   const handleConfirmReceive = () => {
     if (!selectedReceiveItem) return;
-    // Chuẩn bị payload
-    const payload = {
-      status: "received",
-      receiveDate: receiveData.receiveDate.split("-").reverse().join("/"),
-      receiveStatus: receiveData.receiveStatus,
-      note: receiveData.note,
+    
+    // Hiển thị toast loading để người dùng biết đang xử lý
+    toast.info("Đang xử lý nhận hàng...", { autoClose: false, toastId: 'receiving' });
+    
+    // Step 1: First update plating status to completed
+    const platingPayload = {
+      status: "completed", // Use a valid enum value
+      notes: JSON.stringify({
+        receiveDate: receiveData.receiveDate.split("-").reverse().join("/"),
+        receiveStatus: receiveData.receiveStatus,
+        note: receiveData.note,
+        receivedBy: user.username,
+        receivedAt: new Date().toISOString()
+      })
     };
-    // Gọi API update tương tự updatePlating
+    
+    // Thực hiện các API call tuần tự để đảm bảo tính nhất quán
     updatePlating
-      .mutateAsync({ id: selectedReceiveItem.id, data: payload })
+      .mutateAsync({ id: selectedReceiveItem.id, data: platingPayload })
       .then(() => {
-        toast.success("Đã nhận hàng thành công");
+        // Step 2: Create finished product entry
+        return apiService.finishedProducts.getAll().catch(() => ({ data: { data: [] }}))
+          .then(existingProducts => {
+            // Check if product from this plating already exists
+            const exists = existingProducts.data.data.some(p => 
+              p.plating_id === selectedReceiveItem.id
+            );
+            
+            if (exists) {
+              return Promise.resolve({ data: { message: 'Product already exists' }});
+            }
+            
+            // Create new finished product using apiService instead of raw fetch
+            return apiService.finishedProducts.create({
+              platingId: selectedReceiveItem.id,
+              assemblyId: selectedReceiveItem.assembly_id,
+              groupId: selectedReceiveItem.group_id,
+              productName: selectedReceiveItem.product_name || 'Product',
+              productCode: selectedReceiveItem.product_code || 'PROD-' + Date.now(),
+              quantity: selectedReceiveItem.product_quantity,
+              status: 'in_stock',
+              qrCodeData: {
+                receiveDate: receiveData.receiveDate,
+                receiveStatus: receiveData.receiveStatus,
+                note: receiveData.note
+              }
+            });
+          });
+      })
+      .then(result => {
+        // Close loading toast and show success
+        toast.dismiss('receiving');
+        toast.success("Đã nhận hàng và lưu vào kho thành phẩm");
         refetchPlating();
       })
-      .catch((err) => {
+      .catch(err => {
+        // Show error if anything fails
+        toast.dismiss('receiving');
         toast.error("Lỗi nhận hàng: " + err.message);
+        console.error("Error receiving product:", err);
       })
       .finally(() => {
         setShowReceiveModal(false);

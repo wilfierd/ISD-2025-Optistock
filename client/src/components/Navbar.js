@@ -1,4 +1,4 @@
-// client/src/components/Navbar.js
+// Updated Navbar.js with QR Scan link
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useNotifications, useMarkNotificationsAsRead } from '../hooks/useNotifications';
@@ -135,6 +135,10 @@ function Navbar({ user, onLogout }) {
     production: {
       en: 'Production',
       vi: 'Sản xuất'
+    },
+    qrScan: {
+      en: 'QR Scan',
+      vi: 'Quét QR'
     },
     warehouseOptions: {
       rawMaterials: {
@@ -317,6 +321,21 @@ function Navbar({ user, onLogout }) {
             }}
           >
             {getText(navItems.production)}
+          </Link>
+          
+          {/* QR Scan link - new addition */}
+          <Link 
+            className={`navbar-brand ${isActive('/qr-scan') ? 'fw-bold' : ''}`} 
+            to="/qr-scan"
+            style={{ 
+              padding: '10px 20px', 
+              margin: '0 5px', 
+              borderRadius: '4px',
+              backgroundColor: isActive('/qr-scan') ? 'rgba(255,255,255,0.2)' : 'transparent',
+              fontWeight: isActive('/qr-scan') ? 'bold' : 'normal'
+            }}
+          >
+            {getText(navItems.qrScan)}
           </Link>
         </div>
         

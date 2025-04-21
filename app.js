@@ -2223,6 +2223,132 @@ app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
     }
 });
 
+// Finished Products API
+app.get('/api/finished-products', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT fp.*, 
+             p.product_name as plating_product_name,
+             p.product_code as plating_product_code,
+             a.group_id,
+             u.username as created_by_name
+      FROM finished_products fp
+      LEFT JOIN plating p ON fp.plating_id = p.id
+      LEFT JOIN assembly_components a ON fp.assembly_id = a.id
+      LEFT JOIN users u ON fp.created_by = u.id
+      ORDER BY fp.created_at DESC
+    `);
+    
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('Error fetching finished products:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch finished products' });
+  }
+});
+
+app.get('/api/finished-products/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [rows] = await pool.query(`
+      SELECT fp.*, 
+             p.product_name as plating_product_name,
+             p.product_code as plating_product_code,
+             a.group_id,
+             u.username as created_by_name
+      FROM finished_products fp
+      LEFT JOIN plating p ON fp.plating_id = p.id
+      LEFT JOIN assembly_components a ON fp.assembly_id = a.id
+      LEFT JOIN users u ON fp.created_by = u.id
+      WHERE fp.id = ?
+    `, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Finished product not found' });
+    }
+    
+    res.json({ success: true, data: rows[0] });
+  } catch (error) {
+    console.error('Error fetching finished product:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch finished product' });
+  }
+});
+
+// Add a finished product
+app.post('/api/finished-products', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { 
+      platingId, 
+      assemblyId, 
+      groupId, 
+      productName, 
+      productCode, 
+      quantity, 
+      status = 'in_stock',
+      qrCodeData = {}
+    } = req.body;
+    
+    // Validate required fields
+    if (!platingId || !assemblyId || !groupId || !productName || !productCode || !quantity) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+    
+    // Insert the finished product
+    const [result] = await pool.query(`
+      INSERT INTO finished_products 
+      (plating_id, assembly_id, group_id, product_name, product_code, quantity, completion_date, created_by, status, qr_code_data)
+      VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
+    `, [
+      platingId,
+      assemblyId,
+      groupId,
+      productName,
+      productCode,
+      quantity,
+      req.session.user.id,
+      status,
+      JSON.stringify(qrCodeData)
+    ]);
+    
+    // Return the newly created product
+    const [newProduct] = await pool.query(`
+      SELECT * FROM finished_products WHERE id = ?
+    `, [result.insertId]);
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Finished product added successfully',
+      data: newProduct[0]
+    });
+  } catch (error) {
+    console.error('Error adding finished product:', error);
+    res.status(500).json({ success: false, error: 'Failed to add finished product' });
+  }
+});
+
+// Update finished product status
+app.put('/api/finished-products/:id/status', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!status) {
+      return res.status(400).json({ success: false, error: 'Status is required' });
+    }
+    
+    await pool.query(`
+      UPDATE finished_products
+      SET status = ?
+      WHERE id = ?
+    `, [status, id]);
+    
+    res.json({ success: true, message: 'Product status updated successfully' });
+  } catch (error) {
+    console.error('Error updating product status:', error);
+    res.status(500).json({ success: false, error: 'Failed to update product status' });
+  }
+});
+
 // Start the server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
