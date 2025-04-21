@@ -85,7 +85,6 @@ function App() {
         />
         <Route key="default" path="/" element={<Navigate to="/dashboard" />} />
         <Route path="/qr-scan" element={user ? <QRScan user={user} /> : <Navigate to="/login" />} />
-        <Route path="/" element={<Navigate to="/dashboard" />} />
         <Route 
           key="qr-scanner"
           path="/qr-scanner" 
