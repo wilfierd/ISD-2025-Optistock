@@ -14,6 +14,7 @@
     "client": "file:",
     "dotenv": "^16.4.7",
     "http-proxy-middleware": "^2.0.6",
+    "jsqr": "^1.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.3.0",

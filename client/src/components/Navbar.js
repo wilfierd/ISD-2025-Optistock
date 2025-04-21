@@ -136,6 +136,10 @@ function Navbar({ user, onLogout }) {
       en: 'Production',
       vi: 'Sản xuất'
     },
+    qrScan: {
+      en: 'QR Scan',
+      vi: 'Quét QR'
+    },
     warehouseOptions: {
       rawMaterials: {
         en: 'Materials Warehouse',
@@ -317,6 +321,19 @@ function Navbar({ user, onLogout }) {
             }}
           >
             {getText(navItems.production)}
+          </Link>
+          <Link 
+            className={`navbar-brand ${isActive('/qr-scan') ? 'fw-bold' : ''}`} 
+            to="/qr-scan"
+            style={{ 
+              padding: '10px 20px', 
+              margin: '0 5px', 
+              borderRadius: '4px',
+              backgroundColor: isActive('/qr-scan') ? 'rgba(255,255,255,0.2)' : 'transparent',
+              fontWeight: isActive('/qr-scan') ? 'bold' : 'normal'
+            }}
+          >
+            {getText(navItems.qrScan)}
           </Link>
         </div>
         

@@ -16,6 +16,7 @@ import Notifications from './components/Notifications';
 import Production from './components/Production';
 import ProductWarehouse from './components/ProductWarehouse';
 import ProductDetail from './components/ProductDetail';
+import QRScan from './components/QRScan'; // Import the new QRScan component
 import QRCodeScanner from './components/QRCodeScanner';
 import ReportFieldSelection from './components/ReportFieldSelection';
 
@@ -83,6 +84,8 @@ function App() {
           element={user ? <ProductDetail user={user} /> : <Navigate to="/login" />}
         />
         <Route key="default" path="/" element={<Navigate to="/dashboard" />} />
+        <Route path="/qr-scan" element={user ? <QRScan user={user} /> : <Navigate to="/login" />} />
+        <Route path="/" element={<Navigate to="/dashboard" />} />
         <Route 
           key="qr-scanner"
           path="/qr-scanner" 
