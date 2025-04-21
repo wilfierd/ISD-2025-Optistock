@@ -16,6 +16,8 @@ import Notifications from './components/Notifications';
 import Production from './components/Production';
 import ProductWarehouse from './components/ProductWarehouse';
 import ProductDetail from './components/ProductDetail';
+import QRCodeScanner from './components/QRCodeScanner';
+import ReportFieldSelection from './components/ReportFieldSelection';
 
 function App() {
   const { data: authData, isLoading } = useAuthStatus();
@@ -81,6 +83,16 @@ function App() {
           element={user ? <ProductDetail user={user} /> : <Navigate to="/login" />}
         />
         <Route key="default" path="/" element={<Navigate to="/dashboard" />} />
+        <Route 
+          key="qr-scanner"
+          path="/qr-scanner" 
+          element={user ? <QRCodeScanner user={user} /> : <Navigate to="/login" />}
+        />
+        <Route 
+          key="report-fields"
+          path="/report-fields" 
+          element={user ? <ReportFieldSelection user={user} /> : <Navigate to="/login" />}
+        />
       </Routes>
     </LanguageProvider>
   );
