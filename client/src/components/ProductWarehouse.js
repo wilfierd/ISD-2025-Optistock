@@ -369,7 +369,7 @@ function ProductWarehouse({ user }) {
       {/* Product Details Modal */}
       {showDetailsModal && selectedProduct && (
         <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1">
-          <div className="modal-dialog modal-lg modal-dialog-centered">
+          <div className="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">{t('productDetails')}</h5>

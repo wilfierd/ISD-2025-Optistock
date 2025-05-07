@@ -59,6 +59,50 @@
     color: #6c757d;
   }
   
+  /* Modal improvements for product history */
+  .modal-dialog-centered.modal-lg {
+    max-width: 900px;
+  }
+  
+  .modal-body {
+    padding: 1.5rem;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  
+  /* Product history accordion styling */
+  .accordion {
+    margin-top: 1.5rem;
+  }
+  
+  .accordion-item {
+    border: 1px solid rgba(0, 0, 0, 0.125);
+    margin-bottom: 0.5rem;
+    border-radius: 0.25rem;
+    overflow: hidden;
+  }
+  
+  .accordion-header {
+    margin: 0;
+    background: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  
+  .accordion-collapse {
+    max-height: 350px;
+    overflow-y: auto;
+  }
+  
+  .accordion-button {
+    font-weight: 500;
+    padding: 1rem 1.25rem;
+    background-color: #f8f9fa;
+    border-radius: 0 !important;
+    position: relative;
+  }
+  
   /* QR code styling */
   .qr-code-container {
     padding: 1rem;
@@ -95,6 +139,24 @@
     border-color: rgba(13, 110, 253, 0.25);
   }
   
+  /* Additional accordion fixes for collapsing and expanding */
+  .accordion-collapse.collapse.show {
+    overflow-y: auto;
+    max-height: 350px;
+    scrollbar-width: thin;
+  }
+  
+  .accordion-collapse.collapsing {
+    overflow-y: hidden;
+    transition: height 0.35s ease;
+  }
+  
+  .accordion-body {
+    padding: 1rem 1.25rem;
+    background-color: #fff;
+    position: relative;
+  }
+  
   /* Filter section styling */
   .input-group-text {
     background-color: #f8f9fa;
@@ -128,5 +190,14 @@
     .action-buttons button {
       margin-bottom: 0.25rem;
       margin-right: 0 !important;
+    }
+    
+    .modal-body {
+      padding: 1rem;
+      max-height: 70vh;
+    }
+    
+    .accordion-collapse.collapse.show {
+      max-height: 250px;
     }
   }
