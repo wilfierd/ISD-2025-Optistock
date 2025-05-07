@@ -1,0 +1,132 @@
+/* client/src/components/ProductWarehouse.css */
+
+/* Card styling */
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-radius: 0.5rem;
+  }
+  
+  .card-header {
+    border-top-left-radius: 0.5rem;
+    border-top-right-radius: 0.5rem;
+  }
+  
+  /* Table styling */
+  .table > :not(caption) > * > * {
+    padding: 0.75rem 1rem;
+  }
+  
+  .table tbody tr:hover {
+    background-color: rgba(13, 110, 253, 0.05);
+  }
+  
+  .batch-id {
+    font-weight: 500;
+  }
+  
+  .action-buttons {
+    white-space: nowrap;
+  }
+  
+  .action-buttons button {
+    padding: 0.25rem 0.5rem;
+  }
+  
+  /* Badge styling */
+  .badge {
+    font-weight: 500;
+    padding: 0.35em 0.65em;
+  }
+  
+  /* Detail modal styling */
+  .product-detail-field {
+    margin-bottom: 0.75rem;
+    display: flex;
+  }
+  
+  .detail-label {
+    font-weight: 500;
+    margin-right: 0.5rem;
+    min-width: 140px;
+    color: #495057;
+  }
+  
+  .detail-value {
+    flex: 1;
+  }
+  
+  .placeholder-info {
+    color: #6c757d;
+  }
+  
+  /* QR code styling */
+  .qr-code-container {
+    padding: 1rem;
+    background-color: white;
+    border-radius: 0.5rem;
+    margin: 0 auto;
+    max-width: 300px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  .qr-details {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    text-align: left;
+  }
+  
+  /* QR scan UI */
+  .qr-scan-placeholder {
+    border: 2px dashed #dee2e6;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    color: #6c757d;
+  }
+  
+  /* Accordion styling */
+  .accordion-button:not(.collapsed) {
+    color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+  }
+  
+  .accordion-button:focus {
+    box-shadow: none;
+    border-color: rgba(13, 110, 253, 0.25);
+  }
+  
+  /* Filter section styling */
+  .input-group-text {
+    background-color: #f8f9fa;
+  }
+  
+  /* Status badges */
+  .badge.bg-success {
+    background-color: #28a745 !important;
+  }
+  
+  .badge.bg-danger {
+    background-color: #dc3545 !important;
+  }
+  
+  .badge.bg-warning {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 767.98px) {
+    .detail-label {
+      min-width: 100px;
+    }
+    
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .action-buttons button {
+      margin-bottom: 0.25rem;
+      margin-right: 0 !important;
+    }
+  }

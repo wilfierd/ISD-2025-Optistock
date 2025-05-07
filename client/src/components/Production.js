@@ -1662,75 +1662,109 @@ function Production({ user }) {
     }));
   };
 
-  // Khi bấm Xác nhận nhận hàng
-  const handleConfirmReceive = () => {
-    if (!selectedReceiveItem) return;
-    
-    // Hiển thị toast loading để người dùng biết đang xử lý
-    toast.info("Đang xử lý nhận hàng...", { autoClose: false, toastId: 'receiving' });
-    
-    // Step 1: First update plating status to completed
-    const platingPayload = {
-      status: "completed", // Use a valid enum value
-      notes: JSON.stringify({
-        receiveDate: receiveData.receiveDate.split("-").reverse().join("/"),
-        receiveStatus: receiveData.receiveStatus,
-        note: receiveData.note,
-        receivedBy: user.username,
-        receivedAt: new Date().toISOString()
-      })
-    };
-    
-    // Thực hiện các API call tuần tự để đảm bảo tính nhất quán
-    updatePlating
-      .mutateAsync({ id: selectedReceiveItem.id, data: platingPayload })
-      .then(() => {
-        // Step 2: Create finished product entry
-        return apiService.finishedProducts.getAll().catch(() => ({ data: { data: [] }}))
-          .then(existingProducts => {
-            // Check if product from this plating already exists
-            const exists = existingProducts.data.data.some(p => 
-              p.plating_id === selectedReceiveItem.id
-            );
-            
-            if (exists) {
-              return Promise.resolve({ data: { message: 'Product already exists' }});
-            }
-            
-            // Create new finished product using apiService instead of raw fetch
-            return apiService.finishedProducts.create({
-              platingId: selectedReceiveItem.id,
-              assemblyId: selectedReceiveItem.assembly_id,
-              groupId: selectedReceiveItem.group_id,
-              productName: selectedReceiveItem.product_name || 'Product',
-              productCode: selectedReceiveItem.product_code || 'PROD-' + Date.now(),
-              quantity: selectedReceiveItem.product_quantity,
-              status: 'in_stock',
-              qrCodeData: {
-                receiveDate: receiveData.receiveDate,
-                receiveStatus: receiveData.receiveStatus,
-                note: receiveData.note
-              }
-            });
-          });
-      })
-      .then(result => {
-        // Close loading toast and show success
-        toast.dismiss('receiving');
-        toast.success("Đã nhận hàng và lưu vào kho thành phẩm");
-        refetchPlating();
-      })
-      .catch(err => {
-        // Show error if anything fails
-        toast.dismiss('receiving');
-        toast.error("Lỗi nhận hàng: " + err.message);
-        console.error("Error receiving product:", err);
-      })
-      .finally(() => {
-        setShowReceiveModal(false);
-        setSelectedReceiveItem(null);
-      });
+  // Improved handleConfirmReceive function for Production.js
+const handleConfirmReceive = () => {
+  if (!selectedReceiveItem) return;
+  
+  // Log what we're receiving for debugging
+  console.log("Receiving item:", selectedReceiveItem);
+  
+  // Display loading toast to show processing
+  toast.info(
+    language === "vi" ? "Đang xử lý nhận hàng..." : "Processing receive...", 
+    { autoClose: false, toastId: 'receiving' }
+  );
+  
+  // Step 1: Update plating status to "received" (not "completed" which it already is)
+  const platingPayload = {
+    status: "received", // Change from "completed" to "received"
+    notes: JSON.stringify({
+      receiveDate: receiveData.receiveDate.split("-").reverse().join("/"),
+      receiveStatus: receiveData.receiveStatus,
+      note: receiveData.note,
+      receivedBy: user.username,
+      receivedAt: new Date().toISOString()
+    })
   };
+  
+  // Implement a more robust sequential process with error handling
+  updatePlating
+    .mutateAsync({ 
+      id: selectedReceiveItem.id, 
+      data: platingPayload 
+    })
+    .then(() => {
+      console.log("Plating status updated to received successfully");
+      
+      // Step 2: Create finished product record
+      return apiService.finishedProducts.getAll();
+    })
+    .then(existingProducts => {
+      // Check if product already exists for this plating
+      const exists = existingProducts.data.data.some(p => 
+        p.plating_id === selectedReceiveItem.id
+      );
+      
+      if (exists) {
+        console.log("Product already exists for this plating, skipping creation");
+        return { data: { message: 'Product already exists' }};
+      }
+      
+      // Validate that we have all required fields
+      if (!selectedReceiveItem.id) throw new Error("Missing plating ID");
+      if (!selectedReceiveItem.assembly_id) throw new Error("Missing assembly ID");
+      if (!selectedReceiveItem.group_id) throw new Error("Missing group ID");
+      if (!selectedReceiveItem.product_quantity) throw new Error("Missing product quantity");
+      
+      const productData = {
+        platingId: selectedReceiveItem.id,
+        assemblyId: selectedReceiveItem.assembly_id,
+        groupId: selectedReceiveItem.group_id,
+        productName: selectedReceiveItem.product_name || 'Product ' + Date.now(),
+        productCode: selectedReceiveItem.product_code || 'PROD-' + Date.now(),
+        quantity: selectedReceiveItem.product_quantity,
+        status: 'in_stock',
+        qrCodeData: {
+          receiveDate: receiveData.receiveDate,
+          receiveStatus: receiveData.receiveStatus,
+          note: receiveData.note
+        }
+      };
+      
+      console.log("Creating finished product with data:", productData);
+      return apiService.finishedProducts.create(productData);
+    })
+    .then(result => {
+      // Handle success - dismiss loading toast and show success message
+      toast.dismiss('receiving');
+      toast.success(
+        language === "vi" 
+          ? "Đã nhận hàng và lưu vào kho thành phẩm" 
+          : "Product received and saved to finished goods warehouse"
+      );
+      
+      // Refresh data to show updated status
+      refetchPlating();
+      console.log("Product successfully received", result);
+    })
+    .catch(err => {
+      // Handle errors
+      console.error("Error during product receive process:", err);
+      toast.dismiss('receiving');
+      
+      // Show a more descriptive error message
+      toast.error(
+        language === "vi" 
+          ? `Lỗi nhận hàng: ${err.message || 'Lỗi không xác định'}` 
+          : `Receive error: ${err.message || 'Unknown error'}`
+      );
+    })
+    .finally(() => {
+      // Always clean up UI state
+      setShowReceiveModal(false);
+      setSelectedReceiveItem(null);
+    });
+};
   const handleGenerateQRForPlating = (batch) => {
     setSelectedBatchForQR(batch);
     setShowQRModal(true);

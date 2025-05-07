@@ -1,0 +1,136 @@
+/* client/src/components/ReportFieldSelection.css */
+
+/* Card styling */
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+    border-radius: 0.5rem;
+  }
+  
+  .card-header {
+    padding: 1rem;
+    border-top-left-radius: 0.5rem !important;
+    border-top-right-radius: 0.5rem !important;
+  }
+  
+  /* Field groups styling */
+  .field-groups .accordion-item:first-of-type .accordion-button {
+    border-top-left-radius: 0.375rem;
+    border-top-right-radius: 0.375rem;
+  }
+  
+  .field-groups .accordion-item:last-of-type .accordion-button.collapsed {
+    border-bottom-right-radius: 0.375rem;
+    border-bottom-left-radius: 0.375rem;
+  }
+  
+  .accordion-button:not(.collapsed) {
+    background-color: rgba(13, 110, 253, 0.1);
+    color: #0d6efd;
+  }
+  
+  .accordion-button:focus {
+    box-shadow: none;
+    border-color: rgba(13, 110, 253, 0.25);
+  }
+  
+  .field-counter {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 1rem;
+    margin-left: 0.5rem;
+  }
+  
+  .group-select-all {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 1rem;
+  }
+  
+  /* Recently used fields styling */
+  .recently-used {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .section-title {
+    font-size: 0.95rem;
+    color: #495057;
+    margin-bottom: 1rem;
+  }
+  
+  .recently-used-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  
+  .recently-used-field {
+    background-color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid #dee2e6;
+    margin: 0 !important;
+  }
+  
+  /* Selected fields preview */
+  .selected-fields-preview {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+  }
+  
+  .selected-fields-preview table {
+    margin-bottom: 0;
+  }
+  
+  .remove-field {
+    padding: 0;
+    color: #dc3545;
+    font-size: 0.75rem;
+  }
+  
+  .remove-field:hover {
+    color: #bb2d3b;
+  }
+  
+  /* Template field summary */
+  .template-field-summary {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+  
+  .template-fields-preview {
+    margin-top: 0.5rem;
+  }
+  
+  .badge.bg-light {
+    border: 1px solid #dee2e6;
+  }
+  
+  /* Form controls */
+  .form-check-input:checked {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+  }
+  
+  .form-check-input:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 767.98px) {
+    .recently-used-fields {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .group-select-all {
+      display: none;
+    }
+  }

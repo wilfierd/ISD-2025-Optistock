@@ -1,4 +1,4 @@
-// Updated Navbar.js with QR Scan link
+// client/src/components/Navbar.js
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useNotifications, useMarkNotificationsAsRead } from '../hooks/useNotifications';
@@ -269,7 +269,7 @@ function Navbar({ user, onLogout }) {
                   {getText(navItems.warehouseOptions.processWarehouse)}
                 </Link>
                 <Link 
-                       to="/materials?type=process" 
+                  to="/product-warehouse" 
                   className="dropdown-item"
                   onClick={() => setShowWarehouseDropdown(false)}
                 >
@@ -322,8 +322,6 @@ function Navbar({ user, onLogout }) {
           >
             {getText(navItems.production)}
           </Link>
-          
-          {/* QR Scan link - new addition */}
           <Link 
             className={`navbar-brand ${isActive('/qr-scan') ? 'fw-bold' : ''}`} 
             to="/qr-scan"
