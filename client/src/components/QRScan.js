@@ -227,56 +227,74 @@ function QRScan({ user }) {
         createdBy: product.created_by_name,
         
         // Build production history from product data
+        // Replace the productionHistory section in processQRCode function with this:
         productionHistory: [
           // Material input stage
           {
-            date: formatDate(product.production_date || product.created_at),
+            date: product.history && product.history.material ? 
+              formatDate(product.history.material.last_updated) : 
+              formatDate(product.created_at),
             stage: 'materialInput',
             title: language === 'vi' ? 'Nguyên liệu đầu vào' : 'Raw Material Input',
             details: {
-              materialCode: product.material_code || 'N/A',
-              materialType: product.material_type || 'N/A',
-              supplier: product.supplier || 'N/A'
+              partName: product.history && product.history.material ? 
+                product.history.material.part_name : 'N/A',  // Changed from materialCode to partName
+              materialType: product.history && product.history.material ? 
+                product.history.material.material_type : 'N/A',
+              supplier: product.history && product.history.material ? 
+                product.history.material.supplier : 'N/A'
             }
           },
           // Pressing stage
           {
-            date: formatDate(product.production_date || product.created_at),
+            date: product.history && product.history.production ? 
+              formatDate(product.history.production.start_date) : 
+              formatDate(product.created_at),
             stage: 'pressing',
             title: language === 'vi' ? 'Ép/Dập' : 'Pressing',
             details: {
-              machineName: product.machine_name || 'N/A',
-              moldName: product.mold_code || 'N/A'
+              machineName: product.history && product.history.production ? 
+                product.history.production.machine_name : 'N/A',
+              moldName: product.history && product.history.production ? 
+                product.history.production.mold_code : 'N/A'
             }
           },
           // Assembly stage
           {
-            date: formatDate(product.assembly_date || product.created_at),
+            date: product.history && product.history.assembly ? 
+              formatDate(product.history.assembly.start_time) : 
+              formatDate(product.created_at),
             stage: 'assembly',
             title: language === 'vi' ? 'Lắp ráp' : 'Assembly',
             details: {
-              pic: product.pic_name || 'N/A',
-              date: formatDate(product.assembly_completion_date || product.created_at)
+              pic: product.history && product.history.assembly ? 
+                product.history.assembly.pic_name : 'N/A',
+              date: product.history && product.history.assembly ? 
+                formatDate(product.history.assembly.completion_time) : 'N/A'
             }
           },
           // Plating stage
           {
-            date: `${formatDate(product.plating_date || product.created_at)} - ${formatDate(product.plating_completion_date || product.created_at)}`,
+            date: product.history && product.history.plating ? 
+              `${product.history.plating.platingDate} - ${product.history.plating.platingEndDate || 'N/A'}` : 
+              formatDate(product.created_at),
             stage: 'plating',
             title: language === 'vi' ? 'Mạ' : 'Plating',
             details: {
-              startDate: formatDate(product.plating_date || product.created_at),
-              endDate: formatDate(product.plating_completion_date || product.created_at)
+              startDate: product.history && product.history.plating ? 
+                product.history.plating.platingDate : 'N/A',
+              endDate: product.history && product.history.plating ? 
+                product.history.plating.platingEndDate : 'N/A'
             }
           },
           // Quality check stage
           {
-            date: formatDate(product.inspection_date || product.completion_date || product.created_at),
+            date: formatDate(product.completion_date || product.created_at),
             stage: 'qualityCheck',
             title: language === 'vi' ? 'Kiểm tra chất lượng' : 'Quality Check',
             details: {
-              inspector: product.inspector_name || product.created_by_name || 'N/A',
-              date: formatDate(product.inspection_date || product.completion_date || product.created_at),
+              inspector: product.created_by_name || 'N/A',
+              date: formatDate(product.completion_date || product.created_at),
               result: product.quality_status === 'NG' ? 
                 (language === 'vi' ? 'Lỗi' : 'Fail') : 
                 (language === 'vi' ? 'Đạt' : 'Pass')
@@ -507,7 +525,7 @@ function QRScan({ user }) {
                     {Object.entries(stage.details).map(([key, value], i) => (
                       <div className="detail-item" key={i}>
                         <span className="detail-key">
-                          {key === 'materialCode' && (language === 'vi' ? 'Mã cuộn nguyên liệu' : 'Material Roll Code')}
+                          {key === 'partName' && (language === 'vi' ? 'Tên linh kiện' : 'Part Name')}
                           {key === 'materialType' && (language === 'vi' ? 'Loại vật liệu' : 'Material Type')}
                           {key === 'supplier' && (language === 'vi' ? 'Nhà cung cấp' : 'Supplier')}
                           {key === 'machineName' && (language === 'vi' ? 'Máy dập' : 'Machine')}

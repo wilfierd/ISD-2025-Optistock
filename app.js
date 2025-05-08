@@ -2246,11 +2246,13 @@ app.get('/api/finished-products', isAuthenticatedAPI, async (req, res) => {
   }
 });
 
+// Replace the current endpoint with this enhanced version
 app.get('/api/finished-products/:id', isAuthenticatedAPI, async (req, res) => {
   try {
     const { id } = req.params;
     
-    const [rows] = await pool.query(`
+    // First, get the basic product information
+    const [products] = await pool.query(`
       SELECT fp.*, 
              p.product_name as plating_product_name,
              p.product_code as plating_product_code,
@@ -2263,11 +2265,81 @@ app.get('/api/finished-products/:id', isAuthenticatedAPI, async (req, res) => {
       WHERE fp.id = ?
     `, [id]);
     
-    if (rows.length === 0) {
+    if (products.length === 0) {
       return res.status(404).json({ success: false, error: 'Finished product not found' });
     }
     
-    res.json({ success: true, data: rows[0] });
+    const product = products[0];
+    
+    // Now, enrich the product with complete production history
+    
+    // 1. Get material information
+    const [materialRows] = await pool.query(`
+      SELECT m.* 
+      FROM materials m
+      JOIN loHangHoa l ON l.material_id = m.id
+      JOIN molds mold ON l.mold_id = mold.id
+      JOIN batch_groups bg ON bg.group_id = ?
+      JOIN batches b ON bg.batch_id = b.id
+      WHERE m.id = l.material_id
+      LIMIT 1
+    `, [product.group_id]);
+    
+    // 2. Get production information
+    const [productionRows] = await pool.query(`
+      SELECT l.*, 
+             m.ten_may_dap as machine_name,
+             mold.ma_khuon as mold_code,
+             u.username as operator_name
+      FROM loHangHoa l
+      JOIN machines m ON l.machine_id = m.id
+      JOIN molds mold ON l.mold_id = mold.id
+      JOIN users u ON l.created_by = u.id
+      JOIN materials mat ON l.material_id = mat.id
+      JOIN batch_groups bg ON bg.group_id = ?
+      JOIN batches b ON bg.batch_id = b.id AND b.mold_code = mold.ma_khuon
+      LIMIT 1
+    `, [product.group_id]);
+    
+    // 3. Get assembly information
+    const [assemblyRows] = await pool.query(`
+      SELECT ac.*, 
+             u.username as pic_name,
+             u.full_name as pic_full_name
+      FROM assembly_components ac
+      JOIN users u ON ac.pic_id = u.id
+      WHERE ac.id = ?
+    `, [product.assembly_id]);
+    
+    // 4. Get plating information
+    const [platingRows] = await pool.query(`
+      SELECT p.*,
+             DATE_FORMAT(p.plating_start_time, '%d/%m/%Y') as platingDate,
+             DATE_FORMAT(p.plating_start_time, '%H:%i:%s') as platingTime,
+             DATE_FORMAT(p.plating_end_time, '%d/%m/%Y') as platingEndDate,
+             DATE_FORMAT(p.plating_end_time, '%H:%i:%s') as platingEndTime
+      FROM plating p
+      WHERE p.id = ?
+    `, [product.plating_id]);
+    
+    // 5. Get batch information
+    const [batchRows] = await pool.query(`
+      SELECT b.*
+      FROM batches b
+      JOIN batch_groups bg ON b.id = bg.batch_id
+      WHERE bg.group_id = ?
+    `, [product.group_id]);
+    
+    // Combine all the data into a complete product history
+    product.history = {
+      material: materialRows.length > 0 ? materialRows[0] : null,
+      production: productionRows.length > 0 ? productionRows[0] : null,
+      assembly: assemblyRows.length > 0 ? assemblyRows[0] : null,
+      plating: platingRows.length > 0 ? platingRows[0] : null,
+      batches: batchRows
+    };
+    
+    res.json({ success: true, data: product });
   } catch (error) {
     console.error('Error fetching finished product:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch finished product' });
