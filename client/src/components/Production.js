@@ -2909,7 +2909,9 @@ const formatDateForDisplay = (dateString) => {
                   {language === "vi" ? "Ngày mạ" : "Plating Date"}:
                 </span>
                 <span className="detail-value">
-                  {selectedPlating.platingDate} {selectedPlating.platingTime}
+                {selectedPlating.platingDate && selectedPlating.platingTime ? 
+                            `${selectedPlating.platingDate} ${selectedPlating.platingTime}` : 
+                            formatDateForDisplay(selectedPlating.plating_start_time) || '-'}
                 </span>
               </div>
               {selectedPlating.platingEndTime && (
