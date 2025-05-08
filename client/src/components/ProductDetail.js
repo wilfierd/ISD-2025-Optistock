@@ -42,9 +42,13 @@ function ProductDetail({ user }) {
     
     try {
       const date = new Date(dateString);
+      // Check if date is valid before formatting
+      if (isNaN(date.getTime())) {
+        return 'N/A';
+      }
       return date.toLocaleString();
     } catch (e) {
-      return dateString;
+      return 'N/A';
     }
   };
   
@@ -228,8 +232,8 @@ function ProductDetail({ user }) {
                             <div className="timeline-marker bg-success"></div>
                             <div className="timeline-content">
                               <h6>{t('plating')}</h6>
-                              <p><strong>{t('platingDate')}:</strong> {product.history.plating.platingDate} {product.history.plating.platingTime}</p>
-                              <p><strong>{t('completionDate')}:</strong> {formatDateTime(product.history.plating.platingEndTime)}</p>
+                              <p><strong>{t('platingDate')}:</strong> {formatDateTime(product.history.plating.plating_start_time)}</p>
+                              <p><strong>{t('completionDate')}:</strong> {formatDateTime(product.history.plating.plating_end_time)}</p>
                             </div>
                           </div>
                         )}

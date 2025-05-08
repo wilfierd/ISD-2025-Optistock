@@ -18,7 +18,8 @@ function ProductWarehouse({ user }) {
   const [qrScanResult, setQrScanResult] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
-  
+  const [productDetailLoading, setProductDetailLoading] = useState(false);
+
   // Fetch finished products
   const { data: products = [], isLoading, error, refetch } = useQuery({
     queryKey: ['finished-products'],
@@ -93,9 +94,28 @@ function ProductWarehouse({ user }) {
     });
   }, [productsWithQualityStatus, searchTerm, statusFilter, dateFilter]);
   
-  // Handle product click - show details
+  // Add this function to fetch complete product data
+  const fetchCompleteProduct = async (productId) => {
+    try {
+      setProductDetailLoading(true);
+      const response = await apiService.finishedProducts.getById(productId);
+      if (response.data && response.data.data) {
+        setSelectedProduct(response.data.data);
+      } else {
+        toast.error(t('productDataNotFound'));
+      }
+    } catch (error) {
+      console.error('Error fetching product details:', error);
+      toast.error(t('errorFetchingProductDetails'));
+    } finally {
+      setProductDetailLoading(false);
+    }
+  };
+
+  // Then update the handleProductClick function:
   const handleProductClick = (product) => {
-    setSelectedProduct(product);
+    // Fetch the complete product data with history
+    fetchCompleteProduct(product.id);
     setShowDetailsModal(true);
   };
   
@@ -180,7 +200,20 @@ function ProductWarehouse({ user }) {
         return 'secondary';
     }
   };
-  
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid before formatting
+      if (isNaN(date.getTime())) {
+        return 'N/A';
+      }
+      return date.toLocaleString();
+    } catch (e) {
+      return 'N/A';
+    }
+  };
   return (
     <div>
       <Navbar user={user} onLogout={handleLogout} />
@@ -383,6 +416,7 @@ function ProductWarehouse({ user }) {
                 ></button>
               </div>
               <div className="modal-body">
+                
                 <div className="row mb-3">
                   <div className="col-md-6">
                     <div className="product-detail-field">
@@ -458,109 +492,94 @@ function ProductWarehouse({ user }) {
                 <div className="mt-4">
                   <h6>{t('productHistory')}</h6>
                   <div className="accordion" id="productHistoryAccordion">
-                    {/* Material Information */}
-                    <div className="accordion-item">
-                      <h2 className="accordion-header">
-                        <button className="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#materialInfo">
-                          {t('materialInformation')}
-                        </button>
-                      </h2>
-                      <div id="materialInfo" className="accordion-collapse collapse show">
-                        <div className="accordion-body">
-                          {selectedProduct.history?.material ? (
-                            <div>
-                              <p><strong>{t('materialName')}:</strong> {selectedProduct.history.material.part_name}</p>
-                              <p><strong>{t('materialCode')}:</strong> {selectedProduct.history.material.material_code}</p>
-                              <p><strong>{t('supplier')}:</strong> {selectedProduct.history.material.supplier}</p>
-                            </div>
-                          ) : (
-                            <div className="placeholder-info">
-                              <p><strong>{t('materialName')}:</strong> AL1100</p>
-                              <p><strong>{t('materialCode')}:</strong> ABC123</p>
-                              <p><strong>{t('supplier')}:</strong> SHENZEN</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Production Information */}
-                    <div className="accordion-item">
-                      <h2 className="accordion-header">
-                        <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#productionInfo">
-                          {t('productionInformation')}
-                        </button>
-                      </h2>
-                      <div id="productionInfo" className="accordion-collapse collapse">
-                        <div className="accordion-body">
-                          {selectedProduct.history?.production ? (
-                            <div>
-                              <p><strong>{t('machine')}:</strong> {selectedProduct.history.production.machine_name}</p>
-                              <p><strong>{t('mold')}:</strong> {selectedProduct.history.production.mold_code}</p>
-                              <p><strong>{t('startDate')}:</strong> {new Date(selectedProduct.history.production.start_date).toLocaleString()}</p>
-                              <p><strong>{t('operator')}:</strong> {selectedProduct.history.production.created_by_name}</p>
-                            </div>
-                          ) : (
-                            <div className="placeholder-info">
-                              <p><strong>{t('machine')}:</strong> A7-45T</p>
-                              <p><strong>{t('mold')}:</strong> ZHG513-302-V1</p>
-                              <p><strong>{t('startDate')}:</strong> {new Date().toLocaleString()}</p>
-                              <p><strong>{t('operator')}:</strong> Operator Name</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Assembly Information */}
-                    <div className="accordion-item">
-                      <h2 className="accordion-header">
-                        <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#assemblyInfo">
-                          {t('assemblyInformation')}
-                        </button>
-                      </h2>
-                      <div id="assemblyInfo" className="accordion-collapse collapse">
-                        <div className="accordion-body">
-                          {selectedProduct.history?.assembly ? (
-                            <div>
-                              <p><strong>{t('assemblyDate')}:</strong> {new Date(selectedProduct.history.assembly.start_time).toLocaleString()}</p>
-                              <p><strong>{t('assembledBy')}:</strong> {selectedProduct.history.assembly.pic_name}</p>
-                              <p><strong>{t('completionTime')}:</strong> {new Date(selectedProduct.history.assembly.completion_time).toLocaleString()}</p>
-                            </div>
-                          ) : (
-                            <div className="placeholder-info">
-                              <p><strong>{t('assemblyDate')}:</strong> {new Date().toLocaleString()}</p>
-                              <p><strong>{t('assembledBy')}:</strong> Assembly Operator</p>
-                              <p><strong>{t('completionTime')}:</strong> {new Date().toLocaleString()}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Plating Information */}
-                    <div className="accordion-item">
-                      <h2 className="accordion-header">
-                        <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#platingInfo">
-                          {t('platingInformation')}
-                        </button>
-                      </h2>
-                      <div id="platingInfo" className="accordion-collapse collapse">
-                        <div className="accordion-body">
-                          {selectedProduct.history?.plating ? (
-                            <div>
-                              <p><strong>{t('platingDate')}:</strong> {selectedProduct.history.plating.platingDate} {selectedProduct.history.plating.platingTime}</p>
-                              <p><strong>{t('completionDate')}:</strong> {new Date(selectedProduct.history.plating.platingEndTime).toLocaleString()}</p>
-                            </div>
-                          ) : (
-                            <div className="placeholder-info">
-                              <p><strong>{t('platingDate')}:</strong> {new Date().toLocaleString()}</p>
-                              <p><strong>{t('completionDate')}:</strong> {new Date().toLocaleString()}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+{/* Material Information */}
+<div className="accordion-item">
+  <h2 className="accordion-header">
+    <button className="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#materialInfo">
+      {t('materialInformation')}
+    </button>
+  </h2>
+  <div id="materialInfo" className="accordion-collapse collapse show">
+    <div className="accordion-body">
+      {selectedProduct.history?.material ? (
+        <div>
+          <p><strong>{t('materialName')}:</strong> {selectedProduct.history.material.part_name}</p>
+          <p><strong>{t('materialCode')}:</strong> {selectedProduct.history.material.material_code}</p>
+          <p><strong>{t('supplier')}:</strong> {selectedProduct.history.material.supplier}</p>
+          <p><strong>{t('lastUpdated')}:</strong> {selectedProduct.history.material.last_updated}</p>
+        </div>
+      ) : (
+        <p>{t('noMaterialInformation')}</p>
+      )}
+    </div>
+  </div>
+</div>
+
+{/* Production Information */}
+<div className="accordion-item">
+  <h2 className="accordion-header">
+    <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#productionInfo">
+      {t('productionInformation')}
+    </button>
+  </h2>
+  <div id="productionInfo" className="accordion-collapse collapse">
+    <div className="accordion-body">
+      {selectedProduct.history?.production ? (
+        <div>
+          <p><strong>{t('machine')}:</strong> {selectedProduct.history.production.machine_name}</p>
+          <p><strong>{t('mold')}:</strong> {selectedProduct.history.production.mold_code}</p>
+          <p><strong>{t('startDate')}:</strong> {formatDateTime(selectedProduct.history.production.start_date)}</p>
+          <p><strong>{t('operator')}:</strong> {selectedProduct.history.production.operator_name || selectedProduct.history.production.created_by_username}</p>
+        </div>
+      ) : (
+        <p>{t('noProductionInformation')}</p>
+      )}
+    </div>
+  </div>
+</div>
+
+{/* Assembly Information */}
+<div className="accordion-item">
+  <h2 className="accordion-header">
+    <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#assemblyInfo">
+      {t('assemblyInformation')}
+    </button>
+  </h2>
+  <div id="assemblyInfo" className="accordion-collapse collapse">
+    <div className="accordion-body">
+      {selectedProduct.history?.assembly ? (
+        <div>
+          <p><strong>{t('assemblyDate')}:</strong> {formatDateTime(selectedProduct.history.assembly.start_time)}</p>
+          <p><strong>{t('assembledBy')}:</strong> {selectedProduct.history.assembly.pic_name}</p>
+          <p><strong>{t('completionTime')}:</strong> {formatDateTime(selectedProduct.history.assembly.completion_time)}</p>
+        </div>
+      ) : (
+        <p>{t('noAssemblyInformation')}</p>
+      )}
+    </div>
+  </div>
+</div>
+
+{/* Plating Information */}
+<div className="accordion-item">
+  <h2 className="accordion-header">
+    <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#platingInfo">
+      {t('platingInformation')}
+    </button>
+  </h2>
+  <div id="platingInfo" className="accordion-collapse collapse">
+    <div className="accordion-body">
+      {selectedProduct.history?.plating ? (
+        <div>
+          <p><strong>{t('platingDate')}:</strong> {formatDateTime(selectedProduct.history.plating.plating_start_time)}</p>
+          <p><strong>{t('completionDate')}:</strong> {formatDateTime(selectedProduct.history.plating.plating_end_time)}</p>
+        </div>
+      ) : (
+        <p>{t('noPlatingInformation')}</p>
+      )}
+    </div>
+  </div>
+</div>
                     
                     {/* Quality Control Information */}
                     <div className="accordion-item">
