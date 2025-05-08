@@ -51,48 +51,7 @@ function ProductWarehouse({ user }) {
   }, [products]);
   
   // Filter products based on search term, status filter, and date filter
-  const filteredProducts = React.useMemo(() => {
-    return productsWithQualityStatus.filter(product => {
-      // Search filter
-      const matchesSearch = 
-        product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.product_code.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      // Status filter
-      const matchesStatus = 
-        statusFilter === 'all' || 
-        (statusFilter === 'ok' && product.qualityStatus === 'OK') ||
-        (statusFilter === 'ng' && product.qualityStatus === 'NG') ||
-        (statusFilter === 'pending' && product.qualityStatus === 'Chờ kiểm tra');
-      
-      // Date filter (example implementation)
-      let matchesDate = true;
-      if (dateFilter !== 'all') {
-        const today = new Date();
-        const productDate = new Date(product.completion_date);
-        
-        switch (dateFilter) {
-          case 'today':
-            matchesDate = isSameDay(productDate, today);
-            break;
-          case 'week':
-            const weekAgo = new Date();
-            weekAgo.setDate(today.getDate() - 7);
-            matchesDate = productDate >= weekAgo;
-            break;
-          case 'month':
-            const monthAgo = new Date();
-            monthAgo.setMonth(today.getMonth() - 1);
-            matchesDate = productDate >= monthAgo;
-            break;
-          default:
-            matchesDate = true;
-        }
-      }
-      
-      return matchesSearch && matchesStatus && matchesDate;
-    });
-  }, [productsWithQualityStatus, searchTerm, statusFilter, dateFilter]);
+
   
   // Add this function to fetch complete product data
   const fetchCompleteProduct = async (productId) => {
@@ -186,7 +145,48 @@ function ProductWarehouse({ user }) {
       date1.getMonth() === date2.getMonth() &&
       date1.getFullYear() === date2.getFullYear();
   };
-  
+  const filteredProducts = React.useMemo(() => {
+    return productsWithQualityStatus.filter(product => {
+      // Search filter
+      const matchesSearch = 
+        product.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.product_code.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Status filter
+      const matchesStatus = 
+        statusFilter === 'all' || 
+        (statusFilter === 'ok' && product.qualityStatus === 'OK') ||
+        (statusFilter === 'ng' && product.qualityStatus === 'NG') ||
+        (statusFilter === 'pending' && product.qualityStatus === 'Chờ kiểm tra');
+      
+      // Date filter (example implementation)
+      let matchesDate = true;
+      if (dateFilter !== 'all') {
+        const today = new Date();
+        const productDate = new Date(product.completion_date);
+        
+        switch (dateFilter) {
+          case 'today':
+            matchesDate = isSameDay(productDate, today);
+            break;
+          case 'week':
+            const weekAgo = new Date();
+            weekAgo.setDate(today.getDate() - 7);
+            matchesDate = productDate >= weekAgo;
+            break;
+          case 'month':
+            const monthAgo = new Date();
+            monthAgo.setMonth(today.getMonth() - 1);
+            matchesDate = productDate >= monthAgo;
+            break;
+          default:
+            matchesDate = true;
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesDate;
+    });
+  }, [productsWithQualityStatus, searchTerm, statusFilter, dateFilter]);
   // Get status badge color
   const getStatusBadgeColor = (status) => {
     switch (status) {
