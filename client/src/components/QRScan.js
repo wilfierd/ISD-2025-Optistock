@@ -434,7 +434,6 @@ function QRScan({ user }) {
                   className="form-control"
                   value={manualCode}
                   onChange={(e) => setManualCode(e.target.value)}
-                  placeholder={language === 'vi' ? 'Nhập mã sản phẩm...' : 'Enter product code...'}
                 />
                 <button 
                   type="submit" 
