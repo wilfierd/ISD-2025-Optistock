@@ -35,17 +35,32 @@ function ProductWarehouse({ user }) {
   // Transform products to add quality status (simulation based on available data)
   const productsWithQualityStatus = React.useMemo(() => {
     return products.map(product => {
-      // Simulate quality status based on the product's data
-      // In a real implementation, this would come from the API
-      const isOK = product.status === 'in_stock' && product.quantity > 0;
-      const hasDefects = !isOK && product.quantity > 0;
-      const defectCount = hasDefects ? Math.floor(product.quantity * 0.1) : 0; // 10% defects as an example
+      // Calculate quality status based on product data
+      let qualityStatus = 'Chờ kiểm tra';
+      let defectCount = 0;
+      let usableCount = product.quantity;
+
+      if (product.status === 'in_stock' && product.quantity > 0) {
+        // If product has quality check data
+        if (product.quality_check) {
+          qualityStatus = product.quality_check.status;
+          defectCount = product.quality_check.defect_count || 0;
+          usableCount = product.quantity - defectCount;
+        } else {
+          // Default to OK if no quality check data but product is in stock
+          qualityStatus = 'OK';
+        }
+      } else if (product.status === 'defective') {
+        qualityStatus = 'NG';
+        defectCount = product.quantity;
+        usableCount = 0;
+      }
       
       return {
         ...product,
-        qualityStatus: isOK ? 'OK' : hasDefects ? 'NG' : 'Chờ kiểm tra',
-        defectCount: defectCount,
-        usableCount: product.quantity - defectCount
+        qualityStatus,
+        defectCount,
+        usableCount
       };
     });
   }, [products]);
@@ -59,7 +74,34 @@ function ProductWarehouse({ user }) {
       setProductDetailLoading(true);
       const response = await apiService.finishedProducts.getById(productId);
       if (response.data && response.data.data) {
-        setSelectedProduct(response.data.data);
+        const product = response.data.data;
+        // Calculate quality status based on product data
+        let qualityStatus = 'Chờ kiểm tra';
+        let defectCount = 0;
+        let usableCount = product.quantity;
+
+        if (product.status === 'in_stock' && product.quantity > 0) {
+          // If product has quality check data
+          if (product.quality_check) {
+            qualityStatus = product.quality_check.status;
+            defectCount = product.quality_check.defect_count || 0;
+            usableCount = product.quantity - defectCount;
+          } else {
+            // Default to OK if no quality check data but product is in stock
+            qualityStatus = 'OK';
+          }
+        } else if (product.status === 'defective') {
+          qualityStatus = 'NG';
+          defectCount = product.quantity;
+          usableCount = 0;
+        }
+        
+        setSelectedProduct({
+          ...product,
+          qualityStatus,
+          defectCount,
+          usableCount
+        });
       } else {
         toast.error(t('productDataNotFound'));
       }
