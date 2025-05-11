@@ -145,51 +145,90 @@ const BackgroundService = {
         try {
           const startTime = new Date(prod.start_date).getTime();
           const now = new Date().getTime();
+          // CHANGE THIS: 1 minute per batch instead of 5
           const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
-
-          // Calculate completed batches (every 5 minutes)
-          const batchesDone = Math.floor(elapsedMinutes / 5);
+          
+          // CHANGE THIS: Calculate with 1 minute per batch
+          const batchesDone = Math.floor(elapsedMinutes / 1);
           const lastProcessed = lastProcessedCounts[prod.id] || 0;
           const totalExpected = prod.expected_output || 100;
-
+  
           console.log(
             `Background processing: Production ${prod.id}: ${batchesDone} batches done, ${lastProcessed} last processed, Total: ${totalExpected}`
           );
-
+  
           // Check if production is at 100% completion
-          if (batchesDone >= totalExpected) {
-            console.log(
-              `Background processing: Production ${prod.id} has reached 100% - stopping`
-            );
+// This should go inside the processBatchesInBackground method of the BackgroundService object
+// Replace the existing "if (batchesDone >= totalExpected)" block with this complete version:
 
-            // Mark production as stopped
-            await apiService.production.update(prod.id, {
-              status: "stopping",
-              actual_output: totalExpected,
-            });
+if (batchesDone >= totalExpected) {
+  console.log(
+    `Background processing: Production ${prod.id} has reached 100% - stopping`
+  );
 
-            // Try to update machine status
-            if (prod.machine_id) {
-              try {
-                await apiService.machines.saveStopReason(prod.machine_id, {
-                  reason:
-                    "Production complete - 100% of expected output reached",
-                  stopTime: new Date().toTimeString().split(" ")[0],
-                  stopDate: new Date()
-                    .toLocaleDateString("en-GB")
-                    .split("/")
-                    .join("/"),
-                });
-              } catch (err) {
-                console.error("Failed to update machine status:", err);
-              }
-            }
+  // Calculate newly completed batches
+  const newlyCompletedCount = totalExpected - lastProcessed;
+  
+  // Only proceed if there are new batches to process and the production is still running
+  if (newlyCompletedCount > 0 && prod.status === "running") {
+    try {
+      console.log(`Creating ${newlyCompletedCount} completed batches for production ${prod.id}`);
+      
+      // Prepare the batch data for warehouse
+      const batchData = {
+        part_name: prod.material_name,
+        machine_name: prod.machine_name,
+        mold_code: prod.mold_code,
+        quantity: newlyCompletedCount,
+        warehouse_entry_time: this.formatDateTime(new Date()),
+        status: null, // Initially ungrouped
+        created_by: 1, // Default user ID - this will be used if user context isn't available
+      };
 
-            // Update the processed count
-            updatedCounts[prod.id] = totalExpected;
-            countsChanged = true;
-            continue;
-          }
+      // Create the batch in warehouse
+      await apiService.batches.create(batchData);
+      console.log(`Successfully created ${newlyCompletedCount} batches in warehouse from background service`);
+      
+      // Notify any listeners of the completion (if needed)
+      // This is a placeholder - component-specific notification can't be triggered from here
+      // but you could emit a custom event if needed
+    } catch (error) {
+      console.error(`Error creating batches for production ${prod.id}:`, error);
+    }
+  }
+
+  // Mark production as stopped with exact total output
+  try {
+    await apiService.production.update(prod.id, {
+      status: "stopping",
+      actual_output: totalExpected,
+    });
+    console.log(`Updated production ${prod.id} status to stopping with output ${totalExpected}`);
+  } catch (error) {
+    console.error(`Error updating production ${prod.id} status:`, error);
+  }
+
+  // Update machine status to stopping
+  if (prod.machine_id) {
+    try {
+      await apiService.machines.saveStopReason(prod.machine_id, {
+        reason: "Production complete - 100% of expected output reached",
+        stopTime: new Date().toTimeString().split(" ")[0],
+        stopDate: new Date().toLocaleDateString("en-GB").split("/").join("/"),
+      });
+      console.log(`Updated machine ${prod.machine_id} status to stopping`);
+    } catch (err) {
+      console.error(`Failed to update machine ${prod.machine_id} status:`, err);
+    }
+  }
+
+  // Update the processed count to exactly match the total expected
+  updatedCounts[prod.id] = totalExpected;
+  countsChanged = true;
+  
+  // Skip to the next production since we've handled this one
+  continue;
+}
 
           // If new batches have been completed
           if (batchesDone > lastProcessed) {
@@ -597,41 +636,45 @@ function Production({ user }) {
   );
 
   // Calculate which production will complete a batch next - memoized to avoid dependency issues
-  const getNextBatchCompletion = React.useCallback(() => {
-    let nextCompletion = null;
-    let minTimeLeft = Infinity;
+// In Production.js, find the getNextBatchCompletion function (around lines 350-380)
+// and update the calculation:
 
-    // Check all running productions
-    productions.forEach((prod) => {
-      if (prod.status === "running") {
-        const startTime = new Date(prod.start_date).getTime();
-        const now = new Date().getTime();
-        const elapsedMinutes = (now - startTime) / (1000 * 60);
+const getNextBatchCompletion = React.useCallback(() => {
+  let nextCompletion = null;
+  let minTimeLeft = Infinity;
 
-        // Calculate which batch is in progress and when it will complete
-        const completedBatches = Math.floor(elapsedMinutes / 5);
-        const nextBatchCompleteTime =
-          startTime + (completedBatches + 1) * 5 * 60 * 1000;
+  // Check all running productions
+  productions.forEach((prod) => {
+    if (prod.status === "running") {
+      const startTime = new Date(prod.start_date).getTime();
+      const now = new Date().getTime();
+      // CHANGE THIS: Use 1 minute per batch
+      const elapsedMinutes = (now - startTime) / (1000 * 60);
 
-        // Time left until next batch completion
-        const timeLeft = nextBatchCompleteTime - now;
+      // CHANGE THIS: Calculate with 1 minute per batch
+      const completedBatches = Math.floor(elapsedMinutes / 1);
+      // CHANGE THIS: Next batch completes in 1 minute
+      const nextBatchCompleteTime = startTime + (completedBatches + 1) * 1 * 60 * 1000;
 
-        // If this is sooner than our current minimum, update
-        if (timeLeft > 0 && timeLeft < minTimeLeft) {
-          minTimeLeft = timeLeft;
-          nextCompletion = {
-            productionId: prod.id,
-            materialName: prod.material_name,
-            machineName: prod.machine_name,
-            timeLeft: timeLeft,
-            completionTime: new Date(nextBatchCompleteTime),
-          };
-        }
+      // Time left until next batch completion
+      const timeLeft = nextBatchCompleteTime - now;
+
+      // If this is sooner than our current minimum, update
+      if (timeLeft > 0 && timeLeft < minTimeLeft) {
+        minTimeLeft = timeLeft;
+        nextCompletion = {
+          productionId: prod.id,
+          materialName: prod.material_name,
+          machineName: prod.machine_name,
+          timeLeft: timeLeft,
+          completionTime: new Date(nextBatchCompleteTime),
+        };
       }
-    });
+    }
+  });
 
-    return nextCompletion;
-  }, [productions]);
+  return nextCompletion;
+}, [productions]);
 
   // Function to process batch completions with rate limiting
   const processBatchCompletions = async () => {
@@ -875,45 +918,108 @@ function Production({ user }) {
     processBatchCompletions();
 
     // Update progress UI more frequently (every 5 seconds)
-    const progressInterval = setInterval(() => {
-      // Update production progress
-      setProductionProgress((prev) => {
-        const updated = { ...prev };
+const progressInterval = setInterval(() => {
+  // Update production progress
+  setProductionProgress((prev) => {
+    const updated = { ...prev };
 
-        productions.forEach((prod) => {
-          if (prod.status === "running" && updated[prod.id]) {
-            const startTime = new Date(prod.start_date).getTime();
-            const now = new Date().getTime();
-            const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+    productions.forEach((prod) => {
+      if (prod.status === "running" && updated[prod.id]) {
+        const startTime = new Date(prod.start_date).getTime();
+        const now = new Date().getTime();
+        const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
 
-            // Assuming 5 min per batch
-            const batchesDone = Math.floor(elapsedMinutes / 5);
-            const totalExpected = prod.expected_output || 100;
-            const percentage = Math.min(
-              Math.round((batchesDone / totalExpected) * 100),
-              100
-            );
-            const remaining = Math.max(totalExpected - batchesDone, 0);
-
-            updated[prod.id] = {
-              batchesDone,
-              batchesRemaining: remaining,
-              totalExpected,
-              percentage,
-              estimatedCompletion: new Date(
-                startTime + totalExpected * 5 * 60 * 1000
-              ),
-            };
-          }
+        // Using 1 min per batch now
+        const batchesDone = Math.floor(elapsedMinutes / 1);
+        const totalExpected = prod.expected_output || 100;
+        
+        // Important: Check if we've completed all batches
+// In the progressInterval useEffect:
+if (batchesDone >= totalExpected) {
+  // Set exact values for completed state
+  updated[prod.id] = {
+    batchesDone: totalExpected,
+    batchesRemaining: 0,
+    totalExpected,
+    percentage: 100,
+    stopped: true,
+    estimatedCompletion: new Date()
+  };
+  
+  // Only trigger these actions if the status hasn't already been changed
+  if (prod.status === "running") {
+    // Create completed batches in warehouse - THIS IS THE KEY ADDITION
+    const newlyCompletedCount = totalExpected - (lastProcessedBatchCounts[prod.id] || 0);
+    if (newlyCompletedCount > 0) {
+      // This will transfer the batch to the warehouse
+      createCompletedBatches(prod, newlyCompletedCount)
+        .then(() => {
+          console.log(`Created ${newlyCompletedCount} batches in warehouse for production ${prod.id}`);
+          
+          // Show completion popup
+          setCompletedBatchInfo({
+            productionId: prod.id,
+            materialName: prod.material_name,
+            machineName: prod.machine_name,
+            moldCode: prod.mold_code,
+            batchNumber: totalExpected,
+            completionTime: new Date(),
+          });
+          setShowCompletionPopup(true);
+          
+          // Auto hide after 10 seconds
+          setTimeout(() => {
+            setShowCompletionPopup(false);
+          }, 10000);
+          
+          // Update the last processed batch count
+          setLastProcessedBatchCounts(prev => ({
+            ...prev,
+            [prod.id]: totalExpected
+          }));
+          saveLastProcessedBatchCounts({
+            ...lastProcessedBatchCounts,
+            [prod.id]: totalExpected
+          });
         });
+    }
+    
+    // Change production status to stopping
+    updateProduction.mutate({
+      id: prod.id,
+      data: {
+        status: "stopping",
+        actual_output: totalExpected
+      }
+    });
+  }
+} else {
+          // Normal progress calculation for in-progress productions
+          const percentage = Math.min(
+            Math.round((batchesDone / totalExpected) * 100),
+            100
+          );
+          const remaining = Math.max(totalExpected - batchesDone, 0);
 
-        return updated;
-      });
+          updated[prod.id] = {
+            batchesDone,
+            batchesRemaining: remaining,
+            totalExpected,
+            percentage,
+            estimatedCompletion: new Date(
+              startTime + totalExpected * 1 * 60 * 1000  // 1 minute per batch
+            ),
+          };
+        }
+      }
+    });
 
-      // Update next batch completion
-      setNextCompletion(getNextBatchCompletion());
-    }, 5000);
+    return updated;
+  });
 
+  // Update next batch completion
+  setNextCompletion(getNextBatchCompletion());
+}, 5000);
     // Local interval for batch processing in this component instance
     const batchProcessingInterval = setInterval(() => {
       console.log(
@@ -1963,7 +2069,8 @@ const formatDateForDisplay = (dateString) => {
                                 </span>
                                 <BatchTimer
                                   startTime={production.start_date}
-                                  batchDuration={5}
+                                  batchDuration={1}
+                                  stopped={production.status !== "running"} 
                                 />
                               </div>
                               <div className="total-estimate">

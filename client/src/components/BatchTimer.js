@@ -1,67 +1,55 @@
-// BatchTimer.js
-import React, { useState, useEffect } from 'react';
-import { useLanguage } from '../contexts/LanguageContext';
+// client/src/components/BatchTimer.js
+import React, { useState, useEffect, useRef } from 'react';
 
-// Timer component for showing countdown to batch completion
-const BatchTimer = ({ startTime, batchDuration = 5 }) => {
-  const { language } = useLanguage();
-  const [timeLeft, setTimeLeft] = useState({ minutes: 0, seconds: 0 });
-  const [isCompleting, setIsCompleting] = useState(false);
+const BatchTimer = ({ startTime, batchDuration = 1, stopped = false }) => {
+  const [timeLeft, setTimeLeft] = useState('');
+  const timerIntervalRef = useRef(null);
 
   useEffect(() => {
-    // Calculate time left until next batch completion
-    const calculateTimeLeft = () => {
-      const now = new Date().getTime();
+    // Clear existing interval if any
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+
+    if (stopped) {
+      setTimeLeft('Completed');
+      return;
+    }
+
+    const updateTimer = () => {
       const start = new Date(startTime).getTime();
+      const now = new Date().getTime();
+      const elapsedSeconds = Math.floor((now - start) / 1000);
+      const batchSeconds = batchDuration * 60;
+      const currentBatch = Math.floor(elapsedSeconds / batchSeconds);
+      const nextBatchTime = start + (currentBatch + 1) * batchSeconds * 1000;
+      const secondsLeft = Math.max(0, Math.floor((nextBatchTime - now) / 1000));
       
-      // Calculate elapsed time in minutes since batch started
-      const elapsedMinutes = (now - start) / (1000 * 60);
+      const minutes = Math.floor(secondsLeft / 60);
+      const seconds = secondsLeft % 60;
       
-      // Calculate which batch is in progress
-      const completedBatches = Math.floor(elapsedMinutes / batchDuration);
-      const nextBatchCompleteTime = start + ((completedBatches + 1) * batchDuration * 60 * 1000);
-      
-      // Calculate time left until next batch completion
-      let diff = nextBatchCompleteTime - now;
-      
-      // If less than 30 seconds left, show "completing" animation
-      if (diff > 0 && diff < 30000) {
-        setIsCompleting(true);
-      } else {
-        setIsCompleting(false);
-      }
-      
-      // Convert to minutes and seconds
-      if (diff > 0) {
-        const minutes = Math.floor((diff / (1000 * 60)) % 60);
-        const seconds = Math.floor((diff / 1000) % 60);
-        return { minutes, seconds };
-      }
-      
-      // Default to next batch if time already passed
-      return { minutes: batchDuration, seconds: 0 };
+      setTimeLeft(`${minutes}:${seconds.toString().padStart(2, '0')}`);
     };
 
-    // Set initial time
-    setTimeLeft(calculateTimeLeft());
-
-    // Update timer every second
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [startTime, batchDuration]);
+    // Initial update
+    updateTimer();
+    
+    // Set up interval
+    timerIntervalRef.current = setInterval(updateTimer, 1000);
+    
+    // Clean up on unmount or when dependencies change
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [startTime, batchDuration, stopped]);
 
   return (
-    <div className={`batch-timer ${isCompleting ? 'completing' : ''}`}>
-      <div className="timer-label">
-        {language === 'vi' ? 'Lô tiếp theo:' : 'Next batch in:'}
-      </div>
-      <div className="timer-value">
-        {String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}
-      </div>
-    </div>
+    <span className={`batch-timer ${timeLeft === 'Completed' ? 'completed' : ''}`}>
+      <span className="timer-label">Next batch:</span>
+      <span className="timer-value">{timeLeft}</span>
+    </span>
   );
 };
 
