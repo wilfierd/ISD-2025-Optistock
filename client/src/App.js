@@ -19,6 +19,7 @@ import ProductDetail from './components/ProductDetail';
 import QRScan from './components/QRScan'; // Import the new QRScan component
 import QRCodeScanner from './components/QRCodeScanner';
 import ReportFieldSelection from './components/ReportFieldSelection';
+import WarehouseReportGenerator from './components/WarehouseReportGenerator';
 
 function App() {
   const { data: authData, isLoading } = useAuthStatus();
@@ -94,6 +95,11 @@ function App() {
           key="report-fields"
           path="/report-fields" 
           element={user ? <ReportFieldSelection user={user} /> : <Navigate to="/login" />}
+        />
+        <Route 
+          key="warehouse-report"
+          path="/warehouse-report" 
+          element={user ? <WarehouseReportGenerator user={user} /> : <Navigate to="/login" />}
         />
       </Routes>
     </LanguageProvider>

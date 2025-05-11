@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import { useLogout } from '../hooks/useAuth';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiService from '../services/api';
 import { toast } from 'react-toastify';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -19,6 +19,10 @@ function ProductWarehouse({ user }) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [productDetailLoading, setProductDetailLoading] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [isStatusUpdating, setIsStatusUpdating] = useState(false);
+  
+  const queryClient = useQueryClient();
 
   // Fetch finished products
   const { data: products = [], isLoading, error, refetch } = useQuery({
@@ -28,6 +32,27 @@ function ProductWarehouse({ user }) {
       return response.data.data || [];
     },
     retry: 1,
+  });
+  
+  // Mutation for updating product status
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ productId, status }) => {
+      return await apiService.finishedProducts.updateStatus(productId, status);
+    },
+    onSuccess: () => {
+      toast.success(t('statusUpdatedSuccessfully'));
+      queryClient.invalidateQueries(['finished-products']);
+      setShowDetailsModal(false);
+      setSelectedProduct(null);
+      setSelectedStatus('');
+    },
+    onError: (error) => {
+      toast.error(t('errorUpdatingStatus'));
+      console.error('Error updating status:', error);
+    },
+    onSettled: () => {
+      setIsStatusUpdating(false);
+    }
   });
   
   const logoutMutation = useLogout();
@@ -54,6 +79,10 @@ function ProductWarehouse({ user }) {
         qualityStatus = 'NG';
         defectCount = product.quantity;
         usableCount = 0;
+      } else if (product.status === 'shipped') {
+        qualityStatus = 'Shipped';
+      } else if (product.status === 'reserved') {
+        qualityStatus = 'Reserved';
       }
       
       return {
@@ -64,9 +93,6 @@ function ProductWarehouse({ user }) {
       };
     });
   }, [products]);
-  
-  // Filter products based on search term, status filter, and date filter
-
   
   // Add this function to fetch complete product data
   const fetchCompleteProduct = async (productId) => {
@@ -94,14 +120,21 @@ function ProductWarehouse({ user }) {
           qualityStatus = 'NG';
           defectCount = product.quantity;
           usableCount = 0;
+        } else if (product.status === 'shipped') {
+          qualityStatus = 'Shipped';
+        } else if (product.status === 'reserved') {
+          qualityStatus = 'Reserved';
         }
         
-        setSelectedProduct({
+        const updatedProduct = {
           ...product,
           qualityStatus,
           defectCount,
           usableCount
-        });
+        };
+        
+        setSelectedProduct(updatedProduct);
+        setSelectedStatus(product.status || 'in_stock');
       } else {
         toast.error(t('productDataNotFound'));
       }
@@ -118,6 +151,25 @@ function ProductWarehouse({ user }) {
     // Fetch the complete product data with history
     fetchCompleteProduct(product.id);
     setShowDetailsModal(true);
+  };
+  
+  // Handle status change
+  const handleStatusChange = (e) => {
+    setSelectedStatus(e.target.value);
+  };
+  
+  // Handle saving the status
+  const handleSaveStatus = () => {
+    if (!selectedProduct || !selectedStatus) {
+      toast.error(t('pleaseSelectStatus'));
+      return;
+    }
+    
+    setIsStatusUpdating(true);
+    updateStatusMutation.mutate({
+      productId: selectedProduct.id,
+      status: selectedStatus
+    });
   };
   
   // Handle QR code generation
@@ -199,7 +251,9 @@ function ProductWarehouse({ user }) {
         statusFilter === 'all' || 
         (statusFilter === 'ok' && product.qualityStatus === 'OK') ||
         (statusFilter === 'ng' && product.qualityStatus === 'NG') ||
-        (statusFilter === 'pending' && product.qualityStatus === 'Chờ kiểm tra');
+        (statusFilter === 'pending' && product.qualityStatus === 'Chờ kiểm tra') ||
+        (statusFilter === 'shipped' && product.status === 'shipped') ||
+        (statusFilter === 'reserved' && product.status === 'reserved');
       
       // Date filter (example implementation)
       let matchesDate = true;
@@ -238,6 +292,10 @@ function ProductWarehouse({ user }) {
         return 'danger';
       case 'Chờ kiểm tra':
         return 'warning';
+      case 'Shipped':
+        return 'info';
+      case 'Reserved':
+        return 'secondary';
       default:
         return 'secondary';
     }
@@ -311,6 +369,8 @@ function ProductWarehouse({ user }) {
                   <option value="ok">{t('statusOK')}</option>
                   <option value="ng">{t('statusNG')}</option>
                   <option value="pending">{t('statusPending')}</option>
+                  <option value="shipped">{t('statusShipped')}</option>
+                  <option value="reserved">{t('statusReserved')}</option>
                 </select>
               </div>
               <div className="col-md-3">
@@ -454,6 +514,7 @@ function ProductWarehouse({ user }) {
                   onClick={() => {
                     setShowDetailsModal(false);
                     setSelectedProduct(null);
+                    setSelectedStatus('');
                   }}
                 ></button>
               </div>
@@ -505,6 +566,53 @@ function ProductWarehouse({ user }) {
                   </div>
                 </div>
                 
+                {/* New Status Update Section */}
+                <div className="card mt-3 mb-4">
+                  <div className="card-header bg-light">
+                    <h6 className="mb-0">{t('updateStatus')}</h6>
+                  </div>
+                  <div className="card-body">
+                    <div className="row align-items-center">
+                      <div className="col-md-5">
+                        <span className="detail-label">{t('currentStatus')}:</span>
+                        <span className={`badge bg-${getStatusBadgeColor(selectedProduct.qualityStatus)} ms-2`}>
+                          {selectedProduct.qualityStatus}
+                        </span>
+                      </div>
+                      <div className="col-md-5">
+                        <label htmlFor="statusSelect" className="form-label">
+                          {t('newStatus')}:
+                        </label>
+                        <select 
+                          id="statusSelect"
+                          className="form-select" 
+                          value={selectedStatus}
+                          onChange={handleStatusChange}
+                        >
+                          <option value="in_stock">{t('statusInStock')}</option>
+                          <option value="defective">{t('statusDefective')}</option>
+                          <option value="shipped">{t('statusShipped')}</option>
+                          <option value="reserved">{t('statusReserved')}</option>
+                        </select>
+                      </div>
+                      <div className="col-md-2">
+                        <button 
+                          className="btn btn-primary mt-md-4" 
+                          onClick={handleSaveStatus}
+                          disabled={isStatusUpdating}
+                        >
+                          {isStatusUpdating ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                              {t('saving')}
+                            </>
+                          ) : t('saveStatus')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
                 {selectedProduct.qualityStatus === 'NG' && (
                   <div className="alert alert-warning mt-3">
                     <h6 className="mb-2">{t('defectDetails')}</h6>
@@ -534,94 +642,94 @@ function ProductWarehouse({ user }) {
                 <div className="mt-4">
                   <h6>{t('productHistory')}</h6>
                   <div className="accordion" id="productHistoryAccordion">
-{/* Material Information */}
-<div className="accordion-item">
-  <h2 className="accordion-header">
-    <button className="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#materialInfo">
-      {t('materialInformation')}
-    </button>
-  </h2>
-  <div id="materialInfo" className="accordion-collapse collapse show">
-    <div className="accordion-body">
-      {selectedProduct.history?.material ? (
-        <div>
-          <p><strong>{t('materialName')}:</strong> {selectedProduct.history.material.part_name}</p>
-          <p><strong>{t('materialCode')}:</strong> {selectedProduct.history.material.material_code}</p>
-          <p><strong>{t('supplier')}:</strong> {selectedProduct.history.material.supplier}</p>
-          <p><strong>{t('lastUpdated')}:</strong> {selectedProduct.history.material.last_updated}</p>
-        </div>
-      ) : (
-        <p>{t('noMaterialInformation')}</p>
-      )}
-    </div>
-  </div>
-</div>
+                    {/* Material Information */}
+                    <div className="accordion-item">
+                      <h2 className="accordion-header">
+                        <button className="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#materialInfo">
+                          {t('materialInformation')}
+                        </button>
+                      </h2>
+                      <div id="materialInfo" className="accordion-collapse collapse show">
+                        <div className="accordion-body">
+                          {selectedProduct.history?.material ? (
+                            <div>
+                              <p><strong>{t('materialName')}:</strong> {selectedProduct.history.material.part_name}</p>
+                              <p><strong>{t('materialCode')}:</strong> {selectedProduct.history.material.material_code}</p>
+                              <p><strong>{t('supplier')}:</strong> {selectedProduct.history.material.supplier}</p>
+                              <p><strong>{t('lastUpdated')}:</strong> {selectedProduct.history.material.last_updated}</p>
+                            </div>
+                          ) : (
+                            <p>{t('noMaterialInformation')}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-{/* Production Information */}
-<div className="accordion-item">
-  <h2 className="accordion-header">
-    <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#productionInfo">
-      {t('productionInformation')}
-    </button>
-  </h2>
-  <div id="productionInfo" className="accordion-collapse collapse">
-    <div className="accordion-body">
-      {selectedProduct.history?.production ? (
-        <div>
-          <p><strong>{t('machine')}:</strong> {selectedProduct.history.production.machine_name}</p>
-          <p><strong>{t('mold')}:</strong> {selectedProduct.history.production.mold_code}</p>
-          <p><strong>{t('startDate')}:</strong> {formatDateTime(selectedProduct.history.production.start_date)}</p>
-          <p><strong>{t('operator')}:</strong> {selectedProduct.history.production.operator_name || selectedProduct.history.production.created_by_username}</p>
-        </div>
-      ) : (
-        <p>{t('noProductionInformation')}</p>
-      )}
-    </div>
-  </div>
-</div>
+                    {/* Production Information */}
+                    <div className="accordion-item">
+                      <h2 className="accordion-header">
+                        <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#productionInfo">
+                          {t('productionInformation')}
+                        </button>
+                      </h2>
+                      <div id="productionInfo" className="accordion-collapse collapse">
+                        <div className="accordion-body">
+                          {selectedProduct.history?.production ? (
+                            <div>
+                              <p><strong>{t('machine')}:</strong> {selectedProduct.history.production.machine_name}</p>
+                              <p><strong>{t('mold')}:</strong> {selectedProduct.history.production.mold_code}</p>
+                              <p><strong>{t('startDate')}:</strong> {formatDateTime(selectedProduct.history.production.start_date)}</p>
+                              <p><strong>{t('operator')}:</strong> {selectedProduct.history.production.operator_name || selectedProduct.history.production.created_by_username}</p>
+                            </div>
+                          ) : (
+                            <p>{t('noProductionInformation')}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-{/* Assembly Information */}
-<div className="accordion-item">
-  <h2 className="accordion-header">
-    <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#assemblyInfo">
-      {t('assemblyInformation')}
-    </button>
-  </h2>
-  <div id="assemblyInfo" className="accordion-collapse collapse">
-    <div className="accordion-body">
-      {selectedProduct.history?.assembly ? (
-        <div>
-          <p><strong>{t('assemblyDate')}:</strong> {formatDateTime(selectedProduct.history.assembly.start_time)}</p>
-          <p><strong>{t('assembledBy')}:</strong> {selectedProduct.history.assembly.pic_name}</p>
-          <p><strong>{t('completionTime')}:</strong> {formatDateTime(selectedProduct.history.assembly.completion_time)}</p>
-        </div>
-      ) : (
-        <p>{t('noAssemblyInformation')}</p>
-      )}
-    </div>
-  </div>
-</div>
+                    {/* Assembly Information */}
+                    <div className="accordion-item">
+                      <h2 className="accordion-header">
+                        <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#assemblyInfo">
+                          {t('assemblyInformation')}
+                        </button>
+                      </h2>
+                      <div id="assemblyInfo" className="accordion-collapse collapse">
+                        <div className="accordion-body">
+                          {selectedProduct.history?.assembly ? (
+                            <div>
+                              <p><strong>{t('assemblyDate')}:</strong> {formatDateTime(selectedProduct.history.assembly.start_time)}</p>
+                              <p><strong>{t('assembledBy')}:</strong> {selectedProduct.history.assembly.pic_name}</p>
+                              <p><strong>{t('completionTime')}:</strong> {formatDateTime(selectedProduct.history.assembly.completion_time)}</p>
+                            </div>
+                          ) : (
+                            <p>{t('noAssemblyInformation')}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-{/* Plating Information */}
-<div className="accordion-item">
-  <h2 className="accordion-header">
-    <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#platingInfo">
-      {t('platingInformation')}
-    </button>
-  </h2>
-  <div id="platingInfo" className="accordion-collapse collapse">
-    <div className="accordion-body">
-      {selectedProduct.history?.plating ? (
-        <div>
-          <p><strong>{t('platingDate')}:</strong> {formatDateTime(selectedProduct.history.plating.plating_start_time)}</p>
-          <p><strong>{t('completionDate')}:</strong> {formatDateTime(selectedProduct.history.plating.plating_end_time)}</p>
-        </div>
-      ) : (
-        <p>{t('noPlatingInformation')}</p>
-      )}
-    </div>
-  </div>
-</div>
+                    {/* Plating Information */}
+                    <div className="accordion-item">
+                      <h2 className="accordion-header">
+                        <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#platingInfo">
+                          {t('platingInformation')}
+                        </button>
+                      </h2>
+                      <div id="platingInfo" className="accordion-collapse collapse">
+                        <div className="accordion-body">
+                          {selectedProduct.history?.plating ? (
+                            <div>
+                              <p><strong>{t('platingDate')}:</strong> {formatDateTime(selectedProduct.history.plating.plating_start_time)}</p>
+                              <p><strong>{t('completionDate')}:</strong> {formatDateTime(selectedProduct.history.plating.plating_end_time)}</p>
+                            </div>
+                          ) : (
+                            <p>{t('noPlatingInformation')}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                     
                     {/* Quality Control Information */}
                     <div className="accordion-item">
@@ -667,6 +775,7 @@ function ProductWarehouse({ user }) {
                   onClick={() => {
                     setShowDetailsModal(false);
                     setSelectedProduct(null);
+                    setSelectedStatus('');
                   }}
                 >
                   {t('close')}
@@ -939,6 +1048,7 @@ function ProductWarehouse({ user }) {
             setShowQrModal(false);
             setShowScanModal(false);
             setSelectedProduct(null);
+            setSelectedStatus('');
             setQrScanResult('');
           }}
         ></div>

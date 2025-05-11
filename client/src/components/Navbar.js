@@ -181,7 +181,11 @@ function Navbar({ user, onLogout }) {
     vietnamese: {
       en: 'Vietnamese',
       vi: 'Tiếng Việt'
-    }
+    },
+    warehouseReport: {
+        en: 'Reports',
+        vi: 'Báo cáo'
+      },
   };
 
   // Function to get text based on current language
@@ -334,6 +338,19 @@ function Navbar({ user, onLogout }) {
             }}
           >
             {getText(navItems.qrScan)}
+          </Link>
+          <Link 
+            className={`navbar-brand ${isActive('/warehouse-report') ? 'fw-bold' : ''}`} 
+            to="/warehouse-report"
+            style={{ 
+              padding: '10px 20px', 
+              margin: '0 5px', 
+              borderRadius: '4px',
+              backgroundColor: isActive('/warehouse-report') ? 'rgba(255,255,255,0.2)' : 'transparent',
+              fontWeight: isActive('/warehouse-report') ? 'bold' : 'normal'
+            }}
+          >
+            {getText(navItems.warehouseReport)}
           </Link>
         </div>
         
