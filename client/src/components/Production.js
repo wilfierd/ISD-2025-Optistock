@@ -202,7 +202,7 @@ processBatchesInBackground: async function () {
 
           // DELETE the production since it's now complete
           try {
-            await apiService.production.delete(prod.id);
+            await apiService.production.archive(prod.id);
             console.log(`Deleted completed production ${prod.id} with output ${totalExpected}`);
           } catch (error) {
             console.error(`Error deleting production ${prod.id}:`, error);

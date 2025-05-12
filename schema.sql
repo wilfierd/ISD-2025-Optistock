@@ -528,7 +528,7 @@ CREATE TABLE IF NOT EXISTS loHangHoa (
     FOREIGN KEY (mold_id) REFERENCES molds(id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
-
+ALTER TABLE loHangHoa ADD COLUMN is_hidden TINYINT(1) DEFAULT 0;
 -- Insert sample data for machines
 INSERT INTO machines (ten_may_dap) VALUES
 ('A7-45T'),

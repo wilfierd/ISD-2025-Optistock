@@ -1360,52 +1360,72 @@ app.post('/api/batches', isAuthenticatedAPI, async (req, res) => {
 // ===== PRODUCTION API =====
 // ===== PRODUCTION API ROUTES =====
 
-// Get all production batches
 app.get('/api/production', isAuthenticatedAPI, async (req, res) => {
-    try {
-      // Get filter from query parameter (default to all)
-      const status = req.query.status || 'all';
-      
-      // Build query based on status filter
-      let query = `
-        SELECT loHangHoa.*, 
-               materials.part_name AS material_name,
-               machines.ten_may_dap AS machine_name,
-               molds.ma_khuon AS mold_code,
-               users.username AS created_by_username
-        FROM loHangHoa
-        LEFT JOIN materials ON loHangHoa.material_id = materials.id
-        LEFT JOIN machines ON loHangHoa.machine_id = machines.id
-        LEFT JOIN molds ON loHangHoa.mold_id = molds.id
-        LEFT JOIN users ON loHangHoa.created_by = users.id
-      `;
-      
-      // Add where clause if filtering by status
-      if (status !== 'all') {
-        query += ` WHERE loHangHoa.status = ?`;
-      }
-      
-      // Order by creation date, newest first
-      query += ` ORDER BY loHangHoa.created_at DESC`;
-      
-      // Execute query
-      const [batches] = status === 'all' 
-        ? await pool.query(query)
-        : await pool.query(query, [status]);
-      
-      res.json({
-        success: true,
-        data: batches
-      });
-    } catch (error) {
-      console.error('Error fetching production batches:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch production batches'
-      });
+  try {
+    // Get filter from query parameter (default to all)
+    const status = req.query.status || 'all';
+    
+    // Build query based on status filter
+    let query = `
+      SELECT loHangHoa.*, 
+             materials.part_name AS material_name,
+             machines.ten_may_dap AS machine_name,
+             molds.ma_khuon AS mold_code,
+             users.username AS created_by_username
+      FROM loHangHoa
+      LEFT JOIN materials ON loHangHoa.material_id = materials.id
+      LEFT JOIN machines ON loHangHoa.machine_id = machines.id
+      LEFT JOIN molds ON loHangHoa.mold_id = molds.id
+      LEFT JOIN users ON loHangHoa.created_by = users.id
+      WHERE loHangHoa.is_hidden = 0
+    `;
+    
+    // Add where clause if filtering by status
+    if (status !== 'all') {
+      query += ` AND loHangHoa.status = ?`;
     }
-  });
-  
+    
+    // Order by creation date, newest first
+    query += ` ORDER BY loHangHoa.created_at DESC`;
+    
+    // Execute query
+    const [batches] = status === 'all' 
+      ? await pool.query(query)
+      : await pool.query(query, [status]);
+    
+    res.json({
+      success: true,
+      data: batches
+    });
+  } catch (error) {
+    console.error('Error fetching production batches:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch production batches'
+    });
+  }
+});
+app.put('/api/production/:id/archive', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await pool.query(
+      'UPDATE loHangHoa SET status = ?, end_date = NOW(), is_hidden = 1 WHERE id = ?', 
+      ['stopping', id]
+    );
+    
+    res.json({
+      success: true,
+      message: 'Production batch archived successfully'
+    });
+  } catch (error) {
+    console.error('Error archiving production batch:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to archive production batch'
+    });
+  }
+});
   // Get batch by ID
   app.get('/api/production/:id', isAuthenticatedAPI, async (req, res) => {
     try {
@@ -1630,46 +1650,50 @@ app.get('/api/production', isAuthenticatedAPI, async (req, res) => {
   });
   
   // Delete production batch
-  app.delete('/api/production/:id', isAuthenticatedAPI, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      // Get the batch to check machine status
-      const [batch] = await pool.query(
-        'SELECT machine_id, status FROM loHangHoa WHERE id = ?',
-        [id]
-      );
-      
-      if (batch.length === 0) {
-        return res.status(404).json({
-          success: false,
-          error: 'Production batch not found'
-        });
-      }
-      
-      // Delete the batch
-      await pool.query('DELETE FROM loHangHoa WHERE id = ?', [id]);
-      
-      // If batch was running, update machine status to stopping
-      if (batch[0].status === 'running') {
-        await pool.query(
-          'UPDATE machines SET status = ? WHERE id = ?',
-          ['stopping', batch[0].machine_id]
-        );
-      }
-      
-      res.json({
-        success: true,
-        message: 'Production batch deleted successfully'
-      });
-    } catch (error) {
-      console.error('Error deleting production batch:', error);
-      res.status(500).json({
+// "Archive" production batch by marking it as "stopping" instead of deleting
+app.delete('/api/production/:id', isAuthenticatedAPI, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the batch to check machine status
+    const [batch] = await pool.query(
+      'SELECT machine_id, status FROM loHangHoa WHERE id = ?',
+      [id]
+    );
+    
+    if (batch.length === 0) {
+      return res.status(404).json({
         success: false,
-        error: 'Failed to delete production batch'
+        error: 'Production batch not found'
       });
     }
-  });
+    
+    // Update to "stopping" and set end_date to mark as completed
+    await pool.query(
+      'UPDATE loHangHoa SET status = ?, end_date = NOW(), is_hidden = 1 WHERE id = ?', 
+      ['stopping', id]
+    );
+    
+    // If batch was running, update machine status
+    if (batch[0].status === 'running') {
+      await pool.query(
+        'UPDATE machines SET status = ? WHERE id = ?',
+        ['stopping', batch[0].machine_id]
+      );
+    }
+    
+    res.json({
+      success: true,
+      message: 'Production batch archived successfully'
+    });
+  } catch (error) {
+    console.error('Error archiving production batch:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to archive production batch'
+    });
+  }
+});
   
   // Additional endpoints for machines
   
@@ -2288,20 +2312,23 @@ app.get('/api/finished-products/:id', isAuthenticatedAPI, async (req, res) => {
   `);
     
     // 2. Get production information
-    const [productionRows] = await pool.query(`
-      SELECT l.*, 
-             m.ten_may_dap as machine_name,
-             mold.ma_khuon as mold_code,
-             u.username as operator_name
-      FROM loHangHoa l
-      JOIN machines m ON l.machine_id = m.id
-      JOIN molds mold ON l.mold_id = mold.id
-      JOIN users u ON l.created_by = u.id
-      JOIN materials mat ON l.material_id = mat.id
-      JOIN batch_groups bg ON bg.group_id = ?
-      JOIN batches b ON bg.batch_id = b.id AND b.mold_code = mold.ma_khuon
-      LIMIT 1
-    `, [product.group_id]);
+// Get production information - fix the query
+const [productionRows] = await pool.query(`
+  SELECT l.*, 
+         m.ten_may_dap as machine_name,
+         mold.ma_khuon as mold_code,
+         u.username as operator_name
+  FROM loHangHoa l
+  JOIN machines m ON l.machine_id = m.id
+  JOIN molds mold ON l.mold_id = mold.id
+  JOIN users u ON l.created_by = u.id
+  JOIN materials mat ON l.material_id = mat.id
+  /* Remove the direct join on group_id which doesn't exist */
+  JOIN batches b ON b.mold_code = mold.ma_khuon
+  JOIN batch_groups bg ON bg.batch_id = b.id
+  WHERE bg.group_id = ?
+  LIMIT 1
+`, [product.group_id]);
     
     // 3. Get assembly information
     const [assemblyRows] = await pool.query(`

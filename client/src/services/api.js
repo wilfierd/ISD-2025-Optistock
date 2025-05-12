@@ -99,7 +99,8 @@ const apiService = {
     getById: (id) => api.get(`/production/${id}`),
     create: (data) => api.post('/production', data),
     update: (id, data) => api.put(`/production/${id}`, data),
-    delete: (id) => api.delete(`/production/${id}`)
+    delete: (id) => api.delete(`/production/${id}`),
+    archive: (id) => axios.put(`/production/${id}/archive`),
   },
   machines: {
     getAll: () => api.get('/machines'),
