@@ -2282,15 +2282,10 @@ app.get('/api/finished-products/:id', isAuthenticatedAPI, async (req, res) => {
     
     // 1. Get material information
     const [materialRows] = await pool.query(`
-      SELECT m.* 
-      FROM materials m
-      JOIN loHangHoa l ON l.material_id = m.id
-      JOIN molds mold ON l.mold_id = mold.id
-      JOIN batch_groups bg ON bg.group_id = ?
-      JOIN batches b ON bg.batch_id = b.id
-      WHERE m.id = l.material_id
-      LIMIT 1
-    `, [product.group_id]);
+    SELECT * FROM materials
+    ORDER BY id DESC
+    LIMIT 1
+  `);
     
     // 2. Get production information
     const [productionRows] = await pool.query(`
