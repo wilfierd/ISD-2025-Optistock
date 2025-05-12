@@ -2313,20 +2313,24 @@ app.get('/api/finished-products/:id', isAuthenticatedAPI, async (req, res) => {
     
     // 2. Get production information
 // Get production information - fix the query
+// Update the production rows query to correctly format both dates
 const [productionRows] = await pool.query(`
   SELECT l.*, 
          m.ten_may_dap as machine_name,
          mold.ma_khuon as mold_code,
-         u.username as operator_name
+         u.username as operator_name,
+         DATE_FORMAT(l.start_date, '%d/%m/%Y %H:%i:%s') as formatted_start_date,
+         DATE_FORMAT(l.end_date, '%d/%m/%Y %H:%i:%s') as formatted_end_date
   FROM loHangHoa l
-  JOIN machines m ON l.machine_id = m.id
-  JOIN molds mold ON l.mold_id = mold.id
-  JOIN users u ON l.created_by = u.id
-  JOIN materials mat ON l.material_id = mat.id
-  /* Remove the direct join on group_id which doesn't exist */
-  JOIN batches b ON b.mold_code = mold.ma_khuon
-  JOIN batch_groups bg ON bg.batch_id = b.id
+  LEFT JOIN machines m ON l.machine_id = m.id
+  LEFT JOIN molds mold ON l.mold_id = mold.id
+  LEFT JOIN users u ON l.created_by = u.id
+  LEFT JOIN materials mat ON l.material_id = mat.id
+  /* Use proper batch filtering if possible */
+  LEFT JOIN batches b ON b.machine_name = m.ten_may_dap AND b.mold_code = mold.ma_khuon
+  LEFT JOIN batch_groups bg ON bg.batch_id = b.id
   WHERE bg.group_id = ?
+  ORDER BY l.created_at DESC
   LIMIT 1
 `, [product.group_id]);
     

@@ -664,29 +664,31 @@ function ProductWarehouse({ user }) {
                         </div>
                       </div>
                     </div>
-
-                    {/* Production Information */}
-                    <div className="accordion-item">
-                      <h2 className="accordion-header">
-                        <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#productionInfo">
-                          {t('productionInformation')}
-                        </button>
-                      </h2>
-                      <div id="productionInfo" className="accordion-collapse collapse">
-                        <div className="accordion-body">
-                          {selectedProduct.history?.production ? (
-                            <div>
-                              <p><strong>{t('machine')}:</strong> {selectedProduct.history.production.machine_name}</p>
-                              <p><strong>{t('mold')}:</strong> {selectedProduct.history.production.mold_code}</p>
-                              <p><strong>{t('startDate')}:</strong> {formatDateTime(selectedProduct.history.production.start_date)}</p>
-                              <p><strong>{t('operator')}:</strong> {selectedProduct.history.production.operator_name || selectedProduct.history.production.created_by_username}</p>
-                            </div>
-                          ) : (
-                            <p>{t('noProductionInformation')}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+{/* Production Information */}
+<div className="accordion-item">
+  <h2 className="accordion-header">
+    <button className="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#productionInfo">
+      {t('productionInformation')}
+    </button>
+  </h2>
+  <div id="productionInfo" className="accordion-collapse collapse">
+    <div className="accordion-body">
+      {selectedProduct.history?.production ? (
+        <div>
+          <p><strong>{t('machine')}:</strong> {selectedProduct.history.production.machine_name}</p>
+          <p><strong>{t('mold')}:</strong> {selectedProduct.history.production.mold_code}</p>
+          <p><strong>{t('startDate')}:</strong> {selectedProduct.history.production.formatted_start_date || formatDateTime(selectedProduct.history.production.start_date)}</p>
+          {selectedProduct.history.production.end_date && (
+            <p><strong>{t('endDate')}:</strong> {selectedProduct.history.production.formatted_end_date || formatDateTime(selectedProduct.history.production.end_date)}</p>
+          )}
+          <p><strong>{t('operator')}:</strong> {selectedProduct.history.production.operator_name || selectedProduct.history.production.created_by_username}</p>
+        </div>
+      ) : (
+        <p>{t('noProductionInformation')}</p>
+      )}
+    </div>
+  </div>
+</div>
 
                     {/* Assembly Information */}
                     <div className="accordion-item">

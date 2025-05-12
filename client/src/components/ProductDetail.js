@@ -206,15 +206,18 @@ function ProductDetail({ user }) {
                         )}
                         
                         {product.history?.production && (
-                          <div className="timeline-item">
-                            <div className="timeline-marker bg-info"></div>
-                            <div className="timeline-content">
-                              <h6>{t('production')}</h6>
-                              <p><strong>{t('startDate')}:</strong> {formatDateTime(product.history.production.start_date)}</p>
-                              <p><strong>{t('machine')}:</strong> {product.history.production.machine_name}</p>
-                            </div>
-                          </div>
-                        )}
+                      <div className="timeline-item">
+                        <div className="timeline-marker bg-info"></div>
+                        <div className="timeline-content">
+                          <h6>{t('production')}</h6>
+                          <p><strong>{t('startDate')}:</strong> {product.history.production.formatted_start_date || formatDateTime(product.history.production.start_date)}</p>
+                          {product.history.production.end_date && (
+                            <p><strong>{t('endDate')}:</strong> {product.history.production.formatted_end_date || formatDateTime(product.history.production.end_date)}</p>
+                          )}
+                          <p><strong>{t('machine')}:</strong> {product.history.production.machine_name}</p>
+                        </div>
+                      </div>
+)}
                         
                         {product.history?.assembly && (
                           <div className="timeline-item">
@@ -303,49 +306,56 @@ function ProductDetail({ user }) {
                   )}
                   
                   {/* Production Information Tab */}
-                  {activeTab === 'production' && product.history?.production && (
-                    <div className="production-info">
-                      <h5>{t('productionInformation')}</h5>
-                      <div className="row mt-3">
-                        <div className="col-md-6">
-                          <table className="table table-striped">
-                            <tbody>
-                              <tr>
-                                <th>{t('machine')}</th>
-                                <td>{product.history.production.machine_name}</td>
-                              </tr>
-                              <tr>
-                                <th>{t('mold')}</th>
-                                <td>{product.history.production.mold_code}</td>
-                              </tr>
-                              <tr>
-                                <th>{t('startDate')}</th>
-                                <td>{formatDateTime(product.history.production.start_date)}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                        <div className="col-md-6">
-                          <table className="table table-striped">
-                            <tbody>
-                              <tr>
-                                <th>{t('expectedOutput')}</th>
-                                <td>{product.history.production.expected_output}</td>
-                              </tr>
-                              <tr>
-                                <th>{t('actualOutput')}</th>
-                                <td>{product.history.production.actual_output}</td>
-                              </tr>
-                              <tr>
-                                <th>{t('status')}</th>
-                                <td>{product.history.production.status}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+{/* Update in the Production Information Tab */}
+{activeTab === 'production' && product.history?.production && (
+  <div className="production-info">
+    <h5>{t('productionInformation')}</h5>
+    <div className="row mt-3">
+      <div className="col-md-6">
+        <table className="table table-striped">
+          <tbody>
+            <tr>
+              <th>{t('machine')}</th>
+              <td>{product.history.production.machine_name}</td>
+            </tr>
+            <tr>
+              <th>{t('mold')}</th>
+              <td>{product.history.production.mold_code}</td>
+            </tr>
+            <tr>
+              <th>{t('startDate')}</th>
+              <td>{product.history.production.formatted_start_date || formatDateTime(product.history.production.start_date)}</td>
+            </tr>
+            {product.history.production.end_date && (
+              <tr>
+                <th>{t('endDate')}</th>
+                <td>{product.history.production.formatted_end_date || formatDateTime(product.history.production.end_date)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="col-md-6">
+        <table className="table table-striped">
+          <tbody>
+            <tr>
+              <th>{t('expectedOutput')}</th>
+              <td>{product.history.production.expected_output}</td>
+            </tr>
+            <tr>
+              <th>{t('actualOutput')}</th>
+              <td>{product.history.production.actual_output}</td>
+            </tr>
+            <tr>
+              <th>{t('status')}</th>
+              <td>{product.history.production.status}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)}
                   
                   {/* Assembly Information Tab */}
                   {activeTab === 'assembly' && product.history?.assembly && (
