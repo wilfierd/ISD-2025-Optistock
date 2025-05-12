@@ -2137,7 +2137,7 @@ app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
   app.put('/api/plating/:id', isAuthenticatedAPI, async (req, res) => {
     try {
       const { id } = req.params;
-      const { product_name, product_code, notes, status } = req.body;
+      const { product_name, product_code, notes, status, platingDate, platingTime } = req.body;
       
       // Xây dựng câu lệnh UPDATE dựa trên dữ liệu được cung cấp
       let updateFields = [];
@@ -2157,7 +2157,14 @@ app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
         updateFields.push('notes = ?');
         queryParams.push(notes);
       }
-      
+      if (platingDate && platingTime) {
+        // Convert DD/MM/YYYY to MySQL datetime format
+        const [day, month, year] = platingDate.split('/');
+        const formattedDateTime = `${year}-${month}-${day} ${platingTime}:00`;
+        
+        updateFields.push('plating_start_time = ?');
+        queryParams.push(formattedDateTime);
+      }
       if (status !== undefined) {
         updateFields.push('status = ?');
         queryParams.push(status);

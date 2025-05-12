@@ -23,12 +23,27 @@ const useProduction = (status = "all") => {
 };
 
 // Custom hook for plating data
+// Custom hook for plating data
 const usePlating = () => {
   return useQuery({
     queryKey: ["plating"],
     queryFn: async () => {
       const response = await apiService.plating.getAll();
-      return response.data.data || [];
+      
+      // Process plating_start_time into platingDate and platingTime
+      return (response.data.data || []).map(item => {
+        if (item.plating_start_time) {
+          try {
+            const date = new Date(item.plating_start_time);
+            const platingDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+            const platingTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+            return { ...item, platingDate, platingTime };
+          } catch (e) {
+            console.error('Error processing date:', e);
+          }
+        }
+        return item;
+      });
     },
     retry: 1,
   });
@@ -387,6 +402,14 @@ function Production({ user }) {
     isLoading: isLoadingPlating,
     refetch: refetchPlating,
   } = usePlating();
+
+  // Add effect to log plating data when it changes
+  useEffect(() => {
+    if (platingItems.length > 0) {
+      console.log('Received plating items:', platingItems);
+    }
+  }, [platingItems]);
+
   const { data: machines = [] } = useQuery({
     queryKey: ["machines"],
     queryFn: async () => {
@@ -1687,38 +1710,46 @@ const handleDeleteProduction = (id, isManualDeletion = true) => {
     }
   };
   const handleConfirmPlating = () => {
-    const formattedDate = platingData.platingDate
-      .split("-")
-      .reverse()
-      .join("/");
+    // Format date as dd/mm/yyyy as expected by the server
+    const formattedDate = platingData.platingDate.split("-").reverse().join("/");
+    
+    // Create a properly formatted plating_start_time that will override any server defaults
     const payload = {
+      // Store the date and time separately for consistent display
       platingDate: formattedDate,
       platingTime: platingData.platingTime,
+      // Also store the combined datetime for backward compatibility
+      plating_start_time: `${formattedDate} ${platingData.platingTime}`,
       status: "processing",
       note: platingNote,
     };
-    // show loading toast
+
+    console.log('Plating payload:', payload);
+  
     toast.info(
       language === "vi" ? "Đang chuyển lô sang mạ…" : "Updating plating…",
       { toastId: "plating" }
     );
-
-    const updates = platingData.selectedItems.map((id) =>
-      updatePlating.mutateAsync({ id, data: payload })
-    );
-
+  
+    const updates = platingData.selectedItems.map((id) => {
+      console.log('Updating plating item:', id, 'with payload:', payload);
+      return updatePlating.mutateAsync({ id, data: payload });
+    });
+  
     Promise.all(updates)
       .then(() => {
+        console.log('Plating updates completed successfully');
         toast.dismiss("plating");
         toast.success(
           language === "vi"
-            ? "Chuyển sang “Đang mạ” thành công"
+            ? "Chuyển sang \"Đang mạ\" thành công"
             : "Plating set successfully"
         );
         refetchPlating();
         setPlatingData((d) => ({ ...d, selectedItems: [] }));
       })
       .catch((err) => {
+        console.error('Error updating plating:', err);
         toast.dismiss("plating");
         toast.error(
           language === "vi" ? `Lỗi: ${err.message}` : `Error: ${err.message}`
@@ -2456,11 +2487,16 @@ const handleDeleteProduction = (id, isManualDeletion = true) => {
                                 <td>{item.product_code || "-"}</td>
                                 <td>{item.product_quantity}</td>
                                 <td>
-                                  {item.platingDate && item.platingTime
-                                    ? `${item.platingDate} ${item.platingTime}`
-                                    : formatDateForDisplay(
-                                        item.plating_start_time
-                                      ) || "-"}
+                                  {/* Display plating date and time consistently */}
+                                  {(() => {
+                                    console.log('Displaying plating item:', item);
+                                    if (item.platingDate && item.platingTime) {
+                                      return `${item.platingDate} ${item.platingTime}`;
+                                    } else if (item.plating_start_time) {
+                                      return item.plating_start_time;
+                                    }
+                                    return "-";
+                                  })()}
                                 </td>
                                 <td>
                                   {item.status === "processing" && (
