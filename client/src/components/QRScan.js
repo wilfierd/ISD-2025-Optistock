@@ -545,41 +545,6 @@ function QRScan({ user }) {
             ))}
           </div>
         </div>
-        
-        {/* Component Parts */}
-        <div className="section">
-          <h4 className="section-title">{language === 'vi' ? 'Thành phần linh kiện' : 'Component Parts'}</h4>
-          <div className="component-parts-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>{language === 'vi' ? 'Mã linh kiện' : 'Part Code'}</th>
-                  <th>{language === 'vi' ? 'Tên linh kiện' : 'Part Name'}</th>
-                  <th>{language === 'vi' ? 'Số lượng' : 'Quantity'}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productData.componentParts.map((part, index) => (
-                  <tr key={index}>
-                    <td>{part.code}</td>
-                    <td>{part.name}</td>
-                    <td>{part.quantity}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        
-        {/* Notes */}
-        {productData.notes && (
-          <div className="section">
-            <h4 className="section-title">{language === 'vi' ? 'Ghi chú' : 'Notes'}</h4>
-            <div className="notes-content">
-              {productData.notes}
-            </div>
-          </div>
-        )}
       </div>
     );
   };
