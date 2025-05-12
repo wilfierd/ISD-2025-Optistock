@@ -100,200 +100,181 @@ const BackgroundService = {
     this.active = true;
   },
 
-  // This function will run in the background to process batches
-  // This function will run in the background to process batches
-  processBatchesInBackground: async function () {
-    try {
-      // Prevent concurrent processing
-      if (processingLock) {
-        console.log("Background processing: Already locked, skipping");
-        return;
-      }
+// This function will run in the background to process batches
+processBatchesInBackground: async function () {
+  try {
+    // Prevent concurrent processing
+    if (processingLock) {
+      console.log("Background processing: Already locked, skipping");
+      return;
+    }
 
-      // Rate limiting
-      const now = Date.now();
-      const lastProcessingTime = getLastProcessingTime();
-      if (now - lastProcessingTime < 10000) {
-        console.log("Background processing: Rate limited, skipping");
-        return;
-      }
+    // Rate limiting
+    const now = Date.now();
+    const lastProcessingTime = getLastProcessingTime();
+    if (now - lastProcessingTime < 10000) {
+      console.log("Background processing: Rate limited, skipping");
+      return;
+    }
 
-      console.log(
-        "Background batch processing running",
-        new Date().toLocaleTimeString()
-      );
-      processingLock = true;
-      saveLastProcessingTime(now);
+    console.log(
+      "Background batch processing running",
+      new Date().toLocaleTimeString()
+    );
+    processingLock = true;
+    saveLastProcessingTime(now);
 
-      // Fetch active productions
-      const productionsResponse = await apiService.production.getAll("running");
-      const productions = productionsResponse.data.data || [];
+    // Fetch active productions
+    const productionsResponse = await apiService.production.getAll("running");
+    const productions = productionsResponse.data.data || [];
 
-      if (productions.length === 0) {
-        console.log("No running productions found");
-        return;
-      }
+    if (productions.length === 0) {
+      console.log("No running productions found");
+      return;
+    }
 
-      console.log(`Found ${productions.length} running productions to process`);
+    console.log(`Found ${productions.length} running productions to process`);
 
-      // Get current processed counts
-      const lastProcessedCounts = getLastProcessedBatchCounts();
-      let updatedCounts = { ...lastProcessedCounts };
-      let countsChanged = false;
+    // Get current processed counts
+    const lastProcessedCounts = getLastProcessedBatchCounts();
+    let updatedCounts = { ...lastProcessedCounts };
+    let countsChanged = false;
 
-      // Process each production
-      for (const prod of productions) {
-        try {
-          const startTime = new Date(prod.start_date).getTime();
-          const now = new Date().getTime();
-          // Using 1 minute per batch
-          const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+    // Process each production
+    for (const prod of productions) {
+      try {
+        const startTime = new Date(prod.start_date).getTime();
+        const now = new Date().getTime();
+        // Using 1 minute per batch
+        const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+        
+        // Calculate with 1 minute per batch
+        const batchesDone = Math.floor(elapsedMinutes / 1);
+        const lastProcessed = lastProcessedCounts[prod.id] || 0;
+        const totalExpected = prod.expected_output || 100;
 
-          // Calculate with 1 minute per batch
-          const batchesDone = Math.floor(elapsedMinutes / 1);
-          const lastProcessed = lastProcessedCounts[prod.id] || 0;
-          const totalExpected = prod.expected_output || 100;
+        console.log(
+          `Background processing: Production ${prod.id}: ${batchesDone} batches done, ${lastProcessed} last processed, Total: ${totalExpected}`
+        );
 
+        // Check if production is at 100% completion
+        if (batchesDone >= totalExpected) {
           console.log(
-            `Background processing: Production ${prod.id}: ${batchesDone} batches done, ${lastProcessed} last processed, Total: ${totalExpected}`
+            `Background processing: Production ${prod.id} has reached 100% - deleting`
           );
 
-          // Check if production is at 100% completion
-          if (batchesDone >= totalExpected) {
-            console.log(
-              `Background processing: Production ${prod.id} has reached 100% - deleting`
-            );
-
-            // Calculate newly completed batches
-            const newlyCompletedCount = totalExpected - lastProcessed;
-
-            // Only proceed if there are new batches to process and the production is still running
-            if (newlyCompletedCount > 0 && prod.status === "running") {
-              try {
-                console.log(
-                  `Creating ${newlyCompletedCount} completed batches for production ${prod.id}`
-                );
-
-                // Prepare the batch data for warehouse
-                const batchData = {
-                  part_name: prod.material_name,
-                  machine_name: prod.machine_name,
-                  mold_code: prod.mold_code,
-                  quantity: newlyCompletedCount,
-                  warehouse_entry_time: this.formatDateTime(new Date()),
-                  status: null, // Initially ungrouped
-                  created_by: 1, // Default user ID - this will be used if user context isn't available
-                };
-
-                // Create the batch in warehouse
-                await apiService.batches.create(batchData);
-                console.log(
-                  `Successfully created ${newlyCompletedCount} batches in warehouse from background service`
-                );
-              } catch (error) {
-                console.error(
-                  `Error creating batches for production ${prod.id}:`,
-                  error
-                );
-              }
-            }
-
-            // DELETE the production instead of marking as stopped
+          // Calculate newly completed batches
+          const newlyCompletedCount = totalExpected - lastProcessed;
+          
+          // Only proceed if there are new batches to process and the production is still running
+          if (newlyCompletedCount > 0 && prod.status === "running") {
             try {
-              await apiService.production.delete(prod.id);
-              console.log(
-                `Deleted completed production ${prod.id} with output ${totalExpected}`
-              );
-            } catch (error) {
-              console.error(`Error deleting production ${prod.id}:`, error);
-            }
-
-            // Update machine status to normal state
-            if (prod.machine_id) {
-              try {
-                await apiService.machines.saveStopReason(prod.machine_id, {
-                  reason:
-                    "Production complete - 100% of expected output reached - Production automatically deleted",
-                  stopTime: new Date().toTimeString().split(" ")[0],
-                  stopDate: new Date()
-                    .toLocaleDateString("en-GB")
-                    .split("/")
-                    .join("/"),
-                });
-                console.log(
-                  `Updated machine ${prod.machine_id} status after production deletion`
-                );
-              } catch (err) {
-                console.error(
-                  `Failed to update machine ${prod.machine_id} status:`,
-                  err
-                );
-              }
-            }
-
-            // Update the processed count to exactly match the total expected
-            updatedCounts[prod.id] = totalExpected;
-            countsChanged = true;
-
-            // Skip to the next production since we've handled this one
-            continue;
-          }
-
-          // If new batches have been completed
-          if (batchesDone > lastProcessed) {
-            const newlyCompletedCount = batchesDone - lastProcessed;
-
-            if (newlyCompletedCount > 0) {
-              console.log(
-                `Background processing: ${newlyCompletedCount} new batches completed for production ${prod.id}`
-              );
-
-              // Create batches in warehouse
+              console.log(`Creating ${newlyCompletedCount} completed batches for production ${prod.id}`);
+              
+              // Prepare the batch data for warehouse
               const batchData = {
                 part_name: prod.material_name,
                 machine_name: prod.machine_name,
                 mold_code: prod.mold_code,
-                quantity: Math.min(newlyCompletedCount, 5), // Limit to 5 at once
+                quantity: newlyCompletedCount,
                 warehouse_entry_time: this.formatDateTime(new Date()),
                 status: null, // Initially ungrouped
-                created_by: 1, // Default to admin user if we don't have user context
+                created_by: 1, // Default user ID - this will be used if user context isn't available
               };
 
-              // Create the batch
+              // Create the batch in warehouse
               await apiService.batches.create(batchData);
-
-              // Update production with new actual output
-              await apiService.production.update(prod.id, {
-                actual_output: batchesDone,
-              });
-
-              // Update our tracking
-              updatedCounts[prod.id] = batchesDone;
-              countsChanged = true;
+              console.log(`Successfully created ${newlyCompletedCount} batches in warehouse from background service`);
+            } catch (error) {
+              console.error(`Error creating batches for production ${prod.id}:`, error);
             }
           }
-        } catch (error) {
-          console.error(
-            "Background processing: Error processing production",
-            prod.id,
-            error
-          );
-        }
-      }
 
-      if (countsChanged) {
-        saveLastProcessedBatchCounts(updatedCounts);
-        console.log(
-          "Background processing: Updated processed counts",
-          updatedCounts
+          // DELETE the production instead of marking as stopped
+          try {
+            await apiService.production.delete(prod.id);
+            console.log(`Deleted completed production ${prod.id} with output ${totalExpected}`);
+          } catch (error) {
+            console.error(`Error deleting production ${prod.id}:`, error);
+          }
+
+          // Update machine status to normal state
+          if (prod.machine_id) {
+            try {
+              await apiService.machines.saveStopReason(prod.machine_id, {
+                reason: "Production complete - 100% of expected output reached - Production automatically deleted",
+                stopTime: new Date().toTimeString().split(" ")[0],
+                stopDate: new Date().toLocaleDateString("en-GB").split("/").join("/"),
+              });
+              console.log(`Updated machine ${prod.machine_id} status after production deletion`);
+            } catch (err) {
+              console.error(`Failed to update machine ${prod.machine_id} status:`, err);
+            }
+          }
+
+          // Update the processed count to exactly match the total expected
+          updatedCounts[prod.id] = totalExpected;
+          countsChanged = true;
+          
+          // Skip to the next production since we've handled this one
+          continue;
+        }
+
+        // If new batches have been completed
+        if (batchesDone > lastProcessed) {
+          const newlyCompletedCount = batchesDone - lastProcessed;
+
+          if (newlyCompletedCount > 0) {
+            console.log(
+              `Background processing: ${newlyCompletedCount} new batches completed for production ${prod.id}`
+            );
+
+            // Create batches in warehouse
+            const batchData = {
+              part_name: prod.material_name,
+              machine_name: prod.machine_name,
+              mold_code: prod.mold_code,
+              quantity: Math.min(newlyCompletedCount, 5), // Limit to 5 at once
+              warehouse_entry_time: this.formatDateTime(new Date()),
+              status: null, // Initially ungrouped
+              created_by: 1, // Default to admin user if we don't have user context
+            };
+
+            // Create the batch
+            await apiService.batches.create(batchData);
+
+            // Update production with new actual output
+            await apiService.production.update(prod.id, {
+              actual_output: batchesDone,
+            });
+
+            // Update our tracking
+            updatedCounts[prod.id] = batchesDone;
+            countsChanged = true;
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Background processing: Error processing production",
+          prod.id,
+          error
         );
       }
-    } catch (error) {
-      console.error("Background processing: Error in batch processing", error);
-    } finally {
-      processingLock = false;
     }
-  },
+
+    if (countsChanged) {
+      saveLastProcessedBatchCounts(updatedCounts);
+      console.log(
+        "Background processing: Updated processed counts",
+        updatedCounts
+      );
+    }
+  } catch (error) {
+    console.error("Background processing: Error in batch processing", error);
+  } finally {
+    processingLock = false;
+  }
+},
 
   // Helper function to format date
   formatDateTime: function (date) {
@@ -929,106 +910,105 @@ function Production({ user }) {
 
     // Update progress UI more frequently (every 5 seconds)
     // Update progress UI more frequently (every 5 seconds)
-    const progressInterval = setInterval(() => {
-      // Update production progress
-      setProductionProgress((prev) => {
-        const updated = { ...prev };
+// Update progress UI more frequently (every 5 seconds)
+const progressInterval = setInterval(() => {
+  // Update production progress
+  setProductionProgress((prev) => {
+    const updated = { ...prev };
 
-        productions.forEach((prod) => {
-          if (prod.status === "running" && updated[prod.id]) {
-            const startTime = new Date(prod.start_date).getTime();
-            const now = new Date().getTime();
-            const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
+    productions.forEach((prod) => {
+      if (prod.status === "running" && updated[prod.id]) {
+        const startTime = new Date(prod.start_date).getTime();
+        const now = new Date().getTime();
+        const elapsedMinutes = Math.floor((now - startTime) / (1000 * 60));
 
-            // Using 1 min per batch now
-            const batchesDone = Math.floor(elapsedMinutes / 1);
-            const totalExpected = prod.expected_output || 100;
-
-            // Important: Check if we've completed all batches
-            if (batchesDone >= totalExpected) {
-              // Set exact values for completed state
-              updated[prod.id] = {
-                batchesDone: totalExpected,
-                batchesRemaining: 0,
-                totalExpected,
-                percentage: 100,
-                stopped: true,
-                estimatedCompletion: new Date(),
-              };
-
-              // Only trigger these actions if the status hasn't already been changed
-              if (prod.status === "running") {
-                // Create completed batches in warehouse - THIS IS THE KEY ADDITION
-                const newlyCompletedCount =
-                  totalExpected - (lastProcessedBatchCounts[prod.id] || 0);
-                if (newlyCompletedCount > 0) {
-                  // This will transfer the batch to the warehouse
-                  createCompletedBatches(prod, newlyCompletedCount).then(() => {
-                    console.log(
-                      `Created ${newlyCompletedCount} batches in warehouse for production ${prod.id}`
-                    );
-
-                    // Show completion popup
-                    setCompletedBatchInfo({
-                      productionId: prod.id,
-                      materialName: prod.material_name,
-                      machineName: prod.machine_name,
-                      moldCode: prod.mold_code,
-                      batchNumber: totalExpected,
-                      completionTime: new Date(),
-                    });
-                    setShowCompletionPopup(true);
-
-                    // Auto hide after 10 seconds
-                    setTimeout(() => {
-                      setShowCompletionPopup(false);
-                    }, 10000);
-
-                    // Update the last processed batch count
-                    setLastProcessedBatchCounts((prev) => ({
-                      ...prev,
-                      [prod.id]: totalExpected,
-                    }));
-                    saveLastProcessedBatchCounts({
-                      ...lastProcessedBatchCounts,
-                      [prod.id]: totalExpected,
-                    });
-
-                    // DELETE the production instead of updating status
-                    deleteProduction.mutate(prod.id);
+        // Using 1 min per batch now
+        const batchesDone = Math.floor(elapsedMinutes / 1);
+        const totalExpected = prod.expected_output || 100;
+        
+        // Important: Check if we've completed all batches
+        if (batchesDone >= totalExpected) {
+          // Set exact values for completed state
+          updated[prod.id] = {
+            batchesDone: totalExpected,
+            batchesRemaining: 0,
+            totalExpected,
+            percentage: 100,
+            stopped: true,
+            estimatedCompletion: new Date()
+          };
+          
+          // Only trigger these actions if the status hasn't already been changed
+          if (prod.status === "running") {
+            // Create completed batches in warehouse - THIS IS THE KEY ADDITION
+            const newlyCompletedCount = totalExpected - (lastProcessedBatchCounts[prod.id] || 0);
+            if (newlyCompletedCount > 0) {
+              // This will transfer the batch to the warehouse
+              createCompletedBatches(prod, newlyCompletedCount)
+                .then(() => {
+                  console.log(`Created ${newlyCompletedCount} batches in warehouse for production ${prod.id}`);
+                  
+                  // Show completion popup
+                  setCompletedBatchInfo({
+                    productionId: prod.id,
+                    materialName: prod.material_name,
+                    machineName: prod.machine_name,
+                    moldCode: prod.mold_code,
+                    batchNumber: totalExpected,
+                    completionTime: new Date(),
                   });
-                } else {
-                  // Even if no new batches to create, still delete the production
+                  setShowCompletionPopup(true);
+                  
+                  // Auto hide after 10 seconds
+                  setTimeout(() => {
+                    setShowCompletionPopup(false);
+                  }, 10000);
+                  
+                  // Update the last processed batch count
+                  setLastProcessedBatchCounts(prev => ({
+                    ...prev,
+                    [prod.id]: totalExpected
+                  }));
+                  saveLastProcessedBatchCounts({
+                    ...lastProcessedBatchCounts,
+                    [prod.id]: totalExpected
+                  });
+                  
+                  // DELETE the production instead of updating status
                   deleteProduction.mutate(prod.id);
-                }
-              }
+                });
             } else {
-              // Normal progress calculation for in-progress productions
-              const percentage = Math.min(
-                Math.round((batchesDone / totalExpected) * 100),
-                100
-              );
-              const remaining = Math.max(totalExpected - batchesDone, 0);
-
-              updated[prod.id] = {
-                batchesDone,
-                batchesRemaining: remaining,
-                totalExpected,
-                percentage,
-                estimatedCompletion: new Date(
-                  startTime + totalExpected * 1 * 60 * 1000 // 1 minute per batch
-                ),
-              };
+              // Even if no new batches to create, still delete the production
+              deleteProduction.mutate(prod.id);
             }
           }
-        });
+        } else {
+          // Normal progress calculation for in-progress productions
+          const percentage = Math.min(
+            Math.round((batchesDone / totalExpected) * 100),
+            100
+          );
+          const remaining = Math.max(totalExpected - batchesDone, 0);
 
-        return updated;
-      });
+          updated[prod.id] = {
+            batchesDone,
+            batchesRemaining: remaining,
+            totalExpected,
+            percentage,
+            estimatedCompletion: new Date(
+              startTime + totalExpected * 1 * 60 * 1000  // 1 minute per batch
+            ),
+          };
+        }
+      }
+    });
 
-      // Update next batch completion
-      setNextCompletion(getNextBatchCompletion());
-    }, 5000);
+    return updated;
+  });
+
+  // Update next batch completion
+  setNextCompletion(getNextBatchCompletion());
+}, 5000);
     // Local interval for batch processing in this component instance
     const batchProcessingInterval = setInterval(() => {
       console.log(
@@ -1628,25 +1608,24 @@ function Production({ user }) {
     });
   };
 
-  // Handle delete production
-  // Handle delete production
-  const handleDeleteProduction = (id, isManualDeletion = true) => {
-    if (isManualDeletion) {
-      // Only show confirmation for manual deletions
-      if (
-        window.confirm(
-          language === "vi"
-            ? "Bạn có chắc chắn muốn xóa lô sản xuất này?"
-            : "Are you sure you want to delete this production batch?"
-        )
-      ) {
-        deleteProduction.mutate(id);
-      }
-    } else {
-      // For automated deletions, just do it without confirmation
+// Handle delete production
+const handleDeleteProduction = (id, isManualDeletion = true) => {
+  if (isManualDeletion) {
+    // Only show confirmation for manual deletions
+    if (
+      window.confirm(
+        language === "vi"
+          ? "Bạn có chắc chắn muốn xóa lô sản xuất này?"
+          : "Are you sure you want to delete this production batch?"
+      )
+    ) {
       deleteProduction.mutate(id);
     }
-  };
+  } else {
+    // For automated deletions, just do it without confirmation
+    deleteProduction.mutate(id);
+  }
+};
 
   // Handle form input changes
   const handleInputChange = (e) => {
