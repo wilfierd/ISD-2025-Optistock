@@ -225,6 +225,28 @@
   .toolbar-btn i {
     margin-right: 8px;
   }
+
+  .sort-dropdown-menu {
+    position: absolute;
+    margin-top: 4px;
+    background-color: var(--white-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    padding: 8px 0;
+    min-width: 160px;
+  }
+  
+  .sort-dropdown-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+  
+  .sort-dropdown-item:hover {
+    background-color: var(--light-color);
+  }  
   
   /* Report data section */
   .report-data-section {
@@ -905,6 +927,116 @@
     .preview-container * {
       visibility: visible !important;
     }
+
+    /* Add these styles to your WarehouseReportGenerator.css file */
+
+.sort-dropdown-container {
+    position: relative;
+    display: inline-block;
+    margin-left: 10px;
+  }
+  
+  .sort-dropdown-btn {
+    display: flex;
+    align-items: center;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 160px;
+    justify-content: space-between;
+    font-weight: normal;
+  }
+  
+  .sort-dropdown-btn:hover {
+    background-color: #e9ecef;
+    border-color: #ced4da;
+  }
+  
+  .sort-dropdown-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+  }
+  
+  .sort-dropdown-btn i.fas {
+    margin-right: 5px;
+  }
+  
+  .sort-dropdown-btn i.fa-caret-down {
+    margin-left: 5px;
+    margin-right: 0;
+    transition: transform 0.2s;
+  }
+  
+  .sort-dropdown-btn[aria-expanded="true"] i.fa-caret-down {
+    transform: rotate(180deg);
+  }
+  
+  .sort-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 5px);
+    right: 0;
+    z-index: 1000;
+    min-width: 160px;
+    padding: 0.5rem 0;
+    margin: 0;
+    background-color: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    animation: fadeIn 0.2s ease;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .sort-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    clear: both;
+    font-weight: 400;
+    color: #212529;
+    text-align: left;
+    white-space: nowrap;
+    background-color: transparent;
+    border: 0;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+  }
+  
+  .sort-dropdown-item:hover {
+    color: #16181b;
+    text-decoration: none;
+    background-color: #f8f9fa;
+  }
+  
+  .sort-dropdown-item.active {
+    color: #fff;
+    text-decoration: none;
+    background-color: #0d6efd;
+  }
+  
+  /* Make the dropdown more mobile-friendly */
+  @media (max-width: 576px) {
+    .sort-dropdown-container {
+      display: block;
+      margin-top: 10px;
+      margin-left: 0;
+    }
+    
+    .sort-dropdown-btn {
+      width: 100%;
+    }
+    
+    .sort-dropdown-menu {
+      width: 100%;
+    }
+  }
   }
 
   /* npm install file-saver xlsx jspdf jspdf-autotable --save */

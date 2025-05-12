@@ -130,7 +130,7 @@ const apiService = {
     getAll: () => api.get('/finished-products'),
     getById: (id) => api.get(`/finished-products/${id}`),
     create: (data) => api.post('/finished-products', data),
-    updateStatus: (id, status) => api.put(`/finished-products/${id}/status`, { status }),
+    updateStatus: (id, status, defectCount = 0) => api.put(`/finished-products/${id}/status`, { status, defect_count: defectCount }),
   },
 };
 

@@ -2231,126 +2231,191 @@ app.get('/api/assemblies', isAuthenticatedAPI, async (req, res) => {
 });
 
 // Finished Products API
+// Update the finished products GET endpoint to format status properly
 app.get('/api/finished-products', isAuthenticatedAPI, async (req, res) => {
-  try {
-    const [rows] = await pool.query(`
-      SELECT fp.*, 
-             p.product_name as plating_product_name,
-             p.product_code as plating_product_code,
-             a.group_id,
-             u.username as created_by_name
-      FROM finished_products fp
-      LEFT JOIN plating p ON fp.plating_id = p.id
-      LEFT JOIN assembly_components a ON fp.assembly_id = a.id
-      LEFT JOIN users u ON fp.created_by = u.id
-      ORDER BY fp.created_at DESC
-    `);
-    
-    res.json({ success: true, data: rows });
-  } catch (error) {
-    console.error('Error fetching finished products:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch finished products' });
-  }
+    try {
+      const [rows] = await pool.query(`
+        SELECT fp.*, 
+               p.product_name as plating_product_name,
+               p.product_code as plating_product_code,
+               a.group_id,
+               u.username as created_by_name,
+               COALESCE(qc.status, 'Pending') as quality_status,
+               qc.defect_count,
+               qc.checked_by as inspector_id,
+               inspector.username as inspector_name
+        FROM finished_products fp
+        LEFT JOIN plating p ON fp.plating_id = p.id
+        LEFT JOIN assembly_components a ON fp.assembly_id = a.id
+        LEFT JOIN users u ON fp.created_by = u.id
+        LEFT JOIN (
+            SELECT product_id, status, defect_count, checked_by
+            FROM quality_checks
+            WHERE (product_id, check_date) IN (
+                SELECT product_id, MAX(check_date)
+                FROM quality_checks
+                GROUP BY product_id
+            )
+        ) qc ON fp.id = qc.product_id
+        LEFT JOIN users inspector ON qc.checked_by = inspector.id
+        ORDER BY fp.created_at DESC
+      `);
+      
+      // Format the data for easier consumption by the frontend
+      const processedRows = rows.map(product => {
+        const usableCount = Math.max(0, product.quantity - (product.defect_count || 0));
+        
+        return {
+          ...product,
+          qualityStatus: product.quality_status || 'Pending',
+          defectCount: product.defect_count || 0,
+          usableCount,
+          // Quality status for display - this is what will show in the UI
+          displayStatus: product.quality_status === 'OK' ? 'OK' : 
+                        product.quality_status === 'NG' ? 'NG' : 'Chờ kiểm tra'
+        };
+      });
+      
+      res.json({ success: true, data: processedRows });
+    } catch (error) {
+      console.error('Error fetching finished products:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch finished products' });
+    }
 });
 
 // Replace the current endpoint with this enhanced version
+// Update GET endpoint for a single finished product with complete history
 app.get('/api/finished-products/:id', isAuthenticatedAPI, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    // First, get the basic product information
-    const [products] = await pool.query(`
-      SELECT fp.*, 
-             p.product_name as plating_product_name,
-             p.product_code as plating_product_code,
-             a.group_id,
-             u.username as created_by_name
-      FROM finished_products fp
-      LEFT JOIN plating p ON fp.plating_id = p.id
-      LEFT JOIN assembly_components a ON fp.assembly_id = a.id
-      LEFT JOIN users u ON fp.created_by = u.id
-      WHERE fp.id = ?
-    `, [id]);
-    
-    if (products.length === 0) {
-      return res.status(404).json({ success: false, error: 'Finished product not found' });
+    try {
+      const { id } = req.params;
+      
+      // First, get the basic product information with latest quality check
+      const [products] = await pool.query(`
+        SELECT fp.*, 
+               p.product_name as plating_product_name,
+               p.product_code as plating_product_code,
+               a.group_id,
+               u.username as created_by_name,
+               COALESCE(qc.status, 'Pending') as quality_status,
+               qc.defect_count,
+               qc.checked_by as inspector_id,
+               inspector.username as inspector_name,
+               qc.check_date as inspection_date
+        FROM finished_products fp
+        LEFT JOIN plating p ON fp.plating_id = p.id
+        LEFT JOIN assembly_components a ON fp.assembly_id = a.id
+        LEFT JOIN users u ON fp.created_by = u.id
+        LEFT JOIN (
+            SELECT product_id, status, defect_count, checked_by, check_date
+            FROM quality_checks
+            WHERE (product_id, check_date) IN (
+                SELECT product_id, MAX(check_date)
+                FROM quality_checks
+                GROUP BY product_id
+            )
+        ) qc ON fp.id = qc.product_id
+        LEFT JOIN users inspector ON qc.checked_by = inspector.id
+        WHERE fp.id = ?
+      `, [id]);
+      
+      if (products.length === 0) {
+        return res.status(404).json({ success: false, error: 'Finished product not found' });
+      }
+      
+      const product = products[0];
+      
+      // Add calculated fields
+      product.usableCount = Math.max(0, product.quantity - (product.defect_count || 0));
+      product.qualityStatus = product.quality_status || 'Pending';
+      product.displayStatus = product.quality_status === 'OK' ? 'OK' : 
+                             product.quality_status === 'NG' ? 'NG' : 'Chờ kiểm tra';
+      
+      // Now, enrich the product with complete production history
+      
+      // 1. Get material information
+      const [materialRows] = await pool.query(`
+        SELECT m.* 
+        FROM materials m
+        JOIN loHangHoa l ON l.material_id = m.id
+        JOIN batch_groups bg ON bg.group_id = ?
+        JOIN batches b ON bg.batch_id = b.id
+        GROUP BY m.id
+        LIMIT 1
+      `, [product.group_id]);
+      
+      // 2. Get production information
+      const [productionRows] = await pool.query(`
+        SELECT l.*, 
+               m.ten_may_dap as machine_name,
+               mold.ma_khuon as mold_code,
+               u.username as created_by_username,
+               u.full_name as operator_name
+        FROM loHangHoa l
+        JOIN machines m ON l.machine_id = m.id
+        JOIN molds mold ON l.mold_id = mold.id
+        JOIN users u ON l.created_by = u.id
+        JOIN batch_groups bg ON bg.group_id = ?
+        JOIN batches b ON bg.batch_id = b.id
+        GROUP BY l.id
+        LIMIT 1
+      `, [product.group_id]);
+      
+      // 3. Get assembly information
+      const [assemblyRows] = await pool.query(`
+        SELECT ac.*, 
+               u.username as pic_name,
+               u.full_name as pic_full_name
+        FROM assembly_components ac
+        JOIN users u ON ac.pic_id = u.id
+        WHERE ac.id = ?
+      `, [product.assembly_id]);
+      
+      // 4. Get plating information
+      const [platingRows] = await pool.query(`
+        SELECT p.*,
+               DATE_FORMAT(p.plating_start_time, '%Y-%m-%d') as formatted_start_date,
+               DATE_FORMAT(p.plating_start_time, '%H:%i:%s') as formatted_start_time,
+               DATE_FORMAT(p.plating_end_time, '%Y-%m-%d') as formatted_end_date, 
+               DATE_FORMAT(p.plating_end_time, '%H:%i:%s') as formatted_end_time
+        FROM plating p
+        WHERE p.id = ?
+      `, [product.plating_id]);
+      
+      // 5. Get batch information
+      const [batchRows] = await pool.query(`
+        SELECT b.*
+        FROM batches b
+        JOIN batch_groups bg ON b.id = bg.batch_id
+        WHERE bg.group_id = ?
+      `, [product.group_id]);
+      
+      // 6. Get quality check history
+      const [qualityHistory] = await pool.query(`
+        SELECT qc.*, 
+               u.username as inspector_name, 
+               u.full_name as inspector_full_name,
+               DATE_FORMAT(qc.check_date, '%Y-%m-%d %H:%i:%s') as formatted_check_date
+        FROM quality_checks qc
+        JOIN users u ON qc.checked_by = u.id
+        WHERE qc.product_id = ?
+        ORDER BY qc.check_date DESC
+      `, [id]);
+      
+      // Combine all the data into a complete product history
+      product.history = {
+        material: materialRows.length > 0 ? materialRows[0] : null,
+        production: productionRows.length > 0 ? productionRows[0] : null,
+        assembly: assemblyRows.length > 0 ? assemblyRows[0] : null,
+        plating: platingRows.length > 0 ? platingRows[0] : null,
+        batches: batchRows,
+        quality_checks: qualityHistory
+      };
+      
+      res.json({ success: true, data: product });
+    } catch (error) {
+      console.error('Error fetching finished product:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch finished product', details: error.message });
     }
-    
-    const product = products[0];
-    
-    // Now, enrich the product with complete production history
-    
-    // 1. Get material information
-    const [materialRows] = await pool.query(`
-      SELECT m.* 
-      FROM materials m
-      JOIN loHangHoa l ON l.material_id = m.id
-      JOIN molds mold ON l.mold_id = mold.id
-      JOIN batch_groups bg ON bg.group_id = ?
-      JOIN batches b ON bg.batch_id = b.id
-      WHERE m.id = l.material_id
-      LIMIT 1
-    `, [product.group_id]);
-    
-    // 2. Get production information
-    const [productionRows] = await pool.query(`
-      SELECT l.*, 
-             m.ten_may_dap as machine_name,
-             mold.ma_khuon as mold_code,
-             u.username as operator_name
-      FROM loHangHoa l
-      JOIN machines m ON l.machine_id = m.id
-      JOIN molds mold ON l.mold_id = mold.id
-      JOIN users u ON l.created_by = u.id
-      JOIN materials mat ON l.material_id = mat.id
-      JOIN batch_groups bg ON bg.group_id = ?
-      JOIN batches b ON bg.batch_id = b.id AND b.mold_code = mold.ma_khuon
-      LIMIT 1
-    `, [product.group_id]);
-    
-    // 3. Get assembly information
-    const [assemblyRows] = await pool.query(`
-      SELECT ac.*, 
-             u.username as pic_name,
-             u.full_name as pic_full_name
-      FROM assembly_components ac
-      JOIN users u ON ac.pic_id = u.id
-      WHERE ac.id = ?
-    `, [product.assembly_id]);
-    
-    // 4. Get plating information
-    const [platingRows] = await pool.query(`
-      SELECT p.*,
-             DATE_FORMAT(p.plating_start_time, '%d/%m/%Y') as platingDate,
-             DATE_FORMAT(p.plating_start_time, '%H:%i:%s') as platingTime,
-             DATE_FORMAT(p.plating_end_time, '%d/%m/%Y') as platingEndDate,
-             DATE_FORMAT(p.plating_end_time, '%H:%i:%s') as platingEndTime
-      FROM plating p
-      WHERE p.id = ?
-    `, [product.plating_id]);
-    
-    // 5. Get batch information
-    const [batchRows] = await pool.query(`
-      SELECT b.*
-      FROM batches b
-      JOIN batch_groups bg ON b.id = bg.batch_id
-      WHERE bg.group_id = ?
-    `, [product.group_id]);
-    
-    // Combine all the data into a complete product history
-    product.history = {
-      material: materialRows.length > 0 ? materialRows[0] : null,
-      production: productionRows.length > 0 ? productionRows[0] : null,
-      assembly: assemblyRows.length > 0 ? assemblyRows[0] : null,
-      plating: platingRows.length > 0 ? platingRows[0] : null,
-      batches: batchRows
-    };
-    
-    res.json({ success: true, data: product });
-  } catch (error) {
-    console.error('Error fetching finished product:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch finished product' });
-  }
 });
 
 // Add a finished product
@@ -2406,26 +2471,115 @@ app.post('/api/finished-products', isAuthenticatedAPI, async (req, res) => {
 });
 
 // Update finished product status
+// Update the status update endpoint to handle quality checks correctly
 app.put('/api/finished-products/:id/status', isAuthenticatedAPI, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-    
-    if (!status) {
-      return res.status(400).json({ success: false, error: 'Status is required' });
+    try {
+      const { id } = req.params;
+      const { status, defect_count } = req.body;
+      
+      // Only allow OK or NG as valid status values
+      if (status !== 'OK' && status !== 'NG') {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Status must be either OK or NG' 
+        });
+      }
+      
+      // Get the current product to verify defect count doesn't exceed quantity
+      const [products] = await pool.query(
+        'SELECT * FROM finished_products WHERE id = ?',
+        [id]
+      );
+      
+      if (products.length === 0) {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+      }
+      
+      const product = products[0];
+      
+      // Set default defect count based on status
+      let finalDefectCount = 0;
+      
+      if (status === 'NG') {
+        // If status is NG and defect_count is provided, use it
+        if (defect_count !== undefined) {
+          finalDefectCount = parseInt(defect_count, 10);
+          
+          // Validate defect count
+          if (isNaN(finalDefectCount) || finalDefectCount < 0) {
+            return res.status(400).json({ 
+              success: false, 
+              error: 'Defect count must be a non-negative number' 
+            });
+          }
+          
+          if (finalDefectCount > product.quantity) {
+            return res.status(400).json({ 
+              success: false, 
+              error: 'Defect count cannot exceed total quantity' 
+            });
+          }
+        } else {
+          // If no defect_count provided but status is NG, require it
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Defect count is required when status is NG' 
+          });
+        }
+      }
+      
+      // Start transaction
+      const connection = await pool.getConnection();
+      await connection.beginTransaction();
+      
+      try {
+        // Update product status in finished_products table
+        const productStatus = status === 'NG' ? 'defective' : 'in_stock';
+        
+        await connection.query(`
+          UPDATE finished_products
+          SET status = ?, defect_count = ?
+          WHERE id = ?
+        `, [productStatus, finalDefectCount, id]);
+        
+        // Add new quality check record
+        await connection.query(`
+          INSERT INTO quality_checks 
+          (product_id, status, defect_count, checked_by, check_date, notes) 
+          VALUES (?, ?, ?, ?, NOW(), ?)
+        `, [
+          id, 
+          status, 
+          finalDefectCount, 
+          req.session.user.id, 
+          `Quality check by ${req.session.user.username}: ${status}${status === 'NG' ? ' - ' + finalDefectCount + ' defective units' : ''}`
+        ]);
+        
+        await connection.commit();
+        
+        res.json({ 
+          success: true, 
+          message: 'Product status and defect count updated successfully',
+          data: {
+            id,
+            status,
+            defect_count: finalDefectCount
+          }
+        });
+      } catch (error) {
+        await connection.rollback();
+        throw error;
+      } finally {
+        connection.release();
+      }
+    } catch (error) {
+      console.error('Error updating product status:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to update product status',
+        details: error.message 
+      });
     }
-    
-    await pool.query(`
-      UPDATE finished_products
-      SET status = ?
-      WHERE id = ?
-    `, [status, id]);
-    
-    res.json({ success: true, message: 'Product status updated successfully' });
-  } catch (error) {
-    console.error('Error updating product status:', error);
-    res.status(500).json({ success: false, error: 'Failed to update product status' });
-  }
 });
 
 // Start the server

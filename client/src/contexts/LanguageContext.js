@@ -336,6 +336,9 @@ const translations = {
     platingInfoUpdatedSuccessfully: "Plating information updated successfully",
     errorUpdatingPlatingInfo: "Error updating plating information",
 
+    // productWarehouse
+    productWarehouse: "ProductWarehouse",
+
     // For English translations
     warehouseReport: "Warehouse Inventory Report",
     dateRange: "Date Range",
@@ -751,6 +754,9 @@ const translations = {
     "Lỗi khi quét mã QR. Vui lòng thử lại.": "Lỗi khi quét mã QR. Vui lòng thử lại.",
     "đã được kiểm tra": "đã được kiểm tra",
     "Trạng thái": "Trạng thái",
+
+    // productWarehouse
+    productWarehouse: "Kho thành phẩm"
   }
 };
 
