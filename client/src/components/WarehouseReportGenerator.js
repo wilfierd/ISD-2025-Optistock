@@ -281,11 +281,13 @@ function WarehouseReportGenerator({ user }) {
     try {
       setIsExporting(true);
       
-      // Create a new workbook
+      // Create workbook
       const wb = utils.book_new();
       
-      // Create data array for the worksheet
+      // Prepare header row
       const wsData = [];
+      const headerRow = [];
+      const selectedFieldNames = [];
       
       // Add title and date range if needed
       if (printOptions.includeTitle) {
@@ -299,29 +301,28 @@ function WarehouseReportGenerator({ user }) {
       }
       
       // Add headers
-      const headers = [];
       selectedFields.forEach(field => {
         switch(field) {
-          case 'id': headers.push('ID'); break;
-          case 'product_code': headers.push('Product Code'); break;
-          case 'product_name': headers.push('Product Name'); break;
-          case 'product_type': headers.push('Product Type'); break;
-          case 'quantity': headers.push('Quantity'); break;
-          case 'status': headers.push('Status'); break;
-          case 'defect_count': headers.push('Defect Count'); break;
-          case 'completion_date': headers.push('Production Date'); break;
-          case 'inspection_date': headers.push('Inspection Date'); break;
+          case 'id': headerRow.push('ID'); selectedFieldNames.push('id'); break;
+          case 'product_code': headerRow.push('Product Code'); selectedFieldNames.push('product_code'); break;
+          case 'product_name': headerRow.push('Product Name'); selectedFieldNames.push('product_name'); break;
+          case 'product_type': headerRow.push('Product Type'); selectedFieldNames.push('product_type'); break;
+          case 'quantity': headerRow.push('Quantity'); selectedFieldNames.push('quantity'); break;
+          case 'status': headerRow.push('Status'); selectedFieldNames.push('status'); break;
+          case 'defect_count': headerRow.push('Defect Count'); selectedFieldNames.push('defect_count'); break;
+          case 'completion_date': headerRow.push('Production Date'); selectedFieldNames.push('completion_date'); break;
+          case 'inspection_date': headerRow.push('Inspection Date'); selectedFieldNames.push('inspection_date'); break;
           default: break;
         }
       });
       
-      wsData.push(headers);
+      wsData.push(headerRow);
       
       // Add data rows
       filteredAndSortedProducts.forEach((product, index) => {
         const row = [];
-        selectedFields.forEach(field => {
-          switch(field) {
+        selectedFieldNames.forEach(fieldName => {
+          switch(fieldName) {
             case 'id': 
               row.push(product.id || `00${index + 1}`);
               break;
@@ -364,8 +365,12 @@ function WarehouseReportGenerator({ user }) {
       const excelBuffer = write(wb, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       
+      // Ensure filename is not longer than 50 characters
+      const truncatedFileName = reportTitle.replace(/\s+/g, '_');
+      const limitedFileName = truncatedFileName.length > 50 ? truncatedFileName.substring(0, 50) : truncatedFileName;
+      
       // Use saveAs from file-saver
-      saveAs(blob, `${reportTitle.replace(/\s+/g, '_')}.xlsx`);
+      saveAs(blob, `${limitedFileName}.xlsx`);
       
       toast.success('Excel report exported successfully');
     } catch (error) {
@@ -515,8 +520,12 @@ function WarehouseReportGenerator({ user }) {
         }
       });      
       
+      // Ensure filename is not longer than 50 characters
+      const truncatedFileName = reportTitle.replace(/\s+/g, '_');
+      const limitedFileName = truncatedFileName.length > 50 ? truncatedFileName.substring(0, 50) : truncatedFileName;
+      
       // Save the PDF
-      doc.save(`${reportTitle.replace(/\s+/g, '_')}.pdf`);
+      doc.save(`${limitedFileName}.pdf`);
       
       toast.success('PDF report exported successfully');
     } catch (error) {
@@ -674,8 +683,21 @@ function WarehouseReportGenerator({ user }) {
   };
 
   // Field Selection Component
-  // Updated FieldSelector Component
-const FieldSelector = () => {
+  const FieldSelector = React.memo(() => {
+    // Use local state for template name to prevent parent re-renders
+    const [localTemplateName, setLocalTemplateName] = useState(templateName);
+    
+    // Only update parent state when focus is lost
+    const handleTemplateNameChange = (e) => {
+      setLocalTemplateName(e.target.value);
+    };
+    
+    // Update parent state when needed
+    const handleTemplateSave = () => {
+      setTemplateName(localTemplateName);
+      saveAsTemplate();
+    };
+    
     return (
       <div className="modal-overlay">
         <div className="modal-container">
@@ -738,14 +760,15 @@ const FieldSelector = () => {
                 <input
                   type="text"
                   placeholder="Enter template name..."
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
+                  value={localTemplateName}
+                  onChange={handleTemplateNameChange}
                   className="template-name-input"
+                  onBlur={() => setTemplateName(localTemplateName)}
                 />
                 <button 
                   className="toolbar-btn save-template-btn"
-                  onClick={saveAsTemplate}
-                  disabled={isSaving || !templateName.trim()}
+                  onClick={handleTemplateSave}
+                  disabled={isSaving || !localTemplateName.trim()}
                 >
                   {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
                   {isSaving ? ' Saving...' : ' Save Template'}
@@ -841,7 +864,7 @@ const FieldSelector = () => {
         </div>
       </div>
     );
-  };
+  });
 
   // Report Preview Component
   const ReportPreview = () => {
@@ -994,6 +1017,12 @@ const FieldSelector = () => {
     );
   };
 
+  // Add validation for report title length when it's changed
+  const handleReportTitleChange = (e) => {
+    // Limit report title to 50 characters
+    setReportTitle(e.target.value.substring(0, 50));
+  };
+
   return (
     <div className="warehouse-report-generator">
       <Navbar user={user} onLogout={handleLogout} />
@@ -1014,15 +1043,17 @@ const FieldSelector = () => {
                   className="form-control"
                   id="reportTitle"
                   value={reportTitle}
-                  onChange={(e) => setReportTitle(e.target.value)}
+                  onChange={handleReportTitleChange}
+                  maxLength={50}
                 />
-                <div className="input-group-append">
+                <div className="input-group-append d-flex">
                   <span className="input-group-text">
                     <i className="fas fa-info-circle me-1"></i>
                     Selected fields: <span className="ms-1 badge bg-primary">{selectedFields.length}</span>
                   </span>
                 </div>
               </div>
+              <small className="text-muted d-block mt-1">Report title length: {reportTitle.length}/50</small>
             </div>
 
             <div className="time-period-section">

@@ -454,8 +454,11 @@ function ReportFieldSelection({ user }) {
         }
       });
       
+      // Ensure filename is not longer than 50 characters
+      const truncatedFileName = fileName.length > 50 ? fileName.substring(0, 50) : fileName;
+      
       // Save PDF
-      pdf.save(`${fileName}.pdf`);
+      pdf.save(`${truncatedFileName}.pdf`);
       
       toast.success(t('pdfExportSuccess'));
     } catch (error) {
@@ -490,12 +493,15 @@ function ReportFieldSelection({ user }) {
       // Combine header and data
       const csvData = [csvHeader, ...csvRows].join('\n');
       
+      // Ensure filename is not longer than 50 characters
+      const truncatedFileName = fileName.length > 50 ? fileName.substring(0, 50) : fileName;
+      
       // Create download link
       const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.setAttribute('href', url);
-      link.setAttribute('download', `${fileName}.csv`);
+      link.setAttribute('download', `${truncatedFileName}.csv`);
       document.body.appendChild(link);
       
       // Trigger download
@@ -708,11 +714,12 @@ function ReportFieldSelection({ user }) {
                     className="form-control"
                     id="fileName"
                     value={fileName}
-                    onChange={(e) => setFileName(e.target.value)}
+                    onChange={(e) => setFileName(e.target.value.substring(0, 50))}
                     placeholder={t('enterFileName')}
+                    maxLength={50}
                   />
                   <div className="form-text">
-                    {t('fileNameHint')}
+                    {t('fileNameHint')} {fileName.length}/50
                   </div>
                 </div>
                 

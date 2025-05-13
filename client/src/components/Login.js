@@ -1,5 +1,5 @@
 // client/src/components/Login.js
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLogin } from '../hooks/useAuth';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -8,6 +8,9 @@ function Login() {
   const [password, setPassword] = useState('');
   const { login, isLoading, error, setError } = useLogin();
   const { language, toggleLanguage, t } = useLanguage();
+  const [showTooltip, setShowTooltip] = useState(false);
+  const timerRef = useRef(null);
+  const hoverRef = useRef(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -22,6 +25,34 @@ function Login() {
       password 
     });
   };
+
+  const handleMouseEnter = () => {
+    hoverRef.current = true;
+    // Don't set a new timer if one is already running
+    if (!timerRef.current) {
+      timerRef.current = setTimeout(() => {
+        if (hoverRef.current) { // Only show tooltip if still hovering
+          setShowTooltip(true);
+        }
+      }, 4000);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    hoverRef.current = false;
+    clearTimeout(timerRef.current);
+    timerRef.current = null;
+    setShowTooltip(false);
+  };
+
+  // Clean up timer on component unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="d-flex align-items-center justify-content-center" style={{ height: '100vh', backgroundColor: '#f5f5f5' }}>
@@ -38,7 +69,36 @@ function Login() {
         </div>
         
         <div className="login-header text-center mb-4">
-          <h2 style={{ color: '#0a4d8c' }}>{t('inventoryManagement')}</h2>
+          <div style={{ position: 'relative' }}>
+            <h2 
+              style={{ color: '#0a4d8c', display: 'inline-block', cursor: 'default' }}
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+            >
+              {t('inventoryManagement')}
+              <div 
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: '#333',
+                  color: 'white',
+                  padding: '8px 12px',
+                  borderRadius: '4px',
+                  zIndex: 1000,
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                  opacity: showTooltip ? 1 : 0,
+                  visibility: showTooltip ? 'visible' : 'hidden',
+                  transition: 'opacity 0.3s, visibility 0.3s',
+                  pointerEvents: 'none'
+                }}
+              >
+                Welcome to máng lợn Opistock
+              </div>
+            </h2>
+          </div>
           <p>{t('loginCredentials')}</p>
         </div>
         

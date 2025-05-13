@@ -185,7 +185,7 @@ const translations = {
     "Are you sure you want to delete this user?": "Are you sure you want to delete this user?",
 
     // Login
-    inventoryManagement: "Inventory Management",
+    inventoryManagement: "Optistock",
     loginCredentials: "Enter your credentials to access the system",
     loggingIn: "Logging in...",
     login: "Login",
@@ -716,7 +716,7 @@ const translations = {
     "Are you sure you want to delete this user?": "Bạn có chắc chắn muốn xóa người dùng này?",
 
     // Login
-    inventoryManagement: "Quản lý kho",
+    inventoryManagement: "Optistock",
     loginCredentials: "Nhập thông tin đăng nhập để truy cập hệ thống",
     loggingIn: "Đang đăng nhập...",
     login: "Đăng nhập",
