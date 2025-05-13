@@ -99,7 +99,8 @@ const apiService = {
     getById: (id) => api.get(`/production/${id}`),
     create: (data) => api.post('/production', data),
     update: (id, data) => api.put(`/production/${id}`, data),
-    delete: (id) => api.delete(`/production/${id}`)
+    delete: (id) => api.delete(`/production/${id}`),
+    archive: (id) => axios.put(`/production/${id}/archive`),
   },
   machines: {
     getAll: () => api.get('/machines'),
@@ -130,7 +131,7 @@ const apiService = {
     getAll: () => api.get('/finished-products'),
     getById: (id) => api.get(`/finished-products/${id}`),
     create: (data) => api.post('/finished-products', data),
-    updateStatus: (id, status) => api.put(`/finished-products/${id}/status`, { status }),
+    updateStatus: (id, status, defectCount = 0) => api.put(`/finished-products/${id}/status`, { status, defect_count: defectCount }),
   },
 };
 

@@ -528,7 +528,7 @@ CREATE TABLE IF NOT EXISTS loHangHoa (
     FOREIGN KEY (mold_id) REFERENCES molds(id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
-
+ALTER TABLE loHangHoa ADD COLUMN is_hidden TINYINT(1) DEFAULT 0;
 -- Insert sample data for machines
 INSERT INTO machines (ten_may_dap) VALUES
 ('A7-45T'),
@@ -607,3 +607,45 @@ CREATE TABLE IF NOT EXISTS finished_products (
     FOREIGN KEY (group_id) REFERENCES batch_groups_counter(id),
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
+
+-- Add defect_count column to the finished_products table
+ALTER TABLE finished_products 
+ADD COLUMN defect_count INT NOT NULL DEFAULT 0;
+
+-- Add a comment to the column for documentation
+ALTER TABLE finished_products
+MODIFY COLUMN defect_count INT NOT NULL DEFAULT 0 COMMENT 'Number of defective products in this batch';
+
+-- Optional: Update existing records if needed (set defect_count based on status)
+-- This will set defect_count to quantity for all products with 'defective' status
+UPDATE finished_products 
+SET defect_count = quantity 
+WHERE status = 'defective';
+
+-- Optional: Create an index on defect_count if you plan to query by it often
+CREATE INDEX idx_finished_products_defect_count ON finished_products(defect_count);
+
+-- Optional: Add a check constraint to ensure defect_count is not greater than quantity
+-- Note: This requires MySQL 8.0.16 or higher
+ALTER TABLE finished_products
+ADD CONSTRAINT chk_defect_count_range 
+CHECK (defect_count >= 0 AND defect_count <= quantity);
+
+-- Create quality_checks table to track inspection history
+CREATE TABLE IF NOT EXISTS quality_checks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  product_id INT NOT NULL,
+  status ENUM('OK', 'NG') NOT NULL,
+  defect_count INT NOT NULL DEFAULT 0,
+  defect_type VARCHAR(100),
+  repair_recommendation TEXT,
+  checked_by INT NOT NULL,
+  check_date DATETIME NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (product_id) REFERENCES finished_products(id) ON DELETE CASCADE,
+  FOREIGN KEY (checked_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+
+-- Create index for faster retrieval by product_id
+CREATE INDEX idx_quality_checks_product ON quality_checks(product_id);

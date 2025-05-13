@@ -18,10 +18,19 @@ function WarehouseReportGenerator({ user }) {
   const navigate = useNavigate();
   const logoutMutation = useLogout();
   const tableRef = useRef(null);
+  const sortByLabel = {
+    id: 'ID',
+    product_name: 'Product Name',
+    inspection_date: 'Inspection Date'
+  };
   
   // State for report settings
   const [reportTitle, setReportTitle] = useState('Warehouse Report April 2025');
-  const [dateRange, setDateRange] = useState({
+  const [dateRangeInput, setDateRangeInput] = useState({
+    from: '01/04/2025',
+    to: '30/04/2025'
+  });
+  const [appliedDateRange, setAppliedDateRange] = useState({
     from: '01/04/2025',
     to: '30/04/2025'
   });
@@ -35,6 +44,7 @@ function WarehouseReportGenerator({ user }) {
   const [reportTemplates, setReportTemplates] = useState([]);
   const [currentTemplate, setCurrentTemplate] = useState(null);
   const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+  const [sortBy, setSortBy] = useState('id'); // Default sort by ID
   const [printOptions, setPrintOptions] = useState({
     includeHeaders: true,
     includeTitle: true,
@@ -111,6 +121,20 @@ function WarehouseReportGenerator({ user }) {
     ]);
   }, []);
 
+  // Convert a date string to Date object
+  const parseDate = (dateString) => {
+    if (!dateString) return null;
+    
+    // Handle date format: "DD/MM/YYYY"
+    if (dateString.includes('/')) {
+      const [day, month, year] = dateString.split('/');
+      return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    }
+    
+    // Handle ISO format
+    return new Date(dateString);
+  };
+
   // Handle field toggle
   const handleFieldToggle = (fieldId) => {
     setSelectedFields(prev => {
@@ -168,10 +192,13 @@ function WarehouseReportGenerator({ user }) {
         break;
     }
     
-    setDateRange({
+    const newDateRange = {
       from: `${fromDate.getDate().toString().padStart(2, '0')}/${(fromDate.getMonth() + 1).toString().padStart(2, '0')}/${fromDate.getFullYear()}`,
       to: `${toDate.getDate().toString().padStart(2, '0')}/${(toDate.getMonth() + 1).toString().padStart(2, '0')}/${toDate.getFullYear()}`
-    });
+    };
+    
+    setDateRangeInput(newDateRange);
+    setAppliedDateRange(newDateRange); // Apply date range immediately when selecting a preset timeframe
   };
 
   // Load a template
@@ -212,8 +239,13 @@ function WarehouseReportGenerator({ user }) {
 
   // Apply date range filter
   const handleApplyDateRange = () => {
+    setAppliedDateRange(dateRangeInput);
     toast.info('Date range applied');
-    // In a real implementation, you would refetch the data with the new date range
+  };
+  
+  // Handle sort change
+  const handleSortChange = (e) => {
+    setSortBy(e.target.value);
   };
 
   // Handle export to Excel
@@ -234,7 +266,7 @@ function WarehouseReportGenerator({ user }) {
       }
       
       if (printOptions.includeDateRange) {
-        wsData.push([`Date Range: ${dateRange.from} - ${dateRange.to}`]);
+        wsData.push([`Date Range: ${appliedDateRange.from} - ${appliedDateRange.to}`]);
         wsData.push([]);  // Empty row
       }
       
@@ -258,7 +290,7 @@ function WarehouseReportGenerator({ user }) {
       wsData.push(headers);
       
       // Add data rows
-      reportData.forEach((product, index) => {
+      filteredAndSortedProducts.forEach((product, index) => {
         const row = [];
         selectedFields.forEach(field => {
           switch(field) {
@@ -335,7 +367,7 @@ function WarehouseReportGenerator({ user }) {
       
       if (printOptions.includeDateRange) {
         doc.setFontSize(12);
-        doc.text(`Date Range: ${dateRange.from} - ${dateRange.to}`, 14, yPos);
+        doc.text(`Date Range: ${appliedDateRange.from} - ${appliedDateRange.to}`, 14, yPos);
         yPos += 10;
       }
       
@@ -387,7 +419,7 @@ function WarehouseReportGenerator({ user }) {
       });
       
       // Prepare data rows
-      const rows = reportData.map((product, index) => {
+      const rows = filteredAndSortedProducts.map((product, index) => {
         const row = [];
         
         selectedFieldNames.forEach(fieldName => {
@@ -487,21 +519,6 @@ function WarehouseReportGenerator({ user }) {
     setShowFieldSelector(false);
   };
 
-  // Handle sort
-  const handleSort = () => {
-    toast.info('Sorting applied');
-  };
-
-  // Handle filter
-  const handleFilter = () => {
-    toast.info('Filtering applied');
-  };
-
-  // Handle group by
-  const handleGroupBy = () => {
-    toast.info('Group by product type');
-  };
-
   // Handle print option change
   const handlePrintOptionChange = (option) => {
     setPrintOptions(prev => ({
@@ -527,6 +544,53 @@ function WarehouseReportGenerator({ user }) {
     }
   };
 
+  // Filter and sort products based on applied date range and sort option
+  const filteredAndSortedProducts = React.useMemo(() => {
+    // First filter by date range - filter by inspection date (created_at)
+    const filtered = reportData.filter(product => {
+      const inspectionDate = product.created_at ? new Date(product.created_at) : null;
+      
+      if (!inspectionDate) return true; // Include products without dates
+      
+      const fromDate = parseDate(appliedDateRange.from);
+      const toDate = parseDate(appliedDateRange.to);
+      
+      // If either date is invalid, don't filter
+      if (!fromDate || !toDate) return true;
+      
+      // Set hours to include the full day
+      fromDate.setHours(0, 0, 0, 0);
+      toDate.setHours(23, 59, 59, 999);
+      
+      return inspectionDate >= fromDate && inspectionDate <= toDate;
+    });
+    
+    // Then sort the filtered data
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'id':
+          // Sort by numeric ID if possible, otherwise alphabetical
+          const aId = parseInt(a.id);
+          const bId = parseInt(b.id);
+          if (!isNaN(aId) && !isNaN(bId)) {
+            return aId - bId;
+          }
+          return String(a.id).localeCompare(String(b.id));
+          
+        case 'product_name':
+          return (a.product_name || '').localeCompare(b.product_name || '');
+          
+        case 'inspection_date':
+          const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+          const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+          return dateB - dateA; // Newest first
+          
+        default:
+          return 0;
+      }
+    });
+  }, [reportData, appliedDateRange, sortBy]);
+  
   // Get status display
   const getStatusDisplay = (status) => {
     switch (status) {
@@ -749,8 +813,8 @@ function WarehouseReportGenerator({ user }) {
                 {printOptions.includeTitle && (
                   <div className="preview-title">{reportTitle}</div>
                 )}
-                {printOptions.includeDateRange && (
-                  <div className="preview-date">Date Range: {dateRange.from} - {dateRange.to}</div>
+                                      {printOptions.includeDateRange && (
+                  <div className="preview-date">Date Range: {appliedDateRange.from} - {appliedDateRange.to}</div>
                 )}
               </div>
               
@@ -772,7 +836,7 @@ function WarehouseReportGenerator({ user }) {
                   )}
                 </thead>
                 <tbody>
-                  {reportData.map((product, index) => (
+                  {filteredAndSortedProducts.map((product, index) => (
                     <tr key={product.id || index}>
                       <td>{index + 1}</td>
                       {selectedFields.includes('id') && <td>{product.id || `00${index + 1}`}</td>}
@@ -911,7 +975,8 @@ function WarehouseReportGenerator({ user }) {
             </div>
 
             <div className="time-period-section">
-              <h6>Time Period</h6>
+              <h6>Time Period (Filter by Inspection Date) </h6>
+            <small className="text-muted d-block mb-2">Changes will only be applied when you click the Apply button</small>
               <div className="btn-group time-period-buttons">
                 <button 
                   type="button" 
@@ -957,8 +1022,8 @@ function WarehouseReportGenerator({ user }) {
                     <input 
                       type="text" 
                       className="form-control" 
-                      value={dateRange.from}
-                      onChange={(e) => setDateRange({...dateRange, from: e.target.value})}
+                      value={dateRangeInput.from}
+                      onChange={(e) => setDateRangeInput({...dateRangeInput, from: e.target.value})}
                     />
                   </div>
                   <div className="date-range-input">
@@ -966,8 +1031,8 @@ function WarehouseReportGenerator({ user }) {
                     <input 
                       type="text" 
                       className="form-control" 
-                      value={dateRange.to}
-                      onChange={(e) => setDateRange({...dateRange, to: e.target.value})}
+                      value={dateRangeInput.to}
+                      onChange={(e) => setDateRangeInput({...dateRangeInput, to: e.target.value})}
                     />
                   </div>
                   <button className="btn btn-primary date-apply-btn" onClick={handleApplyDateRange}>
@@ -994,19 +1059,49 @@ function WarehouseReportGenerator({ user }) {
                   <i className="fas fa-file-pdf"></i> Export PDF
                 </button>
               </div>
-              
+
               <div className="toolbar">
+                <button 
+                    className="toolbar-btn"
+                    onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                >
+                    {sortByLabel[sortBy] || 'Sort by'} ▼
+                </button>
+
+                {showTemplateDropdown && (
+                    <div className="sort-dropdown-menu">
+                    <div 
+                        className="sort-dropdown-item"
+                        onClick={() => {
+                        setSortBy('id');
+                        setShowTemplateDropdown(false);
+                        }}
+                    >
+                        ID
+                    </div>
+                    <div 
+                        className="sort-dropdown-item"
+                        onClick={() => {
+                        setSortBy('product_name');
+                        setShowTemplateDropdown(false);
+                        }}
+                    >
+                        Product Name
+                    </div>
+                    <div 
+                        className="sort-dropdown-item"
+                        onClick={() => {
+                        setSortBy('inspection_date');
+                        setShowTemplateDropdown(false);
+                        }}
+                    >
+                        Inspection Date
+                    </div>
+                    </div>
+                )}
+
                 <button className="toolbar-btn" onClick={() => setShowFieldSelector(true)}>
-                  <i className="fas fa-cog"></i> Edit Fields
-                </button>
-                <button className="toolbar-btn" onClick={handleFilter}>
-                  <i className="fas fa-filter"></i> Filter
-                </button>
-                <button className="toolbar-btn" onClick={handleSort}>
-                  <i className="fas fa-sort"></i> Sort
-                </button>
-                <button className="toolbar-btn" onClick={handleGroupBy}>
-                  <i className="fas fa-object-group"></i> Group By
+                    <i className="fas fa-cog"></i> Edit Fields
                 </button>
               </div>
             </div>
@@ -1043,14 +1138,14 @@ function WarehouseReportGenerator({ user }) {
                           Error loading data: {error.message}
                         </td>
                       </tr>
-                    ) : reportData.length === 0 ? (
+                    ) : filteredAndSortedProducts.length === 0 ? (
                       <tr>
                         <td colSpan={selectedFields.length + 1} className="text-center py-3">
-                          No products found
+                          No products found in the selected date range
                         </td>
                       </tr>
                     ) : (
-                      reportData.map((product, index) => (
+                      filteredAndSortedProducts.map((product, index) => (
                         <tr key={product.id || index}>
                           <td>{index + 1}</td>
                           {selectedFields.includes('id') && <td>{product.id || `00${index + 1}`}</td>}
