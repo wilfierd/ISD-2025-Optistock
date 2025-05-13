@@ -432,27 +432,19 @@ function ProductDetail({ user }) {
                           <table className="table table-striped">
                             <tbody>
                               <tr>
-                                <th>{t('platingDate')}</th>
-                                <td>{product.history.plating.platingDate}</td>
-                              </tr>
-                              <tr>
-                                <th>{t('platingTime')}</th>
-                                <td>{product.history.plating.platingTime}</td>
-                              </tr>
-                              <tr>
                                 <th>{t('startTime')}</th>
                                 <td>{formatDateTime(product.history.plating.plating_start_time)}</td>
-                              </tr>
+
+                              </tr>                              <tr>
+                                <th>{t('endTime')}</th>
+                                <td>{formatDateTime(product.history.plating.plating_end_time)}</td>                              </tr>
                             </tbody>
                           </table>
                         </div>
                         <div className="col-md-6">
                           <table className="table table-striped">
                             <tbody>
-                              <tr>
-                                <th>{t('endTime')}</th>
-                                <td>{formatDateTime(product.history.plating.platingEndTime)}</td>
-                              </tr>
+
                               <tr>
                                 <th>{t('status')}</th>
                                 <td>{product.history.plating.status}</td>
