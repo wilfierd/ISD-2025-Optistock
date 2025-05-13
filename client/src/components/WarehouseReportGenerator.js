@@ -242,6 +242,34 @@ function WarehouseReportGenerator({ user }) {
     setAppliedDateRange(dateRangeInput);
     toast.info('Date range applied');
   };
+
+  const deleteTemplate = (templateId, event) => {
+    // Stop event propagation to prevent template selection when clicking delete
+    if (event) {
+      event.stopPropagation();
+    }
+    
+    // Confirmation before deleting
+    if (window.confirm('Are you sure you want to delete this template?')) {
+      setIsSaving(true);
+      
+      // In a real implementation, you would delete from the API
+      setTimeout(() => {
+        // Filter out the template with the given ID
+        const updatedTemplates = reportTemplates.filter(t => t.id !== templateId);
+        setReportTemplates(updatedTemplates);
+        
+        // If the current template is being deleted, reset current template
+        if (currentTemplate && currentTemplate.id === templateId) {
+          setCurrentTemplate(null);
+          setTemplateName('');
+        }
+        
+        toast.success('Template deleted successfully');
+        setIsSaving(false);
+      }, 500);
+    }
+  };
   
   // Handle sort change
   const handleSortChange = (e) => {
@@ -646,7 +674,8 @@ function WarehouseReportGenerator({ user }) {
   };
 
   // Field Selection Component
-  const FieldSelector = () => {
+  // Updated FieldSelector Component
+const FieldSelector = () => {
     return (
       <div className="modal-overlay">
         <div className="modal-container">
@@ -661,47 +690,69 @@ function WarehouseReportGenerator({ user }) {
             </button>
           </div>
           <div className="modal-body">
-            <div className="template-select">
-              <h6 className="mb-0">Report Templates:</h6>
-              <div className="template-dropdown">
+            <div className="template-section">
+              <div className="template-select">
+                <h6 className="mb-0">Report Templates:</h6>
+                <div className="template-dropdown">
+                  <button 
+                    className="template-dropdown-btn"
+                    onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                  >
+                    <span>{currentTemplate ? currentTemplate.name : 'Select a template'}</span>
+                    <i className={`fas fa-chevron-${showTemplateDropdown ? 'up' : 'down'}`}></i>
+                  </button>
+                  
+                  {showTemplateDropdown && (
+                    <div className="template-dropdown-menu">
+                      {reportTemplates.length > 0 ? (
+                        reportTemplates.map(template => (
+                          <div 
+                            key={template.id} 
+                            className="template-dropdown-item"
+                          >
+                            <div 
+                              className="template-name"
+                              onClick={() => loadTemplate(template.id)}
+                            >
+                              {template.name}
+                            </div>
+                            <button 
+                              className="template-delete-btn"
+                              onClick={(e) => deleteTemplate(template.id, e)}
+                              disabled={isSaving}
+                              title="Delete template"
+                            >
+                              <i className="fas fa-trash-alt"></i>
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="template-dropdown-item template-empty">No templates available</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+  
+              <div className="template-save">
+                <input
+                  type="text"
+                  placeholder="Enter template name..."
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  className="template-name-input"
+                />
                 <button 
-                  className="template-dropdown-btn"
-                  onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                  className="toolbar-btn save-template-btn"
+                  onClick={saveAsTemplate}
+                  disabled={isSaving || !templateName.trim()}
                 >
-                  {currentTemplate ? currentTemplate.name : 'Select a template'}
+                  {isSaving ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
+                  {isSaving ? ' Saving...' : ' Save Template'}
                 </button>
-                {showTemplateDropdown && (
-                  <div className="template-dropdown-menu">
-                    {reportTemplates.map(template => (
-                      <div 
-                        key={template.id} 
-                        className="template-dropdown-item"
-                        onClick={() => loadTemplate(template.id)}
-                      >
-                        {template.name}
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
-
-            <div className="template-save">
-              <input
-                type="text"
-                placeholder="Template name..."
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-              />
-              <button 
-                className="toolbar-btn"
-                onClick={saveAsTemplate}
-                disabled={isSaving}
-              >
-                {isSaving ? 'Saving...' : 'Save as Template'}
-              </button>
-            </div>
-
+  
             <div className="recently-used">
               <h6>Recently Used</h6>
               <div className="recently-used-items">
@@ -734,7 +785,7 @@ function WarehouseReportGenerator({ user }) {
                 </div>
               </div>
             </div>
-
+  
             {fieldGroups.map((group, groupIndex) => (
               <div key={group.name} className="field-group">
                 <div className="field-group-header">
@@ -1218,3 +1269,7 @@ function WarehouseReportGenerator({ user }) {
 }
 
 export default WarehouseReportGenerator;
+
+// /* Template Management Styles for WarehouseReportGenerator.css */
+
+// /* Template Section Layout */
